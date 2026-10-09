@@ -1,42 +1,48 @@
 ---
-status: draft for review
-created: 2026-10-09
+status: current
+updated: 2026-10-09
 ---
 
 # The Library: Build Plan
 
-Small milestones, each with a concrete check that proves it works. Design details live in [architecture.md](architecture.md).
+Milestones for rebuilding Phase 1 from scratch, riskiest unknown first. Design details are in [architecture.md](architecture.md).
 
-**Blockers that need Sandip:**
-- **Before M2:** Google Cloud OAuth setup (architecture section 8, steps 1 to 5). About 10 minutes in the console.
-- **Before M1 deploy:** `aws login` (the CLI session has expired).
-- **Before M6:** confirm who owns the `sandip.dev` CloudFront distribution (architecture section 9).
+Every milestone ends with `pnpm test`, `pnpm lint` and `pnpm typecheck` green, and one commit on `main` pushed to the private repo. The first build attempt is kept, uncommitted, in `scratch/first-pass/` for reference; pieces are reused only after review.
 
-## Phase 1: Ingest + reader
+## Phase 1 (rebuild)
 
 | # | Milestone | Done when |
 |---|---|---|
-| M0 | Repo, docs, pnpm workspace, lint/format, vitest wired | `pnpm test` and `pnpm lint` pass on an empty workspace |
-| M1 | CDK app with `LibraryStateful` (table + GSIs, content bucket with lifecycle rules, web bucket, Cognito pool/client) | `cdk synth` assertion tests pass; `cdk deploy LibraryStateful` succeeds |
-| M2 | `pnpm gmail:auth` script writes refresh token to SSM | Script run once; a smoke command lists your Gmail labels using only the SSM parameter |
-| M3 | Ingest core in `packages/core`: source rules, MIME parse, sanitize, text/metadata extraction | Fixture tests: each keep-list sender type parses with correct publication, view-online and unsubscribe links; each noise type (GitHub, Substack notes, Weekly Stack, receipt) is filtered; no `<script>`, `on*`, or 1x1 pixel survives sanitization |
-| M4 | Ingest Lambda + Scheduler + SNS error alarm + `pnpm backfill --weeks 4` | Backfill count in DynamoDB matches the Gmail query count minus filtered; a second run inserts 0 (dedupe); a forced error sends the alarm email |
-| M5 | API Lambda + HTTP API + JWT authorizer, all Phase 1 routes | Integration test with a real Cognito token: list, get, rate, change state, mute; request without a token gets 401 |
-| M6 | Hosting: CloudFront behaviors on `sandip.dev`, SPA rewrite, response headers | `https://sandip.dev/thelibrary/` serves the app shell with `X-Robots-Tag: noindex`; `/thelibrary/api/issues` returns 401 without auth; the root site is unchanged |
-| M7 | Frontend: login, date-sorted list, unread/all, sender filter, issue view (sandboxed iframe), Relevant/Irrelevant, read/unread, archive, open original, sender page with mute + unsubscribe, "No new numbers." empty state | Playwright smoke at iPhone and desktop widths covers login, open, rate, archive; ratings survive reload |
-| M8 | Hardening + README (setup, deploy, rotate Gmail token, add a sender rule) | Fresh-clone deploy works by following the README alone; one week of real use with no ingest alarms |
+| R0 | **Reset and re-plan.** First pass archived; this file and `architecture.md` rewritten. | Docs describe the system as it will be built. |
+| R1 | **Workspace.** pnpm workspace (`packages/core`, `services/ingest`, `services/api`, `web`, `infra`), TypeScript 6.0, eslint, prettier, vitest, esbuild as a root devDependency, `allowBuilds` for esbuild. | Empty workspace passes test, lint, typecheck. |
+| R2 | **Hosting spike.** CDK app with `stage` context. Deploy a `TheLibrary-prod` skeleton: web bucket, app distribution, SPA function, headers policy, placeholder shell, and a temporary unauthenticated echo Lambda behind the HTTP API. `scripts/amplify-proxy.ts` (dry run by default) and `scripts/check-hosting.sh`. **With Sandip's OK**, apply the Amplify rewrite rule. | `check-hosting.sh` passes through `https://sandip.dev/thelibrary`, or a fallback from architecture section 4 is chosen and recorded there. Root site unchanged. |
+| R3 | **Core library.** `sources.ts`, parse, sanitize, extract, `processMessage`, keys, shared API types. Synthetic fixtures for every sender type and noise type. | Every fixture classified correctly; view-online and unsubscribe asserted per fixture; no script, handler, `cid:` image or pixel survives sanitizing. |
+| R4 | **Storage and ingest.** Table with all 4 GSIs, content bucket with lifecycle, ingest Lambda (Gmail over fetch, `Store`), Scheduler created disabled, errors alarm with SNS email. `TheLibrary-dev` stack. `scripts/seed-dev.ts` and `pnpm test:int` harness. | Unit tests on the ingest loop; integration on dev: seeding twice creates no duplicates, sender counters and S3 objects correct. |
+| R5 | **Gmail hookup** (needs Sandip's Google Cloud setup; does not block R6 and R7). `pnpm gmail:auth`, `pnpm gmail:check`, enable the schedule, staleness alarm, `pnpm backfill --weeks 4`. | Newsletter + filtered count equals the Gmail query count; rerun inserts 0; 5 real issues spot-checked. |
+| R6 | **API and auth.** Cognito (Essentials, managed login with branding, TOTP), JWT authorizer, router + repo, echo stub removed. Minimal web shell: sign in, callback, `/status` page. | Router unit tests; dev integration tests for every route; no token = 401 through `sandip.dev`. **Checkpoint:** Sandip signs in on prod and sees `/status`, which proves branding, TOTP, callback, audience and proxy auth together. |
+| R7 | **Reader UI.** Home (unread/all/archived, sender filter, load more, refresh now, "No new numbers."), issue view (sandboxed srcdoc, Relevant/Irrelevant toggles, read/unread, archive, open original), sender page (mute, unsubscribe link), senders index. Mock mode. | Helper unit tests; browser check in mock mode at 390px and desktop, light and dark. |
+| R8 | **Go live.** Full web deploy with generated `config.json`. | Sandip rates, archives and reopens issues on iPhone and Mac; state persists across devices; `check-hosting.sh` passes. |
+| R9 | **Hardening.** Forced-error alarm test, `reprocess` command (re-sanitize from `raw/` for issues under 30 days old), README (setup, deploy, token rotation, adding sender rules), AWS Budget on the project tag, `robots.txt` change proposed for the `sandip.dev` repo. | Fresh clone deploys from the README alone; `/status` shows ~9 runs a day; one week with no alarms. |
 
-Phase 1 ships after M8. Then collect about a week of ratings.
+## Things only Sandip can do
 
-## Phase 2: Ranking
+| When | What |
+|---|---|
+| R2 | Approve the one Amplify rewrite rule on the live `sandip.dev` app (existing rules preserved and backed up; removable with `--remove`). |
+| Before R5 | Google Cloud OAuth setup (architecture section 3 lists scope; steps in README at R5): project, Gmail API, consent screen External and **published to "In production"** (Testing mode expires tokens after 7 days), Desktop OAuth client. About 10 minutes. |
+| R4 | Confirm the SNS subscription email. |
+| R6 | First sign-in: set a password, enroll TOTP. |
+| R9 | Decide on the `robots.txt` and shared-origin note in the `sandip.dev` repo. |
+
+## Phase 2: ranking (after ~1 week of Phase 1 ratings)
 
 | # | Milestone | Done when |
 |---|---|---|
-| P2.1 | Resolve Haiku 5.5 inference-profile ID and pricing; enrichment step (Titan embed + Haiku summary/topics) with retry; backfill enrichment | Every non-filtered issue has `summary`, `topics`, `embedding`; Bedrock cost for the backfill is logged |
-| P2.2 | Ranking math in `packages/core` (Thompson-sampled sender affinity, topic centroids, recency) + rank step after ingest and after ratings | Unit tests: cold start orders keep-list senders above neutral ones; a sender with 5 Irrelevant ratings drops; same-day order is stable across calls |
-| P2.3 | `sort=rank`, reason line, yellow box on top 5, topic filter, `DIGEST#<date>` logging | UI shows ranked list with one-line reasons; digest row written once per day |
-| P2.4 | Success metric view: rolling 14-day share of digest items rated Relevant | Number visible in the app's settings/about page; target >= 60% |
+| P2.1 | Verify Haiku 5.5 price and invoke access; enrichment (Titan embedding into `EMB` item, Haiku summary + topics with thinking off), retry for un-enriched issues; enrich the backfill. | Every non-filtered issue enriched; backfill cost logged. |
+| P2.2 | Ranking math in `packages/core` + rank step after ingest and after each rating. | Cold start orders keep-list senders above neutral; 5 Irrelevant ratings drop a sender; order stable within a day. |
+| P2.3 | Rank sort, reason line, yellow box on top 5, topic filter, digest logging. | Ranked list with reasons; one digest row per day. |
+| P2.4 | Success metric: rolling 14-day share of digest items rated Relevant. | Visible in the app; target >= 60%. |
 
 ## Phase 3 (optional, later)
 
-Audio briefing per architecture section 12. Not planned in detail.
+Audio briefing, per architecture section 13.
