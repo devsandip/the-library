@@ -11,5 +11,8 @@
   },
   "dependencies": {
     "@library/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.164"
   }
 }

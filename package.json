@@ -9,12 +9,17 @@
   "scripts": {
     "test": "vitest run",
     "test:int": "vitest run --config vitest.int.config.ts",
-    "typecheck": "pnpm -r --parallel typecheck",
+    "typecheck": "pnpm -r --parallel typecheck && tsc -p scripts",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write . && eslint --fix .",
-    "cdk": "pnpm --filter @library/infra exec cdk"
+    "cdk": "pnpm --filter @library/infra exec cdk",
+    "amplify-proxy": "tsx scripts/amplify-proxy.ts",
+    "check-hosting": "bash scripts/check-hosting.sh",
+    "deploy": "pnpm --filter @library/web build && pnpm cdk deploy -c stage=prod --require-approval never"
   },
   "devDependencies": {
+    "@aws-sdk/client-amplify": "^3.1148.0",
+    "@aws-sdk/client-cloudformation": "^3.1148.0",
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.0.0",
     "esbuild": "^0.28.2",
