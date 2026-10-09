@@ -17,16 +17,22 @@
     "check-hosting": "bash scripts/check-hosting.sh",
     "deploy": "pnpm --filter @library/web build && pnpm cdk deploy -c stage=prod --require-approval never",
     "seed-dev": "tsx scripts/seed-dev.ts",
-    "create-user": "bash scripts/create-user.sh"
+    "create-user": "bash scripts/create-user.sh",
+    "gmail:auth": "tsx scripts/gmail-auth.ts",
+    "gmail:check": "tsx scripts/gmail-check.ts",
+    "backfill": "tsx scripts/backfill.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-amplify": "^3.1148.0",
     "@aws-sdk/client-cloudformation": "^3.1148.0",
     "@aws-sdk/client-dynamodb": "^3.1148.0",
+    "@aws-sdk/client-lambda": "^3.1148.0",
     "@aws-sdk/client-s3": "^3.1148.0",
+    "@aws-sdk/client-ssm": "^3.1148.0",
     "@aws-sdk/lib-dynamodb": "^3.1148.0",
     "@eslint/js": "^10.0.1",
     "@library/core": "workspace:*",
+    "@smithy/node-http-handler": "^4.12.1",
     "@types/node": "^24.0.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.12.0",

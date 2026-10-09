@@ -9,6 +9,16 @@ Milestones for rebuilding Phase 1 from scratch, riskiest unknown first. Design d
 
 Every milestone ends with `pnpm test`, `pnpm lint` and `pnpm typecheck` green, and one commit on `main` pushed to the private repo. The first build attempt is kept, uncommitted, in `scratch/first-pass/` for reference; pieces are reused only after review.
 
+## Status (2026-10-09)
+
+| Milestone | State |
+|---|---|
+| R0 to R4, R6, R7 | Done. 71 unit tests, 12 integration tests on dev. |
+| R2 | Done. Amplify rule live; every hosting check passes through `sandip.dev`. |
+| R8 | Reader deployed to https://sandip.dev/thelibrary/. Waiting on Sandip: create the login (`pnpm create-user`), sign in, try it on iPhone and Mac. |
+| R5 | Tooling ready (`gmail:auth`, `gmail:check`, `backfill`, staleness alarm). Waiting on Sandip's Google Cloud setup (README "Connect Gmail"). |
+| R9 | README done. Forced-error alarm test, `reprocess`, budget and `robots.txt` still open. |
+
 ## Phase 1 (rebuild)
 
 | # | Milestone | Done when |

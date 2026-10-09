@@ -1,5 +1,5 @@
 import { Duration, RemovalPolicy, Stack, TimeZone } from "aws-cdk-lib";
-import { Alarm, ComparisonOperator, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import { Alarm, ComparisonOperator, Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
 import type { TableV2 } from "aws-cdk-lib/aws-dynamodb";
 import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
@@ -83,6 +83,25 @@ export class Ingest extends Construct {
         treatMissingData: TreatMissingData.NOT_BREACHING,
       });
       errors.addAlarmAction(new SnsAction(props.alarmTopic));
+
+      // Staleness: no clean run in a day. Only once the schedule runs, or it would fire at once.
+      if (props.scheduleEnabled) {
+        const stale = new Alarm(this, "StaleAlarm", {
+          alarmDescription: "The Library has not completed a clean ingest run in 24 hours.",
+          metric: new Metric({
+            namespace: "TheLibrary",
+            metricName: "IngestSucceeded",
+            dimensionsMap: { Stage: props.stage },
+            statistic: "Sum",
+            period: Duration.days(1),
+          }),
+          threshold: 1,
+          evaluationPeriods: 1,
+          comparisonOperator: ComparisonOperator.LESS_THAN_THRESHOLD,
+          treatMissingData: TreatMissingData.BREACHING,
+        });
+        stale.addAlarmAction(new SnsAction(props.alarmTopic));
+      }
     }
   }
 }
