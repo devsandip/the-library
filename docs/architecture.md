@@ -98,6 +98,7 @@ One bad message is logged and counted; the run continues; the message is retried
 
 SPA function, applied to the default behavior:
 - `/thelibrary/assets/*`, `/thelibrary/config.json`, `/thelibrary/favicon.svg`: pass through.
+- `/thelibrary/about.html`, `/thelibrary/privacy.html`, `/thelibrary/terms.html`: pass through. Public static pages (no user data) that Google requires as the OAuth app's home page, privacy policy and terms before it can be published to production.
 - Any other path under `/thelibrary/`: rewrite to `/thelibrary/index.html`. No extension guessing: sender URLs use opaque IDs, but this rule means a dot in a path can never cause a 403.
 - `/` or `/thelibrary`: 301 with a **relative** `Location` (`/thelibrary/`), so a proxied request never bounces to the `cloudfront.net` domain.
 - Anything else: 404.

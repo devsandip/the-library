@@ -41,6 +41,10 @@ check "hashed asset is immutable ($asset)" '[[ -n "$asset" ]] && header "$ORIGIN
 code="$(status "$BASE/assets/nope-123.js")"
 check "missing asset is 404/403 without redirect ($code)" '[[ "$code" == 404 || "$code" == 403 ]]'
 check "config.json served" '[[ "$(status "$BASE/config.json")" == 200 ]]'
+for page in about privacy terms; do
+  check "public $page page loads without sign-in" '[[ "$(status "$BASE/$page.html")" == 200 ]] && ! curl -s "$BASE/$page.html" | grep -q "/src/main\|assets/index-"'
+done
+check "privacy page states the Gmail scope" 'curl -s "$BASE/privacy.html" | grep -q "gmail.readonly"'
 
 if [[ "$ECHO" == 1 ]]; then
   echo "API chain (echo stub)"

@@ -59,7 +59,14 @@ In the [Google Cloud console](https://console.cloud.google.com/), signed in as t
 
    Only after this do **Branding**, **Audience**, **Clients** and **Data Access** appear in the left menu.
 4. **Data Access** > **Add or remove scopes**: paste `https://www.googleapis.com/auth/gmail.readonly` under "Manually add scopes", **Add to table**, **Update**, then **Save**.
-5. **Audience** > **Publish app** (status changes from "Testing" to "In production"). Apps left in Testing get refresh tokens that expire after 7 days, which would quietly break ingest every week. Personal use does not need Google's verification: you will click through a "Google hasn't verified this app" warning once (Advanced > Go to The Library). Unverified apps are capped at 100 users, which does not matter here.
+5. **Branding**: fill in the fields Google requires before publishing, then **Save**. Leave App logo empty (uploading one forces Google's verification review).
+   - Application home page: `https://sandip.dev/thelibrary/about.html`
+   - Application privacy policy link: `https://sandip.dev/thelibrary/privacy.html`
+   - Application terms of service link: `https://sandip.dev/thelibrary/terms.html`
+   - Authorized domains: **Add domain** > `sandip.dev`
+   - Developer contact information: your Gmail
+
+   Then **Audience** > **Publish app** (status changes from "Testing" to "In production"). Apps left in Testing get refresh tokens that expire after 7 days, which would quietly break ingest every week. Personal use does not need Google's verification: you will click through a "Google hasn't verified this app" warning once (Advanced > Go to The Library). Unverified apps are capped at 100 users, which does not matter here.
 6. **Clients** > **Create client**: Application type **Desktop app**, name "The Library CLI", **Create**, then **Download JSON**.
 
 Then, on your Mac:

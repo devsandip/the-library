@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Privacy policy · The Library</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fbfaf7;
+        --fg: #1d1d1b;
+        --muted: #6b6a66;
+        --border: #e4e2dc;
+        --accent: #2f5d8a;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #121211;
+          --fg: #ecebe6;
+          --muted: #9b9a94;
+          --border: #2c2c2a;
+          --accent: #8fb8de;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          17px/1.6 -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 38rem;
+        margin: 0 auto;
+        padding: 48px 20px 64px;
+      }
+      h1,
+      h2 {
+        font-family: "Iowan Old Style", Charter, Georgia, serif;
+        line-height: 1.25;
+      }
+      h1 {
+        font-size: 2rem;
+        margin: 0 0 0.25rem;
+      }
+      h2 {
+        font-size: 1.2rem;
+        margin: 2rem 0 0.5rem;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      a {
+        color: var(--accent);
+      }
+      code {
+        font-size: 0.9em;
+        overflow-wrap: anywhere;
+      }
+      footer {
+        margin-top: 3rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Privacy policy</h1>
+      <p class="muted">The Library · effective October 9, 2026</p>
+
+      <h2>Who this covers</h2>
+      <p>
+        The Library is a private, single-user newsletter reader operated by Sandip Dev for personal
+        use. It has no other users and does not offer accounts to anyone.
+      </p>
+
+      <h2>Google data it accesses</h2>
+      <p>
+        With the owner's permission, The Library uses the Gmail API with read-only access
+        (<code>https://www.googleapis.com/auth/gmail.readonly</code>) to the owner's own Gmail
+        account. It processes only messages that match the owner's newsletter labels and senders.
+        For any other message it reads, it keeps only the sender, subject and date, so the message
+        is not fetched again. It never sends, deletes or changes email.
+      </p>
+
+      <h2>How the data is used</h2>
+      <p>
+        To show newsletters in the reader, to keep the owner's read state and Relevant/Irrelevant
+        ratings, and to rank issues for the owner. Short summaries and topic tags may be generated
+        with Amazon Bedrock inside the owner's AWS account. The data is not used for advertising and
+        is not used to train models.
+      </p>
+
+      <h2>Where it is stored and for how long</h2>
+      <p>
+        In the owner's Amazon Web Services account, in the US East (N. Virginia) region. Original
+        messages are deleted after 30 days and cleaned copies after 365 days. Extracted text,
+        ratings and metadata are kept until the owner deletes them.
+      </p>
+
+      <h2>Sharing</h2>
+      <p>
+        The data is not sold or shared. Only the owner can sign in, with a password and an
+        authenticator code. Amazon Web Services hosts the data as the infrastructure provider.
+      </p>
+
+      <h2>Google API Services User Data Policy</h2>
+      <p>
+        The Library's use and transfer of information received from Google APIs adheres to the
+        <a href="https://developers.google.com/terms/api-services-user-data-policy"
+          >Google API Services User Data Policy</a
+        >, including the Limited Use requirements.
+      </p>
+
+      <h2>Revoking access and deleting data</h2>
+      <p>
+        Access can be revoked at any time at
+        <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>,
+        which stops all new reads. The owner can delete the stored data at any time.
+      </p>
+
+      <h2>Contact</h2>
+      <p><a href="https://sandip.dev/#/contact">sandip.dev/#/contact</a></p>
+
+      <footer>
+        <a href="/thelibrary/about.html">About The Library</a> ·
+        <a href="/thelibrary/terms.html">Terms of service</a>
+      </footer>
+    </main>
+  </body>
+</html>

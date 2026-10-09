@@ -39,6 +39,14 @@ describe("prod stack: hosting", () => {
     });
   });
 
+  it("lets the public about/privacy/terms pages bypass the sign-in shell", () => {
+    for (const page of ["about", "privacy", "terms"]) {
+      t.hasResourceProperties("AWS::CloudFront::Function", {
+        FunctionCode: Match.stringLikeRegexp(`uri === "/thelibrary/${page}.html"`),
+      });
+    }
+  });
+
   it("sends the CSP and noindex on every response", () => {
     t.hasResourceProperties("AWS::CloudFront::ResponseHeadersPolicy", {
       ResponseHeadersPolicyConfig: Match.objectLike({

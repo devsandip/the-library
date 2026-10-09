@@ -28,8 +28,9 @@ import { REPO_ROOT } from "./functions.js";
 
 /**
  * Viewer-request function for the static behavior. Everything under /thelibrary/ that is not a
- * real file becomes index.html (SPA routing). Redirects use a relative Location so a request
- * proxied through sandip.dev never bounces to the cloudfront.net domain.
+ * real file becomes index.html (SPA routing). about/privacy/terms are public static pages that
+ * Google's OAuth consent screen links to; they hold no user data. Redirects use a relative
+ * Location so a request proxied through sandip.dev never bounces to the cloudfront.net domain.
  */
 const SPA_FUNCTION = `
 function handler(event) {
@@ -44,7 +45,10 @@ function handler(event) {
   if (
     uri.indexOf("${BASE_PATH}/assets/") === 0 ||
     uri === "${BASE_PATH}/config.json" ||
-    uri === "${BASE_PATH}/favicon.svg"
+    uri === "${BASE_PATH}/favicon.svg" ||
+    uri === "${BASE_PATH}/about.html" ||
+    uri === "${BASE_PATH}/privacy.html" ||
+    uri === "${BASE_PATH}/terms.html"
   ) {
     return request;
   }
