@@ -1,0 +1,22 @@
+{
+  "name": "@library/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5173 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5173 --strictPort",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "preact": "^11.0.1",
+    "preact-iso": "^2.12.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@library/core": "workspace:*",
+    "@preact/preset-vite": "^2.10.6",
+    "vite": "^8.3.4"
+  }
+}

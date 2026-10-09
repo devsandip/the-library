@@ -1,0 +1,8 @@
+packages:
+  - packages/*
+  - services/*
+  - infra
+  - web
+
+allowBuilds:
+  esbuild: true

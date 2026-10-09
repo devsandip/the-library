@@ -1,0 +1,7 @@
+pnpm-lock.yaml
+scratch
+**/cdk.out
+**/dist
+**/fixtures/**
+# Prose docs are formatted by hand
+*.md
