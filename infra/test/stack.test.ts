@@ -69,3 +69,73 @@ describe("dev stack", () => {
     synth("dev").resourceCountIs("AWS::CloudFront::Distribution", 0);
   });
 });
+
+describe("data and ingest", () => {
+  it("prod: table with 4 GSIs, PITR and deletion protection, retained", () => {
+    const t = synth("prod");
+    t.hasResource("AWS::DynamoDB::GlobalTable", {
+      DeletionPolicy: "Retain",
+      Properties: Match.objectLike({
+        GlobalSecondaryIndexes: Match.arrayWith([
+          Match.objectLike({ IndexName: "gsi1" }),
+          Match.objectLike({ IndexName: "gsi2" }),
+          Match.objectLike({ IndexName: "gsi3" }),
+          Match.objectLike({ IndexName: "gsi4" }),
+        ]),
+        Replicas: [
+          Match.objectLike({
+            DeletionProtectionEnabled: true,
+            PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true },
+          }),
+        ],
+      }),
+    });
+  });
+
+  it("dev: table is disposable", () => {
+    synth("dev").hasResource("AWS::DynamoDB::GlobalTable", { DeletionPolicy: "Delete" });
+  });
+
+  it("content bucket expires raw/ after 30 days and html/ after 365", () => {
+    synth("prod").hasResourceProperties("AWS::S3::Bucket", {
+      LifecycleConfiguration: {
+        Rules: Match.arrayWith([
+          Match.objectLike({ Prefix: "raw/", ExpirationInDays: 30 }),
+          Match.objectLike({ Prefix: "html/", ExpirationInDays: 365 }),
+        ]),
+      },
+    });
+  });
+
+  it("ingest never retries async invokes and runs one at a time", () => {
+    const t = synth("prod");
+    t.hasResourceProperties("AWS::Lambda::EventInvokeConfig", { MaximumRetryAttempts: 0 });
+    t.hasResourceProperties("AWS::Lambda::Function", {
+      Timeout: 600,
+      ReservedConcurrentExecutions: 1,
+    });
+  });
+
+  it("prod schedule: every 2h 06-22 IST, no retries, created disabled", () => {
+    synth("prod").hasResourceProperties("AWS::Scheduler::Schedule", {
+      ScheduleExpression: "cron(0 6-22/2 * * ? *)",
+      ScheduleExpressionTimezone: "Asia/Kolkata",
+      State: "DISABLED",
+      Target: Match.objectLike({ RetryPolicy: Match.objectLike({ MaximumRetryAttempts: 0 }) }),
+    });
+  });
+
+  it("dev has no schedule and no alarms", () => {
+    const t = synth("dev");
+    t.resourceCountIs("AWS::Scheduler::Schedule", 0);
+    t.resourceCountIs("AWS::CloudWatch::Alarm", 0);
+  });
+
+  it("prod alarms on any ingest error", () => {
+    synth("prod").hasResourceProperties("AWS::CloudWatch::Alarm", {
+      MetricName: "Errors",
+      Threshold: 1,
+      Period: 21600,
+    });
+  });
+});

@@ -16,7 +16,8 @@ export class Api extends Construct {
   constructor(scope: Construct, id: string, props: ApiProps) {
     super(scope, id);
 
-    this.httpApi = new HttpApi(this, "HttpApi", {
+    // "Http": the first API (construct "HttpApi") never got a DNS record from AWS; replaced on 2026-10-09.
+    this.httpApi = new HttpApi(this, "Http", {
       apiName: `thelibrary-${props.stage}`,
       createDefaultStage: false,
     });

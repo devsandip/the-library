@@ -12,7 +12,10 @@ new LibraryStack(app, `TheLibrary-${stage}`, {
   stage,
   env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: REGION },
   description: `The Library newsletter reader (${stage})`,
+  // Stack-level tags (explicitStackTags is on); the dev tooling's safety guard checks "stage".
+  tags: { project: "thelibrary", stage },
 });
 
+// Resource-level tags, for cost allocation.
 Tags.of(app).add("project", "thelibrary");
 Tags.of(app).add("stage", stage);
