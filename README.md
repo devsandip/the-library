@@ -41,7 +41,7 @@ These steps were done once in October 2026; they are here for a rebuild or a new
 
 1. **Deploy.** `AWS_PROFILE=admin pnpm deploy`. Confirm the "AWS Notification - Subscription Confirmation" email so alarms reach you.
 2. **Expose it on sandip.dev.** `AWS_PROFILE=admin pnpm amplify-proxy` shows the change; add `--apply` to make it. It only touches the `/thelibrary/<*>` rule and backs up the rest to `scratch/`.
-3. **Create your login.** `AWS_PROFILE=admin pnpm create-user`. Cognito emails a temporary password; sign in at https://sandip.dev/thelibrary/, choose a password, and scan the QR code with an authenticator app.
+3. **Create your login.** `AWS_PROFILE=admin pnpm create-user`. Cognito emails a temporary password; sign in at https://sandip.dev/thelibrary/, choose a password, and scan the QR code with an authenticator app. The app is single-user (every account has full control), so the script refuses to create a second account; rerun it to resend your own unused invite.
 4. **Connect Gmail** (below).
 5. **Backfill and turn on the schedule** (below).
 
