@@ -32,6 +32,7 @@ import type {
   ReaderState,
   SenderDetailResponse,
   SenderListItem,
+  SenderPatch,
   StatusResponse,
   View,
 } from "@library/core/types";
@@ -64,7 +65,7 @@ export function toSender(s: Item): SenderListItem {
     senderKey: s.senderKey as string,
     publication: s.publication as string,
     muted: Boolean(s.muted),
-    onKeepList: Boolean(s.onKeepList),
+    mustRead: Boolean(s.mustRead),
     up: (s.up as number | undefined) ?? 0,
     down: (s.down as number | undefined) ?? 0,
     issueCount: (s.issueCount as number | undefined) ?? 0,
@@ -126,6 +127,33 @@ function inFilter(attr: string, prefix: string, values: string[], negate = false
   return { expr, names, values: vals };
 }
 
+/** Unread cursors: which stream (1 Must Read, 2 everything else), plus that stream's cursor. */
+function encodePhase(phase: 1 | 2, cursor?: string): string {
+  return Buffer.from(JSON.stringify(cursor ? { p: phase, c: cursor } : { p: phase })).toString(
+    "base64url",
+  );
+}
+
+function decodePhase(cursor: string | undefined): { phase: 1 | 2; cursor?: string } {
+  if (cursor === undefined) return { phase: 1 };
+  let v: unknown;
+  try {
+    v = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+  } catch {
+    throw badRequest("bad cursor");
+  }
+  const o = v as { p?: unknown; c?: unknown } | null;
+  if (
+    typeof o !== "object" ||
+    o === null ||
+    (o.p !== 1 && o.p !== 2) ||
+    (o.c !== undefined && typeof o.c !== "string")
+  ) {
+    throw badRequest("bad cursor");
+  }
+  return { phase: o.p, cursor: o.c as string | undefined };
+}
+
 export class DynamoRepo implements RepoPort {
   private readonly ddb: DynamoDBDocumentClient;
   private readonly s3: S3Client;
@@ -151,7 +179,18 @@ export class DynamoRepo implements RepoPort {
 
   // ---------- issues ----------
 
-  private async viewQuery(view: View, senderId?: string): Promise<IndexQuery> {
+  private unreadQuery(filter?: IndexQuery["filter"]): IndexQuery {
+    return {
+      index: INDEX.unread,
+      pkAttr: "gsi2pk",
+      skAttr: "gsi2sk",
+      pkValue: PARTITION.unread,
+      filter,
+    };
+  }
+
+  /** One view as one index stream. Muted senders are hidden everywhere but Archived. */
+  private viewQuery(view: View, muted: string[], senderId?: string): IndexQuery {
     if (senderId) {
       return {
         index: INDEX.bySender,
@@ -163,7 +202,7 @@ export class DynamoRepo implements RepoPort {
     }
     const q: IndexQuery =
       view === "unread"
-        ? { index: INDEX.unread, pkAttr: "gsi2pk", skAttr: "gsi2sk", pkValue: PARTITION.unread }
+        ? this.unreadQuery()
         : {
             index: INDEX.list,
             pkAttr: "gsi1pk",
@@ -171,7 +210,6 @@ export class DynamoRepo implements RepoPort {
             pkValue: view === "archived" ? PARTITION.archive : PARTITION.inbox,
           };
     if (view === "archived") return q; // explicit view: show everything archived
-    const muted = (await this.listSenders()).filter((s) => s.muted).map((s) => s.senderId);
     // DynamoDB allows 100 values in IN; muting more than 100 senders is not a real scenario.
     return muted.length
       ? { ...q, filter: inFilter("senderId", "m", muted.slice(0, 100), true) }
@@ -208,19 +246,77 @@ export class DynamoRepo implements RepoPort {
     return Buffer.from(JSON.stringify(key)).toString("base64url");
   }
 
-  /**
-   * Newest first. Filters (muted senders, states) apply after DynamoDB's Limit, so keep reading
-   * until the page is full. The next cursor is the last returned item's key, so trimming never
-   * skips anything.
-   */
+  /** Issues for a view, newest first. In Unread, Must Read newsletters come first. */
   async listIssues(view: View, opts: ListOptions): Promise<IssueListResponse> {
-    const q = await this.viewQuery(view, opts.senderId);
-    let start = this.decodeCursor(opts.cursor, q);
+    const senders = await this.listSenders();
+    const muted = senders.filter((s) => s.muted).map((s) => s.senderId);
+    const starred = new Set(senders.filter((s) => s.mustRead).map((s) => s.senderId));
+    const page =
+      view === "unread" && !opts.senderId
+        ? await this.listUnread(
+            [...starred].filter((id) => !muted.includes(id)),
+            muted,
+            opts,
+          )
+        : await this.readStream(
+            this.viewQuery(view, muted, opts.senderId),
+            opts.limit,
+            opts.cursor,
+          );
+    return {
+      ...page,
+      items: page.items.map((i) => (starred.has(i.senderId) ? { ...i, mustRead: true } : i)),
+    };
+  }
+
+  /**
+   * Unread as two streams over the UNREAD index, one after the other: Must Read newsletters, then
+   * everything else. The cursor names the stream it continues and wraps that stream's cursor.
+   */
+  private async listUnread(
+    must: string[],
+    muted: string[],
+    opts: ListOptions,
+  ): Promise<IssueListResponse> {
+    const first = must.length ? this.unreadQuery(inFilter("senderId", "mr", must)) : undefined;
+    const hide = [...must, ...muted];
+    const rest = this.unreadQuery(hide.length ? inFilter("senderId", "x", hide, true) : undefined);
+    const at = decodePhase(opts.cursor);
+
+    if (at.phase === 1 && first) {
+      const page = await this.readStream(first, opts.limit, at.cursor);
+      if (page.cursor) return { items: page.items, cursor: encodePhase(1, page.cursor) };
+      // Must Read is exhausted: fill the page from everything else (peek one if it is full).
+      const room = opts.limit - page.items.length;
+      const next = await this.readStream(rest, Math.max(room, 1), undefined);
+      if (room === 0) {
+        return { items: page.items, cursor: next.items.length ? encodePhase(2) : undefined };
+      }
+      return {
+        items: [...page.items, ...next.items],
+        cursor: next.cursor ? encodePhase(2, next.cursor) : undefined,
+      };
+    }
+    const page = await this.readStream(rest, opts.limit, at.phase === 2 ? at.cursor : undefined);
+    return { items: page.items, cursor: page.cursor ? encodePhase(2, page.cursor) : undefined };
+  }
+
+  /**
+   * One index stream, newest first. Filters (muted senders, states) apply after DynamoDB's Limit,
+   * so keep reading until the page is full. The next cursor is the last returned item's key, so
+   * trimming never skips anything.
+   */
+  private async readStream(
+    q: IndexQuery,
+    limit: number,
+    cursor: string | undefined,
+  ): Promise<IssueListResponse> {
+    let start = this.decodeCursor(cursor, q);
     const items: Item[] = [];
     let exhausted = false;
 
-    for (let round = 0; round < 10 && items.length <= opts.limit; round++) {
-      const need = opts.limit + 1 - items.length;
+    for (let round = 0; round < 10 && items.length <= limit; round++) {
+      const need = limit + 1 - items.length;
       const res: QueryCommandOutput = await this.query({
         IndexName: q.index,
         KeyConditionExpression: "#pk = :pk",
@@ -239,14 +335,14 @@ export class DynamoRepo implements RepoPort {
       start = res.LastEvaluatedKey;
     }
 
-    if (items.length > opts.limit) {
-      const page = items.slice(0, opts.limit);
+    if (items.length > limit) {
+      const page = items.slice(0, limit);
       return { items: page.map(toListItem), cursor: this.encodeCursor(page[page.length - 1]!, q) };
     }
     // Short page: either the index is exhausted, or the round cap hit; then resume where reading stopped.
-    const cursor =
+    const next =
       exhausted || !start ? undefined : Buffer.from(JSON.stringify(start)).toString("base64url");
-    return { items: items.map(toListItem), cursor };
+    return { items: items.map(toListItem), cursor: next };
   }
 
   private async mustGetIssue(id: string): Promise<Item> {
@@ -424,15 +520,17 @@ export class DynamoRepo implements RepoPort {
     };
   }
 
-  async setMuted(senderId: string, muted: boolean): Promise<SenderListItem> {
+  async updateSender(senderId: string, patch: SenderPatch): Promise<SenderListItem> {
+    const u = updateExpression({ ...patch }, []);
     try {
       const res = await this.ddb.send(
         new UpdateCommand({
           TableName: this.table,
           Key: senderItemKey(senderId),
-          UpdateExpression: "SET muted = :m",
+          UpdateExpression: u.expr,
           ConditionExpression: "attribute_exists(pk)",
-          ExpressionAttributeValues: { ":m": muted },
+          ExpressionAttributeNames: u.names,
+          ExpressionAttributeValues: u.values,
           ReturnValues: "ALL_NEW",
         }),
       );

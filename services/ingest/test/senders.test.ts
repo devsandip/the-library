@@ -39,6 +39,7 @@ describe("planSenders", () => {
     senderKey: "dan@tldrnewsletter.com",
     publication: "TLDR Fintech",
     muted: true,
+    mustRead: true,
     up: 1,
     down: 0,
     issueCount: 2,
@@ -68,7 +69,8 @@ describe("planSenders", () => {
       issueCount: 1,
       up: 1,
       down: 0,
-      muted: true, // inherited from the merged sender
+      muted: true, // both flags inherited from the merged sender
+      mustRead: true,
       lastSeenAt: at(3),
     });
     expect(plan.deletes.map((d) => d.senderId)).toEqual([legacyTldr]);
@@ -157,7 +159,7 @@ describe("planSenders", () => {
         receivedAt: at(1),
       },
     ];
-    const plan = planSenders(issues, [senderFor(issues, { muted: false })]);
+    const plan = planSenders(issues, [senderFor(issues, { muted: false, mustRead: false })]);
     expect(plan).toEqual({ rekeys: [], creates: [], updates: [], deletes: [], unchanged: 1 });
   });
 });

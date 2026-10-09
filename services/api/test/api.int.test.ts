@@ -174,6 +174,60 @@ describe("API on dev", () => {
     expect((await call<IssueListResponse>("GET", "/issues")).body.items).toHaveLength(6);
   });
 
+  it("Must Read: starred newsletters' unread issues come first, marked, across pages", async () => {
+    const PRAG = senderIdentity("pragmaticengineer@substack.com", "").senderId;
+    const CASEY = senderIdentity("casey@platformer.news", "").senderId;
+    const star = (id: string, mustRead: boolean) =>
+      call<SenderListResponse["items"][number]>("PATCH", `/senders/${id}`, { body: { mustRead } });
+    expect((await star(PRAG, true)).body).toMatchObject({ mustRead: true });
+    await star(CASEY, true);
+
+    const expected = [
+      "fx-platformer",
+      "fx-pragmatic",
+      "fx-bytebytego",
+      "fx-tldr",
+      "fx-lenny",
+      "fx-example",
+    ];
+    const unread = await call<IssueListResponse>("GET", "/issues");
+    expect(ids(unread)).toEqual(expected);
+    expect(unread.body.items.filter((i) => i.mustRead).map((i) => i.id)).toEqual([
+      "fx-platformer",
+      "fx-pragmatic",
+    ]);
+
+    // Paging crosses from Must Read into everything else with no gaps or repeats.
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    do {
+      const r = await call<IssueListResponse>("GET", "/issues", {
+        query: { limit: "2", ...(cursor ? { cursor } : {}) },
+      });
+      seen.push(...ids(r));
+      cursor = r.body.cursor;
+      pages++;
+    } while (cursor && pages < 10);
+    expect(seen).toEqual(expected);
+    expect(pages).toBe(3);
+
+    // Other views mark starred issues but keep their order.
+    const all = await call<IssueListResponse>("GET", "/issues", { query: { view: "all" } });
+    expect(ids(all)).toEqual(FIXTURE_NEWSLETTER_IDS);
+    expect(all.body.items.find((i) => i.id === "fx-pragmatic")?.mustRead).toBe(true);
+
+    // Muting wins over the star.
+    await call("PATCH", `/senders/${PRAG}`, { body: { muted: true } });
+    expect(ids(await call<IssueListResponse>("GET", "/issues"))).toEqual(
+      expected.filter((id) => id !== "fx-pragmatic"),
+    );
+
+    await call("PATCH", `/senders/${PRAG}`, { body: { muted: false, mustRead: false } });
+    await star(CASEY, false);
+    expect(ids(await call<IssueListResponse>("GET", "/issues"))).toEqual(FIXTURE_NEWSLETTER_IDS);
+  });
+
   it("serves issue detail with sanitized HTML; filtered and unknown ids are 404", async () => {
     const r = await call<IssueDetailResponse>("GET", "/issues/fx-bytebytego");
     expect(r.status).toBe(200);

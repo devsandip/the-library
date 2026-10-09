@@ -6,6 +6,7 @@ import type {
   ReaderState,
   SenderDetailResponse,
   SenderListItem,
+  SenderPatch,
   StatusResponse,
   View,
 } from "@library/core/types";
@@ -25,7 +26,7 @@ export interface RepoPort {
   logOpen(id: string): Promise<void>;
   listSenders(): Promise<SenderListItem[]>;
   getSender(senderId: string): Promise<SenderDetailResponse>;
-  setMuted(senderId: string, muted: boolean): Promise<SenderListItem>;
+  updateSender(senderId: string, patch: SenderPatch): Promise<SenderListItem>;
   status(): Promise<StatusResponse>;
 }
 

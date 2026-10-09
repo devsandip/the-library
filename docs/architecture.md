@@ -159,13 +159,13 @@ All four GSIs are defined before the first deploy because CloudFormation adds on
 | Issue | `ISSUE#<gmailMsgId>` | `META` | `senderId`, `publication`, `fromAddr`, `fromName` (kept so sender rules can be re-applied after the raw message expires), `subject`, `receivedAt`, `snippet`, `viewOnlineUrl`, `unsubscribeUrl`, `wordCount`, `readMinutes`, `state` (`unread`\|`read`\|`archived`\|`filtered`), `rating` (`1`\|`-1`), `ratedAt`, `s3Keys`, `labelIds`. Phase 2 adds `summary`, `topics`, `score`, `scoreReason`. |
 | Embedding (P2) | `ISSUE#<id>` | `EMB` | 512 float32 as binary. |
 | Event | `ISSUE#<id>` | `EVT#<iso>#<rand>` | `type` (`rating`\|`state`\|`open`), `value`, `prev`. Append-only. |
-| Sender | `SENDER#<senderId>` | `META` | `senderKey` (readable, e.g. `pragmaticengineer@substack.com`), `publication`, `addresses` (set), `muted`, `onKeepList`, `up`, `down`, `issueCount`, `lastSeenAt`, `unsubscribeUrl`. |
+| Sender | `SENDER#<senderId>` | `META` | `senderKey` (readable, e.g. `pragmaticengineer@substack.com`), `publication`, `addresses` (set), `muted`, `mustRead` (Sandip's star, seeded once from the PRD keep list), `up`, `down`, `issueCount`, `lastSeenAt`, `unsubscribeUrl`. |
 | Ingest state | `STATE` | `INGEST` | `lastRunAt`, `lastRunStats`, `lastError`. |
 | Digest (P2) | `DIGEST#<yyyy-mm-dd>` | `META` | Top-N issue IDs shown that day. |
 
 `senderId` is opaque: `s` + the first 12 hex characters of SHA-256 of the canonical sender key (alias key, or the From address lowercased with any `+tag` removed). It is URL-safe, so `@` and `/` never travel through two proxies.
 
-Sender rules live in `packages/core/src/sources.ts`. Aliases name a newsletter by address (Platformer, not "Casey Newton") and merge several addresses into one. Addresses that send several newsletters, told apart only by the From name (every TLDR edition comes from `dan@tldrnewsletter.com`), get `#<name>` appended to the key, so each edition is its own sender. After changing the rules, `pnpm rebuild-senders` re-keys stored issues and recomputes every sender item from its issues (counts, ratings, addresses, names), keeping flags such as `muted`. It runs inside the ingest Lambda, whose concurrency of 1 keeps it from overlapping an ingest run.
+Sender rules live in `packages/core/src/sources.ts`. Aliases name a newsletter by address (Platformer, not "Casey Newton") and merge several addresses into one. Addresses that send several newsletters, told apart only by the From name (every TLDR edition comes from `dan@tldrnewsletter.com`), get `#<name>` appended to the key, so each edition is its own sender. After changing the rules, `pnpm rebuild-senders` re-keys stored issues and recomputes every sender item from its issues (counts, ratings, addresses, names), keeping the `muted` and `mustRead` flags (a split sender inherits them). It runs inside the ingest Lambda, whose concurrency of 1 keeps it from overlapping an ingest run.
 
 | Index | pk | sk | Present on | Serves |
 |---|---|---|---|---|
@@ -186,18 +186,18 @@ HTTP API, one route `ANY /thelibrary/api/{proxy+}` behind the Cognito JWT author
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/thelibrary/api/issues?view=unread\|all\|archived&sender=&cursor=&limit=` | Newest first. Home views hide muted senders. |
+| GET | `/thelibrary/api/issues?view=unread\|all\|archived&sender=&cursor=&limit=` | Newest first. Home views hide muted senders. Unread lists Must Read newsletters first; every list marks their issues `mustRead`. |
 | GET | `/thelibrary/api/issues/{id}` | Metadata + sanitized HTML (from S3). |
 | PATCH | `/thelibrary/api/issues/{id}` | `{ "state": "unread" \| "read" \| "archived" }` |
 | POST | `/thelibrary/api/issues/{id}/rating` | `{ "value": 1 \| -1 \| 0 }` (0 clears) |
 | POST | `/thelibrary/api/issues/{id}/events` | `{ "type": "open" }` (logged only) |
 | GET | `/thelibrary/api/senders` | All senders with counts, mute state, unsubscribe link. |
 | GET | `/thelibrary/api/senders/{senderId}` | Sender + its issues. |
-| PATCH | `/thelibrary/api/senders/{senderId}` | `{ "muted": true \| false }` |
+| PATCH | `/thelibrary/api/senders/{senderId}` | `{ "muted"?: true \| false, "mustRead"?: true \| false }`, at least one |
 | POST | `/thelibrary/api/ingest` | Async "refresh now". |
 | GET | `/thelibrary/api/status` | Last ingest run, counts. |
 
-**Listing:** query the view's index newest first with a `FilterExpression` excluding muted senders, and keep querying until `limit` items are collected or the index is exhausted. The cursor is built from the **last returned item's** keys (table keys + that index's keys), never from a `LastEvaluatedKey` after trimming. A malformed cursor is a 400.
+**Listing:** query the view's index newest first with a `FilterExpression` excluding muted senders, and keep querying until `limit` items are collected or the index is exhausted. The cursor is built from the **last returned item's** keys (table keys + that index's keys), never from a `LastEvaluatedKey` after trimming. A malformed cursor is a 400. Unread without a sender filter is two such streams over the `UNREAD` index, read one after the other: Must Read senders (`senderId IN (...)`), then everyone else (`NOT IN` starred and muted). Its cursor names the stream it continues and wraps that stream's cursor.
 
 **Rating:** read the current rating, then one transaction: conditional update of the issue (`rating` equals the value read, or absent), `ADD up/down` on the sender by the delta, put an event. A concurrent change from another device fails the condition and returns 409; the UI refetches.
 
@@ -254,7 +254,7 @@ Formula unchanged from v1 (see git history of this file for the derivation):
 score = 0.40 * S_sender + 0.40 * S_topic + 0.20 * R
 ```
 
-- `S_sender`: Thompson sample from Beta(prior + up, prior + down), keep list prior (3,1), others (2,2), seeded by date + sender so the order is stable within a day.
+- `S_sender`: Thompson sample from Beta(prior + up, prior + down), Must Read prior (3,1), others (2,2), seeded by date + sender so the order is stable within a day.
 - `S_topic`: cosine to a liked centroid (seeded with the five interests, `k = 5` pseudo-counts, 60-day half-life) minus 0.5 x cosine to a disliked centroid, z-scored across candidates.
 - `R`: `0.5^(age_hours / 48)`.
 - Candidates: unread issues from the last 14 days only (`gsi2sk > now-14d`).

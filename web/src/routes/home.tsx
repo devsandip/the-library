@@ -12,6 +12,16 @@ const VIEWS: { id: View; label: string }[] = [
   { id: "archived", label: "Archived" },
 ];
 
+function IssueList({ items }: { items: IssueListItem[] }) {
+  return (
+    <ul class="issue-list">
+      {items.map((i) => (
+        <IssueRow key={i.id} issue={i} />
+      ))}
+    </ul>
+  );
+}
+
 export function Home() {
   const { api } = useApp();
   const { query, route } = useLocation();
@@ -37,6 +47,8 @@ export function Home() {
 
   const cursor = more ? more.cursor : list.data?.cursor;
   const items = [...(list.data?.items ?? []), ...(more?.items ?? [])];
+  // Unread lists Must Read newsletters first; label the two groups.
+  const grouped = view === "unread" && !sender && items.some((i) => i.mustRead);
 
   const loadMore = async () => {
     if (!cursor) return;
@@ -118,13 +130,21 @@ export function Home() {
           )}
         </div>
       )}
-      {items.length > 0 && (
-        <ul class="issue-list">
-          {items.map((i) => (
-            <IssueRow key={i.id} issue={i} />
-          ))}
-        </ul>
-      )}
+      {items.length > 0 &&
+        (grouped ? (
+          <>
+            <h2 class="list-heading">Must Read</h2>
+            <IssueList items={items.filter((i) => i.mustRead)} />
+            {items.some((i) => !i.mustRead) && (
+              <>
+                <h2 class="list-heading">Everything else</h2>
+                <IssueList items={items.filter((i) => !i.mustRead)} />
+              </>
+            )}
+          </>
+        ) : (
+          <IssueList items={items} />
+        ))}
       {cursor && list.status === "ok" && (
         <p class="load-more">
           <button type="button" onClick={loadMore} disabled={more?.loading}>

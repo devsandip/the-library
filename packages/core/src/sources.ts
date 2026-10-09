@@ -129,25 +129,6 @@ const slug = (s: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-/** Keep list from the PRD. Matched against the From display name and address. */
-const KEEP_LIST: RegExp[] = [
-  /\bthe ken\b/i,
-  /platformer/i,
-  /system design/i,
-  /neo kim/i,
-  /algomaster/i,
-  /bytebytego/i,
-  /pragmatic ?engineer/i,
-  /lenny/i,
-  /product talk|teresa torres/i,
-  /itamar gilad/i,
-  /lewis c\.? lin/i,
-  /business insider/i,
-  /\btldr\b/i,
-  /economist/i,
-  /washington ?post/i,
-];
-
 /**
  * senderKey is readable (alias key, or the address without any +tag, plus "#<name>" for addresses
  * split by From name). senderId is an opaque, URL-safe hash of it, so "@" and "/" never travel
@@ -162,10 +143,7 @@ export function senderIdentity(fromAddr: string, fromName: string) {
   const senderKey = split ? `${base}#${slug(name) || name.toLowerCase()}` : base;
   const senderId = `s${createHash("sha256").update(senderKey).digest("hex").slice(0, 12)}`;
   const publication = alias?.publication ?? (name || addr.split("@")[0] || addr);
-  const onKeepList = KEEP_LIST.some(
-    (re) => re.test(fromName) || re.test(addr) || re.test(publication),
-  );
-  return { senderId, senderKey, publication, onKeepList };
+  return { senderId, senderKey, publication };
 }
 
 /**

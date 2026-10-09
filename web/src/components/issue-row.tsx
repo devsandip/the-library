@@ -1,7 +1,7 @@
 import type { IssueListItem } from "@library/core/types";
 import { BASE } from "../config.js";
 import { relativeTime } from "../format.js";
-import { ThumbDown, ThumbUp } from "./icons.js";
+import { StarIcon, ThumbDown, ThumbUp } from "./icons.js";
 
 export function IssueRow({
   issue,
@@ -19,6 +19,11 @@ export function IssueRow({
           <span class="publication">
             {unread && <span class="dot" aria-label="Unread" />}
             {issue.publication}
+            {issue.mustRead && (
+              <span class="star" title="Must Read" aria-label="Must Read">
+                <StarIcon filled />
+              </span>
+            )}
           </span>
         )}
         <span class="subject">{issue.subject}</span>

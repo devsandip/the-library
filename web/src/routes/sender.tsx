@@ -1,7 +1,9 @@
 import { useState } from "preact/hooks";
 import { useRoute } from "preact-iso";
+import type { SenderPatch } from "@library/core/types";
 import { BASE } from "../config.js";
 import { useApp } from "../context.js";
+import { StarIcon } from "../components/icons.js";
 import { IssueRow } from "../components/issue-row.js";
 import { useAsync } from "../hooks.js";
 
@@ -13,14 +15,14 @@ export function Sender() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
 
-  const toggleMute = async () => {
+  const update = async (patch: SenderPatch) => {
     const before = sender.data;
     if (!before) return;
-    sender.set({ ...before, muted: !before.muted });
+    sender.set({ ...before, ...patch });
     setSaving(true);
     setError(undefined);
     try {
-      await api.setMuted(senderId, !before.muted);
+      await api.updateSender(senderId, patch);
     } catch (err) {
       sender.set(before);
       setError((err as Error).message);
@@ -51,12 +53,26 @@ export function Sender() {
       <p class="muted">
         {s.issueCount} {s.issueCount === 1 ? "issue" : "issues"} · {s.up} Relevant · {s.down}{" "}
         Irrelevant
-        {s.onKeepList && " · on your reading list"}
       </p>
       <p class="muted small">{s.addresses.join(", ")}</p>
 
       <div class="sender-actions">
-        <button type="button" onClick={toggleMute} disabled={saving} aria-pressed={s.muted}>
+        <button
+          type="button"
+          class={`star-toggle${s.mustRead ? " on" : ""}`}
+          onClick={() => update({ mustRead: !s.mustRead })}
+          disabled={saving}
+          aria-pressed={s.mustRead}
+        >
+          <StarIcon filled={s.mustRead} />
+          Must Read
+        </button>
+        <button
+          type="button"
+          onClick={() => update({ muted: !s.muted })}
+          disabled={saving}
+          aria-pressed={s.muted}
+        >
           {s.muted ? "Unmute" : "Mute sender"}
         </button>
         {s.unsubscribeUrl && (
@@ -65,6 +81,9 @@ export function Sender() {
           </a>
         )}
       </div>
+      {s.mustRead && !s.muted && (
+        <p class="muted small">Must Read: its unread issues come first on Home.</p>
+      )}
       {s.muted && (
         <p class="muted small">Muted: new issues are kept but hidden from Unread and All.</p>
       )}

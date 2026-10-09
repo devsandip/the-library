@@ -1,4 +1,4 @@
-import type { Rating, ReaderState, View } from "@library/core/types";
+import type { Rating, ReaderState, SenderPatch, View } from "@library/core/types";
 import { badRequest, HttpError, notFound } from "./errors.js";
 import type { Services } from "./port.js";
 
@@ -108,9 +108,15 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     method: "PATCH",
     pattern: new RegExp(`^/senders/${SENDER_ID}$`),
     handler: async (svc, req, p) => {
-      const { muted } = json<{ muted?: unknown }>(req);
-      if (typeof muted !== "boolean") throw badRequest("muted must be true or false");
-      return ok(await svc.repo.setMuted(param(p, 0), muted));
+      const body = json<Record<string, unknown>>(req);
+      const patch: SenderPatch = {};
+      for (const key of ["muted", "mustRead"] as const) {
+        if (body[key] === undefined) continue;
+        if (typeof body[key] !== "boolean") throw badRequest(`${key} must be true or false`);
+        patch[key] = body[key];
+      }
+      if (!Object.keys(patch).length) throw badRequest("send muted or mustRead");
+      return ok(await svc.repo.updateSender(param(p, 0), patch));
     },
   },
   {

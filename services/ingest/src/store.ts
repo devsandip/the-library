@@ -166,16 +166,15 @@ export class Store {
                 TableName: this.table,
                 Key: senderItemKey(p.senderId),
                 UpdateExpression:
-                  "SET senderId = :sid, senderKey = :skey, onKeepList = :keep, " +
+                  "SET senderId = :sid, senderKey = :skey, " +
                   "publication = if_not_exists(publication, :pub), " +
                   "gsi1pk = if_not_exists(gsi1pk, :g1pk), gsi1sk = if_not_exists(gsi1sk, :g1sk), " +
-                  "muted = if_not_exists(muted, :false), " +
+                  "muted = if_not_exists(muted, :false), mustRead = if_not_exists(mustRead, :false), " +
                   "up = if_not_exists(up, :zero), down = if_not_exists(down, :zero) " +
                   "ADD issueCount :one, addresses :addr",
                 ExpressionAttributeValues: {
                   ":sid": p.senderId,
                   ":skey": p.senderKey,
-                  ":keep": p.onKeepList,
                   ":pub": p.publication,
                   ":g1pk": senderIndex.gsi1pk,
                   ":g1sk": senderIndex.gsi1sk,
@@ -316,7 +315,7 @@ export class Store {
           FilterExpression: "sk = :meta",
           ProjectionExpression:
             "pk, id, #st, senderId, publication, fromAddr, fromName, receivedAt, rating, " +
-            "unsubscribeUrl, senderKey, muted, onKeepList, up, down, issueCount, addresses, lastSeenAt",
+            "unsubscribeUrl, senderKey, muted, mustRead, up, down, issueCount, addresses, lastSeenAt",
           ExpressionAttributeNames: { "#st": "state" },
           ExpressionAttributeValues: { ":meta": "META" },
           ExclusiveStartKey: start,
@@ -341,7 +340,7 @@ export class Store {
             senderKey: i.senderKey as string | undefined,
             publication: i.publication as string | undefined,
             muted: i.muted as boolean | undefined,
-            onKeepList: i.onKeepList as boolean | undefined,
+            mustRead: i.mustRead as boolean | undefined,
             up: i.up as number | undefined,
             down: i.down as number | undefined,
             issueCount: i.issueCount as number | undefined,
@@ -382,6 +381,7 @@ export class Store {
               ...senderIndexAttributes(c.senderId, c.publication),
               ...senderItemFields(c),
               muted: c.muted,
+              mustRead: c.mustRead,
             },
             ConditionExpression: "attribute_not_exists(pk)",
           }),
@@ -475,13 +475,12 @@ export class Store {
   }
 }
 
-/** The attributes a rebuild sets on a sender item (flags such as muted are left alone). */
+/** The attributes a rebuild sets on a sender item (flags such as muted and mustRead are left alone). */
 function senderItemFields(s: SenderFields) {
   return {
     senderId: s.senderId,
     senderKey: s.senderKey,
     publication: s.publication,
-    onKeepList: s.onKeepList,
     issueCount: s.issueCount,
     up: s.up,
     down: s.down,

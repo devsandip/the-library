@@ -90,7 +90,7 @@ describe("Store on dev", () => {
       ].sort(),
     );
     const bbg = senders.find((s) => s.senderKey === "bytebytego@substack.com");
-    expect(bbg).toMatchObject({ muted: false, up: 0, down: 0, onKeepList: true });
+    expect(bbg).toMatchObject({ muted: false, mustRead: false, up: 0, down: 0 });
     expect(bbg?.lastSeenAt).toBe("2026-10-01T12:00:00.000Z");
     expect(bbg?.unsubscribeUrl).toContain("bytebytego.substack.com");
     expect(senders.find((s) => s.senderKey === "casey@platformer.news")?.publication).toBe(

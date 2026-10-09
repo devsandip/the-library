@@ -273,6 +273,28 @@ select {
   color: var(--muted);
 }
 
+.issue-row .star {
+  display: inline-flex;
+  color: var(--accent);
+}
+
+.issue-row .star svg {
+  width: 13px;
+  height: 13px;
+}
+
+.list-heading {
+  margin: 1.25rem 0 0;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--ui);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 .issue-row .dot {
   width: 7px;
   height: 7px;
@@ -486,6 +508,45 @@ a.button {
   border-bottom: 1px solid var(--border);
   color: inherit;
   text-decoration: none;
+}
+
+.sender-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.sender-row a {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0;
+}
+
+.star-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+}
+
+.star-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.star-button.on,
+.star-toggle.on {
+  color: var(--accent);
+}
+
+.star-toggle.on {
+  border-color: var(--accent);
 }
 
 .sender-name {

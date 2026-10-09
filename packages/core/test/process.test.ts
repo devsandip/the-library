@@ -47,7 +47,6 @@ describe("per-fixture metadata", () => {
       labels: ["INBOX"],
       senderKey: "bytebytego@substack.com",
       publication: "ByteByteGo",
-      keep: true,
       view: "https://blog.bytebytego.com/p/ep182-discord?ref=x",
       unsub: "https://bytebytego.substack.com/action/disable_email?token=abc",
     },
@@ -57,7 +56,6 @@ describe("per-fixture metadata", () => {
       labels: [f.LABEL_NEWSLETTERS],
       senderKey: "casey@platformer.news",
       publication: "Platformer",
-      keep: true,
       view: "https://www.platformer.news/ai-search",
       unsub: "https://platformer.news/unsubscribe?id=42",
     },
@@ -67,7 +65,6 @@ describe("per-fixture metadata", () => {
       labels: [f.LABEL_MECO],
       senderKey: "dan@tldrnewsletter.com#tldr-ai",
       publication: "TLDR AI",
-      keep: true,
       view: undefined,
       unsub: undefined,
     },
@@ -77,7 +74,6 @@ describe("per-fixture metadata", () => {
       labels: [],
       senderKey: "lenny@substack.com",
       publication: "Lenny's Newsletter",
-      keep: true,
       view: "https://www.lennysnewsletter.com/p/how-i-ai-specs",
       unsub: undefined,
     },
@@ -87,7 +83,6 @@ describe("per-fixture metadata", () => {
       labels: [],
       senderKey: "pragmaticengineer@substack.com",
       publication: "The Pragmatic Engineer",
-      keep: true,
       view: "https://newsletter.pragmaticengineer.com/p/stripe-apis",
       unsub: undefined,
     },
@@ -97,7 +92,6 @@ describe("per-fixture metadata", () => {
       labels: [f.LABEL_NEWSLETTERS],
       senderKey: "hello@example-weekly.test",
       publication: "Example Weekly",
-      keep: false,
       view: "https://example-weekly.test/p/42",
       unsub: "https://example-weekly.test/u/abc",
     },
@@ -107,7 +101,6 @@ describe("per-fixture metadata", () => {
     expect(p.senderId).toMatch(/^s[0-9a-f]{12}$/);
     expect(p.senderId).toBe(senderIdentity(c.senderKey, "").senderId);
     expect(p.publication).toBe(c.publication);
-    expect(p.onKeepList).toBe(c.keep);
     expect(p.viewOnlineUrl).toBe(c.view);
     expect(p.unsubscribeUrl).toBe(c.unsub);
     expect(p.receivedAt).toBe(new Date(1791700000000).toISOString());

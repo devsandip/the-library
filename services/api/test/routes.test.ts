@@ -19,7 +19,7 @@ const sender: SenderListItem = {
   senderKey: "bytebytego@substack.com",
   publication: "ByteByteGo",
   muted: false,
-  onKeepList: true,
+  mustRead: true,
   up: 0,
   down: 0,
   issueCount: 1,
@@ -35,7 +35,7 @@ function setup(overrides: Partial<RepoPort> = {}) {
     logOpen: vi.fn(async () => undefined),
     listSenders: vi.fn(async () => [sender]),
     getSender: vi.fn(async () => ({ ...sender, addresses: [], issues: [issue] })),
-    setMuted: vi.fn(async (_id, muted) => ({ ...sender, muted })),
+    updateSender: vi.fn(async (_id, patch) => ({ ...sender, ...patch })),
     status: vi.fn(async () => ({ stage: "test", lastError: null })),
     ...overrides,
   };
@@ -139,17 +139,27 @@ describe("routing and validation", () => {
     );
   });
 
-  it("senders: list, detail, mute", async () => {
+  it("senders: list, detail, mute, star", async () => {
     const { call, repo } = setup();
     expect((await call("GET", "/senders")).body.items).toHaveLength(1);
     expect((await call("GET", "/senders/s0123456789ab")).body.issues).toHaveLength(1);
     expect(
       (await call("PATCH", "/senders/s0123456789ab", { body: { muted: true } })).body.muted,
     ).toBe(true);
-    expect(repo.setMuted).toHaveBeenCalledWith("s0123456789ab", true);
-    expect((await call("PATCH", "/senders/s0123456789ab", { body: { muted: "yes" } })).status).toBe(
-      400,
-    );
+    expect(repo.updateSender).toHaveBeenCalledWith("s0123456789ab", { muted: true });
+    const starred = await call("PATCH", "/senders/s0123456789ab", { body: { mustRead: false } });
+    expect(starred.body.mustRead).toBe(false);
+    expect(repo.updateSender).toHaveBeenLastCalledWith("s0123456789ab", { mustRead: false });
+  });
+
+  it("PATCH sender validates the body", async () => {
+    const { call, repo } = setup();
+    const patch = (body: unknown) => call("PATCH", "/senders/s0123456789ab", { body });
+    expect((await patch({ muted: "yes" })).status).toBe(400);
+    expect((await patch({ mustRead: 1 })).status).toBe(400);
+    expect((await patch({})).status).toBe(400);
+    expect((await patch({ other: true })).status).toBe(400);
+    expect(repo.updateSender).not.toHaveBeenCalled();
   });
 
   it("ingest starts a run and returns 202; status returns 200", async () => {

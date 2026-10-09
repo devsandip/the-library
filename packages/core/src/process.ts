@@ -34,7 +34,6 @@ export type ProcessedMessage =
       senderId: string;
       senderKey: string;
       publication: string;
-      onKeepList: boolean;
       snippet: string;
       html: string;
       text: string;
@@ -90,7 +89,7 @@ export async function processMessage(msg: GmailMessageInput): Promise<ProcessedM
   const html = sanitizeNewsletterHtml(rawHtml);
   const text = htmlToCleanText(html);
   const words = wordCount(text);
-  const { senderId, senderKey, publication, onKeepList } = senderIdentity(fromAddr, fromName);
+  const { senderId, senderKey, publication } = senderIdentity(fromAddr, fromName);
 
   // Find links in the original HTML (sanitizing rewrites them), then clean the view-online one.
   const viewOnlineRaw = findViewOnlineUrl(links, { substack: fromAddr.endsWith("@substack.com") });
@@ -108,7 +107,6 @@ export async function processMessage(msg: GmailMessageInput): Promise<ProcessedM
     senderId,
     senderKey,
     publication,
-    onKeepList,
     snippet,
     html,
     text,

@@ -2,7 +2,7 @@
  * Rebuild sender items from the issues they own (`pnpm rebuild-senders`). Run after changing the
  * sender rules in packages/core/src/sources.ts: issues whose sender or publication changed are
  * re-keyed, and every sender item is recomputed from its issues, so counts, ratings, addresses
- * and names match what is stored. Flags (muted) are kept; a sender created by a split inherits
+ * and names match what is stored. Flags (muted, mustRead) are kept; a sender created by a split inherits
  * them from the sender its issues came from.
  */
 import { senderIdentity } from "@library/core";
@@ -26,7 +26,7 @@ export interface StoredSender {
   senderKey?: string;
   publication?: string;
   muted?: boolean;
-  onKeepList?: boolean;
+  mustRead?: boolean;
   up?: number;
   down?: number;
   issueCount?: number;
@@ -40,7 +40,6 @@ export interface SenderFields {
   senderId: string;
   senderKey: string;
   publication: string;
-  onKeepList: boolean;
   issueCount: number;
   up: number;
   down: number;
@@ -59,7 +58,7 @@ export interface IssueRekey {
 export interface SenderPlan {
   rekeys: IssueRekey[];
   /** New sender items, with flags inherited from the senders their issues came from. */
-  creates: (SenderFields & { muted: boolean })[];
+  creates: (SenderFields & { muted: boolean; mustRead: boolean })[];
   /** Existing sender items whose computed fields changed; `current` is what was read. */
   updates: { next: SenderFields; current: StoredSender }[];
   /** Sender items that no issue points at any more. */
@@ -69,10 +68,7 @@ export interface SenderPlan {
 
 export function planSenders(issues: StoredIssue[], senders: StoredSender[]): SenderPlan {
   const byId = new Map(senders.map((s) => [s.senderId, s]));
-  const groups = new Map<
-    string,
-    { issue: StoredIssue; key: string; publication: string; keep: boolean }[]
-  >();
+  const groups = new Map<string, { issue: StoredIssue; key: string; publication: string }[]>();
   const rekeys: IssueRekey[] = [];
 
   for (const issue of issues) {
@@ -86,7 +82,7 @@ export function planSenders(issues: StoredIssue[], senders: StoredSender[]): Sen
       });
     }
     const group = groups.get(id.senderId) ?? [];
-    group.push({ issue, key: id.senderKey, publication: id.publication, keep: id.onKeepList });
+    group.push({ issue, key: id.senderKey, publication: id.publication });
     groups.set(id.senderId, group);
   }
 
@@ -98,7 +94,6 @@ export function planSenders(issues: StoredIssue[], senders: StoredSender[]): Sen
       senderId,
       senderKey: latest.key,
       publication: latest.publication,
-      onKeepList: latest.keep,
       issueCount: group.length,
       up: group.filter((g) => g.issue.rating === 1).length,
       down: group.filter((g) => g.issue.rating === -1).length,
@@ -108,8 +103,12 @@ export function planSenders(issues: StoredIssue[], senders: StoredSender[]): Sen
     };
     const current = byId.get(senderId);
     if (!current) {
-      const muted = group.some((g) => byId.get(g.issue.senderId)?.muted === true);
-      plan.creates.push({ ...next, muted });
+      const from = group.map((g) => byId.get(g.issue.senderId));
+      plan.creates.push({
+        ...next,
+        muted: from.some((s) => s?.muted === true),
+        mustRead: from.some((s) => s?.mustRead === true),
+      });
     } else if (changedFields(next, current).length) {
       plan.updates.push({ next, current });
     } else {
@@ -125,7 +124,6 @@ export function changedFields(next: SenderFields, cur: StoredSender): string[] {
   const pairs: [string, unknown, unknown][] = [
     ["senderKey", next.senderKey, cur.senderKey],
     ["publication", next.publication, cur.publication],
-    ["onKeepList", next.onKeepList, Boolean(cur.onKeepList)],
     ["issueCount", next.issueCount, cur.issueCount ?? 0],
     ["up", next.up, cur.up ?? 0],
     ["down", next.down, cur.down ?? 0],

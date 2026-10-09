@@ -11,6 +11,7 @@ import type {
   SenderDetailResponse,
   SenderListItem,
   SenderListResponse,
+  SenderPatch,
   StatusResponse,
   View,
 } from "@library/core/types";
@@ -22,16 +23,16 @@ const now = Date.now();
 const senders: SenderListItem[] = [
   ["s000000000001", "bytebytego@substack.com", "ByteByteGo", true],
   ["s000000000002", "casey@platformer.news", "Platformer", true],
-  ["s000000000003", "lenny@substack.com", "Lenny's Newsletter", true],
-  ["s000000000004", "pragmaticengineer@substack.com", "The Pragmatic Engineer", true],
-  ["s000000000005", "dan@tldrnewsletter.com", "TLDR AI", true],
+  ["s000000000003", "lenny@substack.com", "Lenny's Newsletter", false],
+  ["s000000000004", "pragmaticengineer@substack.com", "The Pragmatic Engineer", false],
+  ["s000000000005", "dan@tldrnewsletter.com#tldr-ai", "TLDR AI", false],
   ["s000000000006", "hello@example-weekly.test", "Example Weekly", false],
-].map(([senderId, senderKey, publication, keep]) => ({
+].map(([senderId, senderKey, publication, mustRead]) => ({
   senderId: senderId as string,
   senderKey: senderKey as string,
   publication: publication as string,
   muted: false,
-  onKeepList: keep as boolean,
+  mustRead: mustRead as boolean,
   up: 0,
   down: 0,
   issueCount: 0,
@@ -111,16 +112,27 @@ export class MockLibraryApi implements LibraryApi {
   }): Promise<IssueListResponse> {
     await delay();
     const muted = new Set(senders.filter((s) => s.muted).map((s) => s.senderId));
-    const all = issues.filter(
+    const must = new Set(senders.filter((s) => s.mustRead).map((s) => s.senderId));
+    const matching = issues.filter(
       (i) =>
         statesFor[opts.view].includes(i.state) &&
         (opts.sender
           ? i.senderId === opts.sender
           : opts.view === "archived" || !muted.has(i.senderId)),
     );
+    // Unread lists Must Read newsletters first, like the API.
+    const all =
+      opts.view === "unread" && !opts.sender
+        ? [
+            ...matching.filter((i) => must.has(i.senderId)),
+            ...matching.filter((i) => !must.has(i.senderId)),
+          ]
+        : matching;
     const start = opts.cursor ? Number(opts.cursor) : 0;
     const limit = opts.limit ?? 30;
-    const page = all.slice(start, start + limit).map(strip);
+    const page = all
+      .slice(start, start + limit)
+      .map((i) => (must.has(i.senderId) ? { ...strip(i), mustRead: true } : strip(i)));
     return { items: page, cursor: start + limit < all.length ? String(start + limit) : undefined };
   }
   async getIssue(id: string): Promise<IssueDetailResponse> {
@@ -165,10 +177,10 @@ export class MockLibraryApi implements LibraryApi {
       issues: issues.filter((i) => i.senderId === senderId).map(strip),
     };
   }
-  async setMuted(senderId: string, muted: boolean) {
+  async updateSender(senderId: string, patch: SenderPatch) {
     await delay(80);
     const s = senders.find((x) => x.senderId === senderId)!;
-    s.muted = muted;
+    Object.assign(s, patch);
     return { ...s };
   }
   async refreshNow() {

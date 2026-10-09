@@ -81,7 +81,7 @@ beforeAll(async () => {
         senderKey: "dan@tldrnewsletter.com",
         publication: "TLDR Dev",
         muted: true,
-        onKeepList: true,
+        mustRead: true,
         up: 1,
         down: 0,
         issueCount: 2,
@@ -129,7 +129,7 @@ describe("rebuild senders on dev", () => {
     expect((await get(senderItemKey(legacyTldr)))?.issueCount).toBe(2);
   });
 
-  it("apply splits and renames senders, keeping ratings and mutes", async () => {
+  it("apply splits and renames senders, keeping ratings, mutes and stars", async () => {
     const report = await rebuildSenders(new Store(stack.tableName, stack.contentBucket), {
       apply: true,
     });
@@ -148,6 +148,7 @@ describe("rebuild senders on dev", () => {
       issueCount: 1,
       up: 1,
       muted: true,
+      mustRead: true,
     });
     expect(await get(senderItemKey(dev))).toMatchObject({
       publication: "TLDR Dev",

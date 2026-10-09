@@ -20,6 +20,8 @@ export interface IssueListItem {
   state: ReaderState;
   rating?: Rating;
   viewOnlineUrl?: string;
+  /** From a Must Read newsletter. In Unread these come first. */
+  mustRead?: boolean;
   // Phase 2
   summary?: string;
   topics?: string[];
@@ -44,7 +46,8 @@ export interface SenderListItem {
   senderKey: string;
   publication: string;
   muted: boolean;
-  onKeepList: boolean;
+  /** Starred by Sandip: its unread issues are listed first. */
+  mustRead: boolean;
   up: number;
   down: number;
   issueCount: number;
@@ -54,6 +57,12 @@ export interface SenderListItem {
 
 export interface SenderListResponse {
   items: SenderListItem[];
+}
+
+/** PATCH /senders/{id}: set either flag, or both. */
+export interface SenderPatch {
+  muted?: boolean;
+  mustRead?: boolean;
 }
 
 export interface SenderDetailResponse extends SenderListItem {

@@ -63,7 +63,7 @@ A private, single-user web reader that ingests my newsletters daily, ranks them 
   - **Topic similarity:** embedding similarity to issues I liked, minus similarity to ones I disliked
   - **Recency:** decay over a few days
   - a small **exploration** factor so low-scored senders still surface occasionally
-- Cold start: seed topic preference from the five interests above, and seed sender priors (positive for the keep list below, neutral otherwise)
+- Cold start: seed topic preference from the five interests above, and seed sender priors (positive for Must Read newsletters, neutral otherwise)
 - Ranking must be explainable in the UI in one line ("Because you liked 4 Platformer issues", "Matches: AI, startups")
 
 ### 3. Read
@@ -72,12 +72,15 @@ A private, single-user web reader that ingests my newsletters daily, ranks them 
 - Actions per issue: Relevant (thumbs up), Irrelevant (thumbs down), mark read, archive, open original
 - Filters: unread / all, by sender, by topic
 - Per-sender view with a "mute sender" action and a visible unsubscribe link
+- Must Read: I star the newsletters I never want to miss; their unread issues come first
 
 ### 4. Learn
 - Relevant/Irrelevant ratings update ranking for the next refresh; no manual weights for me to tune
 - Implicit signals (opened, time on page) can be logged but should not override explicit thumbs in v1
 
 ## Keep list (seed priors)
+
+Since 2026-10-09 this list only seeds **Must Read**: a star I put on a newsletter (sender page or Senders index). Starred newsletters' unread issues come first, and the star is the ranking prior. New senders start unstarred.
 
 The Ken, Platformer, System Design Newsletter (Neo Kim), AlgoMaster, ByteByteGo, The Pragmatic Engineer, Lenny's Newsletter, Product Talk (Teresa Torres), Itamar Gilad, Lewis C. Lin Deep Dives, Business Insider, TLDR (main / AI / Founders, once subscribed). The Economist and Washington Post are paid and may be re-enabled.
 

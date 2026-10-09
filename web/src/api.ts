@@ -7,6 +7,7 @@ import type {
   SenderDetailResponse,
   SenderListItem,
   SenderListResponse,
+  SenderPatch,
   StatusResponse,
   View,
 } from "@library/core/types";
@@ -27,7 +28,7 @@ export interface LibraryApi {
   logOpen(id: string): Promise<void>;
   listSenders(): Promise<SenderListResponse>;
   getSender(senderId: string): Promise<SenderDetailResponse>;
-  setMuted(senderId: string, muted: boolean): Promise<SenderListItem>;
+  updateSender(senderId: string, patch: SenderPatch): Promise<SenderListItem>;
   refreshNow(): Promise<void>;
   status(): Promise<StatusResponse>;
 }
@@ -102,10 +103,8 @@ export class HttpLibraryApi implements LibraryApi {
   getSender(senderId: string) {
     return this.request<SenderDetailResponse>("GET", `/senders/${encodeURIComponent(senderId)}`);
   }
-  setMuted(senderId: string, muted: boolean) {
-    return this.request<SenderListItem>("PATCH", `/senders/${encodeURIComponent(senderId)}`, {
-      muted,
-    });
+  updateSender(senderId: string, patch: SenderPatch) {
+    return this.request<SenderListItem>("PATCH", `/senders/${encodeURIComponent(senderId)}`, patch);
   }
   async refreshNow() {
     await this.request<unknown>("POST", "/ingest");
