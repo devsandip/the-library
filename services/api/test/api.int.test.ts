@@ -4,16 +4,19 @@
  * Run with `pnpm test:int`.
  */
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
+import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
-import { senderIdentity } from "@library/core";
+import { issueKey, senderIdentity, TOPICS_KEY } from "@library/core";
 import type {
   IssueDetailResponse,
   IssueListResponse,
   SenderDetailResponse,
   SenderListResponse,
   StatusResponse,
+  TopicListResponse,
 } from "@library/core/types";
 import {
+  docClient,
   devStack,
   seedDev,
   wipeDevTable,
@@ -69,6 +72,22 @@ async function eventually<T>(read: () => Promise<T>, ok: (v: T) => boolean): Pro
 }
 
 const ids = (r: { body: IssueListResponse }) => r.body.items.map((i) => i.id);
+const ddb = docClient();
+const getItem = (id: string) =>
+  ddb
+    .send(new GetCommand({ TableName: stack.tableName, Key: issueKey(id), ConsistentRead: true }))
+    .then((r) => r.Item);
+
+/** Claude's call on an issue, written the way enrichment writes it. */
+const setSorted = (id: string, shelf: string, topic: string) =>
+  ddb.send(
+    new UpdateCommand({
+      TableName: stack.tableName,
+      Key: issueKey(id),
+      UpdateExpression: "SET shelf = :s, shelfAuto = :s, shelfSetBy = :by, topic = :t",
+      ExpressionAttributeValues: { ":s": shelf, ":by": "claude", ":t": topic },
+    }),
+  );
 
 beforeAll(async () => {
   stack = await devStack();
@@ -226,6 +245,60 @@ describe("API on dev", () => {
     await call("PATCH", `/senders/${PRAG}`, { body: { muted: false, mustRead: false } });
     await star(CASEY, false);
     expect(ids(await call<IssueListResponse>("GET", "/issues"))).toEqual(FIXTURE_NEWSLETTER_IDS);
+  });
+
+  it("shelves: News holds news and unsorted issues, Learning only learning; topics narrow", async () => {
+    await setSorted("fx-bytebytego", "learning", "Engineering");
+    await setSorted("fx-pragmatic", "learning", "Engineering");
+    await setSorted("fx-tldr", "news", "AI");
+    const shelf = (q: Record<string, string>) =>
+      call<IssueListResponse>("GET", "/issues", { query: q });
+    expect(ids(await shelf({ shelf: "learning" }))).toEqual(["fx-bytebytego", "fx-pragmatic"]);
+    expect(ids(await shelf({ shelf: "news" }))).toEqual([
+      "fx-platformer",
+      "fx-tldr",
+      "fx-lenny",
+      "fx-example",
+    ]);
+    expect(ids(await shelf({ shelf: "news", topic: "AI" }))).toEqual(["fx-tldr"]);
+    expect(ids(await shelf({ shelf: "learning", view: "all", topic: "Engineering" }))).toEqual([
+      "fx-bytebytego",
+      "fx-pragmatic",
+    ]);
+  });
+
+  it("a moved issue keeps its shelf; a sender's 'always' shelf moves the rest", async () => {
+    const LENNY = senderIdentity("lenny@substack.com", "").senderId;
+    const PRAG = senderIdentity("pragmaticengineer@substack.com", "").senderId;
+    const learning = () =>
+      call<IssueListResponse>("GET", "/issues", { query: { shelf: "learning" } }).then(ids);
+
+    const moved = await call("PATCH", "/issues/fx-pragmatic", { body: { shelf: "news" } });
+    expect(moved.body).toMatchObject({ shelf: "news" });
+    expect(await getItem("fx-pragmatic")).toMatchObject({ shelfSetBy: "sandip" });
+
+    expect(
+      (await call("PATCH", `/senders/${LENNY}`, { body: { shelf: "learning" } })).body,
+    ).toMatchObject({ shelf: "learning" });
+    expect(await learning()).toEqual(["fx-bytebytego", "fx-lenny"]);
+
+    // Sandip's own move beats the sender setting.
+    await call("PATCH", `/senders/${PRAG}`, { body: { shelf: "learning" } });
+    expect((await getItem("fx-pragmatic"))?.shelf).toBe("news");
+
+    // Clearing the setting hands issues back to Claude: unsorted here, so back under News.
+    await call("PATCH", `/senders/${LENNY}`, { body: { shelf: null } });
+    expect((await getItem("fx-lenny"))?.shelf).toBeUndefined();
+    expect(
+      (await call<SenderDetailResponse>("GET", `/senders/${LENNY}`)).body.shelf,
+    ).toBeUndefined();
+    await call("PATCH", `/senders/${PRAG}`, { body: { shelf: null } });
+  });
+
+  it("serves the topic list Claude proposed", async () => {
+    const topics = [{ name: "AI", description: "Models and tools" }];
+    await ddb.send(new PutCommand({ TableName: stack.tableName, Item: { ...TOPICS_KEY, topics } }));
+    expect((await call<TopicListResponse>("GET", "/topics")).body.topics).toEqual(topics);
   });
 
   it("serves issue detail with sanitized HTML; filtered and unknown ids are 404", async () => {

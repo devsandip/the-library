@@ -48,11 +48,11 @@ Open work (fixes, new features, the rest of Phase 2) is tracked as [GitHub issue
 
 ## Phase 2: ranking (after ~1 week of Phase 1 ratings)
 
-Proposed changes to this phase (Must Read, categories, ranking as a sort) are in issues #2 to #5 and land here when they are built.
+Reshaped by issues #2 to #5 (2026-10-09): Must Read shipped (#2); enrichment and the News/Learning tabs are built and deployed dark, waiting for Anthropic model access on the AWS account (#4, #3); ranking becomes a sort inside each tab (#5).
 
 | # | Milestone | Done when |
 |---|---|---|
-| P2.1 | Verify Haiku 5.5 price and invoke access; enrichment (Titan embedding into `EMB` item, Haiku summary + topics with thinking off), retry for un-enriched issues; enrich the backfill. | Every non-filtered issue enriched; backfill cost logged. |
+| P2.1 | Enrichment per issue: Haiku summary, News/Learning shelf, one topic, promo flag (thinking off); Titan embedding into the `EMB` item; retry for un-enriched issues; topic list proposed once; enrich the backfill. | Every non-filtered issue enriched; backfill cost logged. |
 | P2.2 | Ranking math in `packages/core` + rank step after ingest and after each rating. | Cold start orders keep-list senders above neutral; 5 Irrelevant ratings drop a sender; order stable within a day. |
 | P2.3 | Rank sort, reason line, yellow box on top 5, topic filter, digest logging. | Ranked list with reasons; one digest row per day. |
 | P2.4 | Success metric: rolling 14-day share of digest items rated Relevant. | Visible in the app; target >= 60%. |

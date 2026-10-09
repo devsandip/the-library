@@ -35,6 +35,9 @@ pnpm install
 | `AWS_PROFILE=admin pnpm test:int` | Integration tests against dev (wipes and reseeds it) |
 | `pnpm check-hosting` | Hosting and auth checks through https://sandip.dev/thelibrary |
 | `pnpm --filter @library/web dev:mock` | Run the UI locally against an in-memory backend |
+| `AWS_PROFILE=admin pnpm topics` | Claude proposes the topic list (dry run; `--apply` stores it) |
+| `AWS_PROFILE=admin pnpm enrich` | Claude sorts and summarizes issues not done yet (`--days 30`, `--force`) |
+| `AWS_PROFILE=admin pnpm rebuild-senders` | Re-key issues after a sender-rule change (dry run; `--apply`) |
 
 ## First-time setup
 
@@ -96,6 +99,7 @@ Then set `INGEST_SCHEDULE_ENABLED = true` in `infra/lib/config.ts` and deploy. T
 - **Remove the app from sandip.dev.** `AWS_PROFILE=admin pnpm amplify-proxy --remove`.
 - **The distribution was replaced** (rare). Rerun `pnpm amplify-proxy --apply`; the rule points at the distribution domain.
 - **Changing the HTTP API.** Avoid replacing it (keep its construct ID): a new API took about 16 minutes to get a DNS record, during which the API returns 502s.
+- **Summaries or tabs missing.** `/status` shows Claude's last run. "Waiting for the topic list": run `pnpm topics --apply`. `AccessDeniedException ... not available for this account`: the AWS account has not completed Anthropic's one-time use-case form (Bedrock console, Model catalog, Claude Haiku 5.5). Then `pnpm enrich --days 30` catches up.
 - **Cost.** About $0.20/month in Phase 1. Every resource is tagged `project=thelibrary`.
 
 ## Backlog

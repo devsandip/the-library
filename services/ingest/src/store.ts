@@ -1,8 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   BatchGetCommand,
   DeleteCommand,
   DynamoDBDocumentClient,
+  GetCommand,
   PutCommand,
   QueryCommand,
   ScanCommand,
@@ -14,9 +16,12 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import {
+  embeddingKey,
+  eventKey,
   INDEX,
   INGEST_STATE_KEY,
   PARTITION,
+  TOPICS_KEY,
   issueIndexAttributes,
   issueKey,
   retryOnConflict,
@@ -26,7 +31,9 @@ import {
   type IngestStats,
   type ProcessedMessage,
 } from "@library/core";
-import type { Rating } from "@library/core/types";
+import type { EnrichStats, Rating, Shelf, ShelfSetBy, Topic } from "@library/core/types";
+import { EMBED_DIMENSIONS, MODELS } from "./bedrock.js";
+import type { Classification, EnrichCandidate } from "./enrich.js";
 import { mapLimit } from "./ingest.js";
 import type { SenderFields, SenderPlan, StoredIssue, StoredSender } from "./senders.js";
 
@@ -454,7 +461,7 @@ export class Store {
     return errors;
   }
 
-  async putIngestState(stats: IngestStats): Promise<void> {
+  async putIngestState(stats: IngestStats, enrichStats?: EnrichStats): Promise<void> {
     await this.ddb.send(
       new PutCommand({
         TableName: this.table,
@@ -463,7 +470,253 @@ export class Store {
           lastRunAt: new Date().toISOString(),
           lastRunStats: stats,
           lastError: stats.errors ? stats.errorSamples.join("; ") : null,
+          lastEnrich: enrichStats,
         },
+      }),
+    );
+  }
+
+  // ---------- enrichment ----------
+
+  /** Stored newsletters (inbox or archive) received since `sinceIso`, with their enrichment state. */
+  async enrichCandidates(sinceIso: string): Promise<EnrichCandidate[]> {
+    const out: EnrichCandidate[] = [];
+    for (const partition of [PARTITION.inbox, PARTITION.archive]) {
+      let start: Record<string, unknown> | undefined;
+      do {
+        const res: QueryCommandOutput = await this.ddb.send(
+          new QueryCommand({
+            TableName: this.table,
+            IndexName: INDEX.list,
+            KeyConditionExpression: "gsi1pk = :p AND gsi1sk >= :since",
+            ExpressionAttributeValues: { ":p": partition, ":since": sinceIso },
+            ProjectionExpression:
+              "id, senderId, publication, subject, receivedAt, summary, shelfSetBy, enrichedAt, embeddedAt",
+            ExclusiveStartKey: start,
+          }),
+        );
+        for (const i of res.Items ?? []) {
+          out.push({
+            id: i.id as string,
+            senderId: i.senderId as string,
+            publication: i.publication as string,
+            subject: i.subject as string,
+            receivedAt: i.receivedAt as string,
+            summary: i.summary as string | undefined,
+            shelfSetBy: i.shelfSetBy as ShelfSetBy | undefined,
+            enriched: Boolean(i.enrichedAt),
+            embedded: Boolean(i.embeddedAt),
+          });
+        }
+        start = res.LastEvaluatedKey;
+      } while (start);
+    }
+    return out;
+  }
+
+  async getTopics(): Promise<Topic[] | undefined> {
+    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: TOPICS_KEY }));
+    return res.Item?.topics as Topic[] | undefined;
+  }
+
+  async putTopics(topics: Topic[]): Promise<void> {
+    await this.ddb.send(
+      new PutCommand({
+        TableName: this.table,
+        Item: { ...TOPICS_KEY, topics, model: MODELS.classify, at: new Date().toISOString() },
+      }),
+    );
+  }
+
+  /** Sandip's per-sender settings: an "always" shelf, and the Must Read star. */
+  async senderSettings(): Promise<Map<string, { shelf?: Shelf; mustRead: boolean }>> {
+    const settings = new Map<string, { shelf?: Shelf; mustRead: boolean }>();
+    let start: Record<string, unknown> | undefined;
+    do {
+      const res: QueryCommandOutput = await this.ddb.send(
+        new QueryCommand({
+          TableName: this.table,
+          IndexName: INDEX.list,
+          KeyConditionExpression: "gsi1pk = :p",
+          ExpressionAttributeValues: { ":p": PARTITION.senders },
+          ProjectionExpression: "senderId, shelf, mustRead",
+          ExclusiveStartKey: start,
+        }),
+      );
+      for (const s of res.Items ?? []) {
+        const shelf = s.shelf === "news" || s.shelf === "learning" ? (s.shelf as Shelf) : undefined;
+        settings.set(s.senderId as string, { shelf, mustRead: s.mustRead === true });
+      }
+      start = res.LastEvaluatedKey;
+    } while (start);
+    return settings;
+  }
+
+  /**
+   * Archive an unread issue by rule. Only once: an issue Sandip took back out of the archive is
+   * never archived again by a rule. Returns whether it was archived.
+   */
+  async autoArchive(id: string, reason: "promo" | "old-news"): Promise<boolean> {
+    const now = new Date().toISOString();
+    try {
+      await this.ddb.send(
+        new UpdateCommand({
+          TableName: this.table,
+          Key: issueKey(id),
+          // The same index moves as issueIndexAttributes() for "archived": INBOX to ARCHIVE
+          // (same sort key), and out of UNREAD.
+          UpdateExpression:
+            "SET #st = :archived, gsi1pk = :archive, stateChangedAt = :now, autoArchived = :why " +
+            "REMOVE gsi2pk, gsi2sk",
+          ConditionExpression: "#st = :unread AND attribute_not_exists(autoArchived)",
+          ExpressionAttributeNames: { "#st": "state" },
+          ExpressionAttributeValues: {
+            ":archived": "archived",
+            ":archive": PARTITION.archive,
+            ":now": now,
+            ":why": reason,
+            ":unread": "unread",
+          },
+        }),
+      );
+    } catch (err) {
+      if ((err as { name?: string }).name === "ConditionalCheckFailedException") return false;
+      throw err;
+    }
+    await this.ddb.send(
+      new PutCommand({
+        TableName: this.table,
+        Item: {
+          ...eventKey(id, now, randomUUID().slice(0, 8)),
+          type: "state",
+          value: "archived",
+          prev: "unread",
+          by: `rule:${reason}`,
+        },
+      }),
+    );
+    return true;
+  }
+
+  /** Unread issues on the News shelf received before `cutoffIso`, not yet archived by a rule. */
+  async unreadNewsBefore(cutoffIso: string): Promise<{ id: string; senderId: string }[]> {
+    const out: { id: string; senderId: string }[] = [];
+    let start: Record<string, unknown> | undefined;
+    do {
+      const res: QueryCommandOutput = await this.ddb.send(
+        new QueryCommand({
+          TableName: this.table,
+          IndexName: INDEX.unread,
+          KeyConditionExpression: "gsi2pk = :p AND gsi2sk < :cutoff",
+          FilterExpression: "shelf = :news AND attribute_not_exists(autoArchived)",
+          ExpressionAttributeValues: {
+            ":p": PARTITION.unread,
+            ":cutoff": cutoffIso,
+            ":news": "news",
+          },
+          ProjectionExpression: "id, senderId",
+          ExclusiveStartKey: start,
+        }),
+      );
+      for (const i of res.Items ?? []) {
+        out.push({ id: i.id as string, senderId: i.senderId as string });
+      }
+      start = res.LastEvaluatedKey;
+    } while (start);
+    return out;
+  }
+
+  /** The issue's clean text (kept forever), or undefined if it was never written. */
+  async getText(id: string): Promise<string | undefined> {
+    try {
+      const res = await this.s3.send(
+        new GetObjectCommand({ Bucket: this.bucket, Key: s3Keys(id).text }),
+      );
+      return await res.Body?.transformToString("utf-8");
+    } catch (err) {
+      if ((err as { name?: string }).name === "NoSuchKey") return undefined;
+      throw err;
+    }
+  }
+
+  /**
+   * Store Claude's classification. The effective shelf follows the sender's "always" setting if
+   * it has one, else Claude; an issue Sandip moved himself keeps his choice.
+   */
+  async putClassification(id: string, c: Classification, senderShelf?: Shelf): Promise<void> {
+    const names = {
+      "#sum": "summary",
+      "#auto": "shelfAuto",
+      "#topic": "topic",
+      "#promo": "promo",
+      "#at": "enrichedAt",
+      "#model": "enrichModel",
+    };
+    const values = {
+      ":sum": c.summary,
+      ":auto": c.shelf,
+      ":topic": c.topic,
+      ":promo": c.promo,
+      ":at": new Date().toISOString(),
+      ":model": MODELS.classify,
+    };
+    const base =
+      "SET #sum = :sum, #auto = :auto, #topic = :topic, #promo = :promo, #at = :at, #model = :model";
+    try {
+      await this.ddb.send(
+        new UpdateCommand({
+          TableName: this.table,
+          Key: issueKey(id),
+          UpdateExpression: `${base}, #shelf = :shelf, #by = :by`,
+          ConditionExpression:
+            "attribute_exists(pk) AND (attribute_not_exists(#by) OR #by <> :sandip)",
+          ExpressionAttributeNames: { ...names, "#shelf": "shelf", "#by": "shelfSetBy" },
+          ExpressionAttributeValues: {
+            ...values,
+            ":shelf": senderShelf ?? c.shelf,
+            ":by": senderShelf ? "sender" : "claude",
+            ":sandip": "sandip",
+          },
+        }),
+      );
+    } catch (err) {
+      if ((err as { name?: string }).name !== "ConditionalCheckFailedException") throw err;
+      // Sandip moved this issue himself: keep his shelf, store the rest.
+      await this.ddb.send(
+        new UpdateCommand({
+          TableName: this.table,
+          Key: issueKey(id),
+          UpdateExpression: base,
+          ConditionExpression: "attribute_exists(pk)",
+          ExpressionAttributeNames: names,
+          ExpressionAttributeValues: values,
+        }),
+      );
+    }
+  }
+
+  async putEmbedding(id: string, vector: number[]): Promise<void> {
+    if (vector.length !== EMBED_DIMENSIONS) throw new Error("embedding has the wrong size");
+    const now = new Date().toISOString();
+    await this.ddb.send(
+      new PutCommand({
+        TableName: this.table,
+        Item: {
+          ...embeddingKey(id),
+          vector: new Uint8Array(new Float32Array(vector).buffer),
+          dims: vector.length,
+          model: MODELS.embed,
+          at: now,
+        },
+      }),
+    );
+    await this.ddb.send(
+      new UpdateCommand({
+        TableName: this.table,
+        Key: issueKey(id),
+        UpdateExpression: "SET embeddedAt = :at",
+        ConditionExpression: "attribute_exists(pk)",
+        ExpressionAttributeValues: { ":at": now },
       }),
     );
   }

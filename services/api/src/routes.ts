@@ -1,4 +1,4 @@
-import type { Rating, ReaderState, SenderPatch, View } from "@library/core/types";
+import type { Rating, ReaderState, SenderPatch, Shelf, View } from "@library/core/types";
 import { badRequest, HttpError, notFound } from "./errors.js";
 import type { Services } from "./port.js";
 
@@ -23,6 +23,7 @@ const ISSUE_ID = "([A-Za-z0-9_-]{1,64})";
 const SENDER_ID = "(s[0-9a-f]{12})";
 const VIEWS: readonly View[] = ["unread", "all", "archived"];
 const READER_STATES: readonly ReaderState[] = ["unread", "read", "archived"];
+const SHELVES: readonly Shelf[] = ["news", "learning"];
 
 const ok = (body: unknown): Response => ({ status: 200, body });
 
@@ -56,7 +57,23 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
       if (senderId !== undefined && !new RegExp(`^${SENDER_ID}$`).test(senderId)) {
         throw badRequest("sender is not a sender id");
       }
-      return ok(await svc.repo.listIssues(view, { limit, cursor: req.query.cursor, senderId }));
+      const shelf = req.query.shelf as Shelf | undefined;
+      if (shelf !== undefined && !SHELVES.includes(shelf)) {
+        throw badRequest("shelf must be news or learning");
+      }
+      const topic = req.query.topic;
+      if (topic !== undefined && (topic.length === 0 || topic.length > 60)) {
+        throw badRequest("topic must be 1 to 60 characters");
+      }
+      return ok(
+        await svc.repo.listIssues(view, {
+          limit,
+          cursor: req.query.cursor,
+          senderId,
+          shelf,
+          topic,
+        }),
+      );
     },
   },
   {
@@ -68,11 +85,19 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     method: "PATCH",
     pattern: new RegExp(`^/issues/${ISSUE_ID}$`),
     handler: async (svc, req, p) => {
-      const { state } = json<{ state?: unknown }>(req);
-      if (!READER_STATES.includes(state as ReaderState)) {
+      const { state, shelf } = json<{ state?: unknown; shelf?: unknown }>(req);
+      if (state === undefined && shelf === undefined) throw badRequest("send state or shelf");
+      if (state !== undefined && !READER_STATES.includes(state as ReaderState)) {
         throw badRequest("state must be unread, read or archived");
       }
-      return ok(await svc.repo.setState(param(p, 0), state as ReaderState));
+      if (shelf !== undefined && !SHELVES.includes(shelf as Shelf)) {
+        throw badRequest("shelf must be news or learning");
+      }
+      const id = param(p, 0);
+      let item =
+        state === undefined ? undefined : await svc.repo.setState(id, state as ReaderState);
+      if (shelf !== undefined) item = await svc.repo.setShelf(id, shelf as Shelf);
+      return ok(item);
     },
   },
   {
@@ -115,9 +140,20 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
         if (typeof body[key] !== "boolean") throw badRequest(`${key} must be true or false`);
         patch[key] = body[key];
       }
-      if (!Object.keys(patch).length) throw badRequest("send muted or mustRead");
+      if (body.shelf !== undefined) {
+        if (body.shelf !== null && !SHELVES.includes(body.shelf as Shelf)) {
+          throw badRequest("shelf must be news, learning or null");
+        }
+        patch.shelf = body.shelf as Shelf | null;
+      }
+      if (!Object.keys(patch).length) throw badRequest("send muted, mustRead or shelf");
       return ok(await svc.repo.updateSender(param(p, 0), patch));
     },
+  },
+  {
+    method: "GET",
+    pattern: /^\/topics$/,
+    handler: async (svc) => ok({ topics: await svc.repo.listTopics() }),
   },
   {
     method: "POST",

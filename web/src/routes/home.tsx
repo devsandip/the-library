@@ -1,10 +1,15 @@
 import { useState } from "preact/hooks";
 import { useLocation } from "preact-iso";
-import type { IssueListItem, View } from "@library/core/types";
+import type { IssueListItem, Shelf, View } from "@library/core/types";
 import { BASE } from "../config.js";
 import { useApp } from "../context.js";
 import { IssueRow } from "../components/issue-row.js";
 import { useAsync } from "../hooks.js";
+
+const SHELVES: { id: Shelf; label: string }[] = [
+  { id: "news", label: "News" },
+  { id: "learning", label: "Learning" },
+];
 
 const VIEWS: { id: View; label: string }[] = [
   { id: "unread", label: "Unread" },
@@ -12,11 +17,35 @@ const VIEWS: { id: View; label: string }[] = [
   { id: "archived", label: "Archived" },
 ];
 
-function IssueList({ items }: { items: IssueListItem[] }) {
+interface Filters {
+  shelf: Shelf;
+  view: View;
+  sender?: string;
+  topic?: string;
+}
+
+/** Filters live in the URL, so Back from an issue restores them. */
+function filtersHref(f: Filters): string {
+  const q = new URLSearchParams();
+  if (f.shelf !== "news") q.set("shelf", f.shelf);
+  if (f.view !== "unread") q.set("view", f.view);
+  if (f.sender) q.set("sender", f.sender);
+  if (f.topic) q.set("topic", f.topic);
+  const qs = q.toString();
+  return `${BASE}/${qs ? `?${qs}` : ""}`;
+}
+
+function IssueList({
+  items,
+  topicHref,
+}: {
+  items: IssueListItem[];
+  topicHref: (topic: string) => string;
+}) {
   return (
     <ul class="issue-list">
       {items.map((i) => (
-        <IssueRow key={i.id} issue={i} />
+        <IssueRow key={i.id} issue={i} topicHref={topicHref} />
       ))}
     </ul>
   );
@@ -25,25 +54,36 @@ function IssueList({ items }: { items: IssueListItem[] }) {
 export function Home() {
   const { api } = useApp();
   const { query, route } = useLocation();
-  // Filters live in the URL, so Back from an issue restores them.
-  const view = (VIEWS.some((v) => v.id === query.view) ? query.view : "unread") as View;
-  const sender = query.sender || undefined;
+  // The shelves appear once Claude has proposed topics and started sorting (`pnpm topics`).
+  const topicList = useAsync(() => api.listTopics(), []);
+  const shelvesOn = (topicList.data?.topics.length ?? 0) > 0;
+  const filters: Filters = {
+    shelf: query.shelf === "learning" ? "learning" : "news",
+    view: (VIEWS.some((v) => v.id === query.view) ? query.view : "unread") as View,
+    sender: query.sender || undefined,
+    topic: query.topic || undefined,
+  };
+  const { shelf, view, sender, topic } = filters;
 
   const senders = useAsync(() => api.listSenders(), []);
-  const list = useAsync(() => api.listIssues({ view, sender }), [view, sender]);
+  const listShelf = shelvesOn ? shelf : undefined;
+  const topicsKnown = topicList.status !== "loading";
+  // Wait for the topic check, so the list loads once, with or without a shelf.
+  const list = useAsync(
+    () =>
+      topicsKnown
+        ? api.listIssues({ shelf: listShelf, view, sender, topic })
+        : new Promise<never>(() => undefined),
+    [topicsKnown, listShelf, view, sender, topic],
+  );
   const [more, setMore] = useState<{ items: IssueListItem[]; cursor?: string; loading: boolean }>();
   const [refreshing, setRefreshing] = useState(false);
 
-  const setFilter = (next: { view?: View; sender?: string }) => {
+  const setFilter = (next: Partial<Filters>) => {
     setMore(undefined);
-    const q = new URLSearchParams();
-    const v = next.view ?? view;
-    const s = "sender" in next ? next.sender : sender;
-    if (v !== "unread") q.set("view", v);
-    if (s) q.set("sender", s);
-    const qs = q.toString();
-    route(`${BASE}/${qs ? `?${qs}` : ""}`);
+    route(filtersHref({ ...filters, ...next }));
   };
+  const topicHref = (t: string) => filtersHref({ ...filters, topic: t });
 
   const cursor = more ? more.cursor : list.data?.cursor;
   const items = [...(list.data?.items ?? []), ...(more?.items ?? [])];
@@ -53,7 +93,7 @@ export function Home() {
   const loadMore = async () => {
     if (!cursor) return;
     setMore((m) => ({ items: m?.items ?? [], cursor, loading: true }));
-    const page = await api.listIssues({ view, sender, cursor });
+    const page = await api.listIssues({ shelf: listShelf, view, sender, topic, cursor });
     setMore((m) => ({
       items: [...(m?.items ?? []), ...page.items],
       cursor: page.cursor,
@@ -76,6 +116,23 @@ export function Home() {
 
   return (
     <section class="home">
+      {shelvesOn && (
+        <div class="shelves" role="tablist" aria-label="Shelf">
+          {SHELVES.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              role="tab"
+              aria-selected={shelf === s.id}
+              class={shelf === s.id ? "active" : ""}
+              onClick={() => setFilter({ shelf: s.id })}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div class="toolbar">
         <div class="tabs" role="tablist" aria-label="Which issues">
           {VIEWS.map((v) => (
@@ -113,6 +170,17 @@ export function Home() {
         </div>
       </div>
 
+      {topic && (
+        <p class="filter-pill">
+          <span>
+            Topic: <strong>{topic}</strong>
+          </span>
+          <button type="button" class="link" onClick={() => setFilter({ topic: undefined })}>
+            Show all topics
+          </button>
+        </p>
+      )}
+
       {list.status === "loading" && <p class="muted">Loading...</p>}
       {list.status === "error" && (
         <p class="error">
@@ -126,7 +194,13 @@ export function Home() {
         <div class="empty">
           <p class="empty-title">No new numbers.</p>
           {view === "unread" && (
-            <p class="muted">Everything is read. New issues arrive every two hours.</p>
+            <p class="muted">
+              {!shelvesOn
+                ? "Everything is read. New issues arrive every two hours."
+                : shelf === "news"
+                  ? "No unread news. New issues arrive every two hours."
+                  : "Nothing waiting on the Learning shelf."}
+            </p>
           )}
         </div>
       )}
@@ -134,16 +208,16 @@ export function Home() {
         (grouped ? (
           <>
             <h2 class="list-heading">Must Read</h2>
-            <IssueList items={items.filter((i) => i.mustRead)} />
+            <IssueList items={items.filter((i) => i.mustRead)} topicHref={topicHref} />
             {items.some((i) => !i.mustRead) && (
               <>
                 <h2 class="list-heading">Everything else</h2>
-                <IssueList items={items.filter((i) => !i.mustRead)} />
+                <IssueList items={items.filter((i) => !i.mustRead)} topicHref={topicHref} />
               </>
             )}
           </>
         ) : (
-          <IssueList items={items} />
+          <IssueList items={items} topicHref={topicHref} />
         ))}
       {cursor && list.status === "ok" && (
         <p class="load-more">

@@ -8,6 +8,15 @@ export type IssueState = "unread" | "read" | "archived" | "filtered";
 export type ReaderState = Exclude<IssueState, "filtered">;
 export type Rating = 1 | -1;
 export type View = "unread" | "all" | "archived";
+/** Home's two tabs: what's happening now, or worth reading in three months. */
+export type Shelf = "news" | "learning";
+/** Who decided an issue's shelf: Claude, the sender's "always" setting, or Sandip moving it. */
+export type ShelfSetBy = "claude" | "sender" | "sandip";
+
+export interface Topic {
+  name: string;
+  description: string;
+}
 
 export interface IssueListItem {
   id: string;
@@ -22,9 +31,14 @@ export interface IssueListItem {
   viewOnlineUrl?: string;
   /** From a Must Read newsletter. In Unread these come first. */
   mustRead?: boolean;
-  // Phase 2
+  // Set by Claude (see services/ingest/src/enrich.ts); absent until the issue is enriched.
   summary?: string;
-  topics?: string[];
+  shelf?: Shelf;
+  topic?: string;
+  promo?: boolean;
+  /** Archived by a rule rather than by Sandip: a promo, or news left unread for a week. */
+  autoArchived?: "promo" | "old-news";
+  // Phase 2
   scoreReason?: string;
 }
 
@@ -48,6 +62,8 @@ export interface SenderListItem {
   muted: boolean;
   /** Starred by Sandip: its unread issues are listed first. */
   mustRead: boolean;
+  /** Always on this shelf (Sandip's choice); unset means Claude decides per issue. */
+  shelf?: Shelf;
   up: number;
   down: number;
   issueCount: number;
@@ -59,10 +75,15 @@ export interface SenderListResponse {
   items: SenderListItem[];
 }
 
-/** PATCH /senders/{id}: set either flag, or both. */
+/** PATCH /senders/{id}: any of these; `shelf: null` hands the shelf back to Claude. */
 export interface SenderPatch {
   muted?: boolean;
   mustRead?: boolean;
+  shelf?: Shelf | null;
+}
+
+export interface TopicListResponse {
+  topics: Topic[];
 }
 
 export interface SenderDetailResponse extends SenderListItem {
@@ -81,11 +102,32 @@ export interface IngestStats {
   durationMs: number;
 }
 
+export interface EnrichStats {
+  checked: number;
+  classified: number;
+  embedded: number;
+  /** Promos archived as Claude flagged them. */
+  promosArchived: number;
+  /** Unread news over a week old, archived (Must Read newsletters are exempt). */
+  oldNewsArchived: number;
+  /** Issues waiting because there is no topic list yet (`pnpm topics --apply` creates it). */
+  waitingForTopics: number;
+  /** Not started before the run's time budget ran out; picked up by the next run. */
+  deferred: number;
+  errors: number;
+  errorSamples: string[];
+  inputTokens: number;
+  outputTokens: number;
+  embedTokens: number;
+  durationMs: number;
+}
+
 export interface StatusResponse {
   stage: string;
   lastRunAt?: string;
   lastRunStats?: IngestStats;
   lastError?: string | null;
+  lastEnrich?: EnrichStats;
 }
 
 export interface ApiError {

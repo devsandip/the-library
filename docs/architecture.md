@@ -156,10 +156,11 @@ All four GSIs are defined before the first deploy because CloudFormation adds on
 
 | Entity | pk | sk | Notes |
 |---|---|---|---|
-| Issue | `ISSUE#<gmailMsgId>` | `META` | `senderId`, `publication`, `fromAddr`, `fromName` (kept so sender rules can be re-applied after the raw message expires), `subject`, `receivedAt`, `snippet`, `viewOnlineUrl`, `unsubscribeUrl`, `wordCount`, `readMinutes`, `state` (`unread`\|`read`\|`archived`\|`filtered`), `rating` (`1`\|`-1`), `ratedAt`, `s3Keys`, `labelIds`. Phase 2 adds `summary`, `topics`, `score`, `scoreReason`. |
-| Embedding (P2) | `ISSUE#<id>` | `EMB` | 512 float32 as binary. |
+| Issue | `ISSUE#<gmailMsgId>` | `META` | `senderId`, `publication`, `fromAddr`, `fromName` (kept so sender rules can be re-applied after the raw message expires), `subject`, `receivedAt`, `snippet`, `viewOnlineUrl`, `unsubscribeUrl`, `wordCount`, `readMinutes`, `state` (`unread`\|`read`\|`archived`\|`filtered`), `rating` (`1`\|`-1`), `ratedAt`, `s3Keys`, `labelIds`. Enrichment (section 11) adds `summary`, `shelf` (`news`\|`learning`, what Home's tabs filter on), `shelfAuto` (Claude's call), `shelfSetBy` (`claude`\|`sender`\|`sandip`), `topic`, `promo`, `enrichedAt`, `embeddedAt`, and `autoArchived` (`promo`\|`old-news`) when a rule archived it. Phase 2 ranking adds `score`, `scoreReason`. |
+| Embedding | `ISSUE#<id>` | `EMB` | Titan V2, 512 float32 as binary, for Phase 2 ranking. |
+| Topic list | `CONFIG` | `TOPICS` | `topics` (`name`, `description`), proposed once by Claude (`pnpm topics`). |
 | Event | `ISSUE#<id>` | `EVT#<iso>#<rand>` | `type` (`rating`\|`state`\|`open`), `value`, `prev`. Append-only. |
-| Sender | `SENDER#<senderId>` | `META` | `senderKey` (readable, e.g. `pragmaticengineer@substack.com`), `publication`, `addresses` (set), `muted`, `mustRead` (Sandip's star, seeded once from the PRD keep list), `up`, `down`, `issueCount`, `lastSeenAt`, `unsubscribeUrl`. |
+| Sender | `SENDER#<senderId>` | `META` | `senderKey` (readable, e.g. `pragmaticengineer@substack.com`), `publication`, `addresses` (set), `muted`, `mustRead` (Sandip's star, seeded once from the PRD keep list), `shelf` ("always News/Learning"; unset means Claude decides per issue), `up`, `down`, `issueCount`, `lastSeenAt`, `unsubscribeUrl`. |
 | Ingest state | `STATE` | `INGEST` | `lastRunAt`, `lastRunStats`, `lastError`. |
 | Digest (P2) | `DIGEST#<yyyy-mm-dd>` | `META` | Top-N issue IDs shown that day. |
 
@@ -186,14 +187,15 @@ HTTP API, one route `ANY /thelibrary/api/{proxy+}` behind the Cognito JWT author
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/thelibrary/api/issues?view=unread\|all\|archived&sender=&cursor=&limit=` | Newest first. Home views hide muted senders. Unread lists Must Read newsletters first; every list marks their issues `mustRead`. |
+| GET | `/thelibrary/api/issues?view=unread\|all\|archived&shelf=news\|learning&topic=&sender=&cursor=&limit=` | Newest first. Home views hide muted senders. Unread lists Must Read newsletters first; every list marks their issues `mustRead`. `shelf=news` also returns issues Claude has not sorted yet. |
 | GET | `/thelibrary/api/issues/{id}` | Metadata + sanitized HTML (from S3). |
-| PATCH | `/thelibrary/api/issues/{id}` | `{ "state": "unread" \| "read" \| "archived" }` |
+| PATCH | `/thelibrary/api/issues/{id}` | `{ "state"?: "unread" \| "read" \| "archived", "shelf"?: "news" \| "learning" }`. A shelf set here is Sandip's (`shelfSetBy: sandip`): neither Claude nor a sender setting moves it back. |
 | POST | `/thelibrary/api/issues/{id}/rating` | `{ "value": 1 \| -1 \| 0 }` (0 clears) |
 | POST | `/thelibrary/api/issues/{id}/events` | `{ "type": "open" }` (logged only) |
 | GET | `/thelibrary/api/senders` | All senders with counts, mute state, unsubscribe link. |
 | GET | `/thelibrary/api/senders/{senderId}` | Sender + its issues. |
-| PATCH | `/thelibrary/api/senders/{senderId}` | `{ "muted"?: true \| false, "mustRead"?: true \| false }`, at least one |
+| PATCH | `/thelibrary/api/senders/{senderId}` | `{ "muted"?, "mustRead"?, "shelf"?: "news" \| "learning" \| null }`, at least one. Setting `shelf` moves the sender's issues there (except ones Sandip moved); `null` hands them back to Claude's call. |
+| GET | `/thelibrary/api/topics` | The topic list. The web shows the News/Learning tabs once it is non-empty. |
 | POST | `/thelibrary/api/ingest` | Async "refresh now". |
 | GET | `/thelibrary/api/status` | Last ingest run, counts. |
 
@@ -260,7 +262,18 @@ score = 0.40 * S_sender + 0.40 * S_topic + 0.20 * R
 - Candidates: unread issues from the last 14 days only (`gsi2sk > now-14d`).
 - Reason line from the dominant component; yellow box on the top 5; top 5 logged to `DIGEST#<date>` so the success metric (share of digest items later rated Relevant, rolling 14 days, target >= 60%) is measurable.
 
-Models: Titan Text Embeddings V2, 512 dimensions, normalized. Claude Haiku 5.5 via `us.anthropic.claude-haiku-5-5` (launched 2026-10-07) for a 20-word summary and 1 to 3 tags from a fixed taxonomy. Haiku 5.5 has adaptive thinking on by default; summary calls turn it off and keep output short. Input is truncated to ~1,500 tokens. Verify pricing at P2.1.
+Embeddings come from enrichment (below). Ranking is a "Best first" sort inside each tab; Must Read issues stay on top. The topic filter planned for P2.3 is covered by topic labels.
+
+### Enrichment (`services/ingest/src/enrich.ts`)
+
+Each issue gets one forced tool call to Claude Haiku 5.5 (`us.anthropic.claude-haiku-5-5`, cross-region profile, `thinking: disabled`: Haiku 5.5 thinks by default and omitting the field does not turn it off, temperature 0). Input: newsletter name, subject, and the first ~6,000 characters of clean text. Output, validated before it is stored: a summary of at most 25 words, `shelf` (test: "would this still be worth reading in three months?" no is News, yes is Learning; digests are News), one `topic` from the stored list, and `promo` (mainly selling something). Titan Text Embeddings V2 (512 dimensions, normalized) embeds name, subject, summary and text into the `EMB` item.
+
+- **When:** after every ingest run, for issues from the last 14 days that are not yet enriched (failures retry next run), within an 8-minute budget; `pnpm enrich --days 30` for the backlog; `--force` redoes everything after a prompt or topic change. Enrichment errors show on `/status` and never fail the ingest run.
+- **Topic list:** proposed once by Claude from the stored subjects (`pnpm topics`, then `--apply`); classification waits until it exists. Changing it later means `--replace` and `pnpm enrich --force`; the topic editor is parked (issue #8).
+- **Shelf precedence:** Sandip's move, then the sender's "always" setting, then Claude.
+- **Rules:** an issue Claude marks as a promo is archived; unread News older than 7 days is archived after each run, except from Must Read newsletters. Each rule archives an issue at most once (`autoArchived`), so restoring one keeps it restored. Both log a state event with `by: rule:<reason>`.
+- **Access:** Anthropic models need a one-time use-case form on the AWS account (Bedrock console, model catalog). Titan needs nothing.
+- **Cost:** Haiku 5.5's Bedrock offer prices output at 5x input, about $1 and $5 per million tokens; an issue is ~1,500 tokens in and ~60 out, so the 4-week backlog costs under $1 and daily runs a few cents.
 
 ## 12. Cost (steady state, ~25 issues/day)
 
@@ -272,7 +285,7 @@ Models: Titan Text Embeddings V2, 512 dimensions, normalized. Claude Haiku 5.5 v
 | CloudWatch logs (14 days) + 2 alarms + 1 custom metric | ~$0.05 | ~$0.05 |
 | DynamoDB PITR (tiny table) | ~$0.02 | ~$0.02 |
 | Titan embeddings ($0.02 per M tokens) | n/a | ~$0.03 |
-| Haiku 5.5 summaries | n/a | ~$1 to $1.50 (unverified price) |
+| Haiku 5.5 enrichment (~25 issues/day) | n/a | ~$1.50 |
 | **Total** | **~$0.20/month** | **~$1.40 to $1.80/month** |
 
 An AWS Budget filtered on `project=thelibrary` alerts at $2 (set up in R9, once the cost-allocation tag is active).

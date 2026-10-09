@@ -184,6 +184,47 @@ button.link {
 
 /* ---------- home ---------- */
 
+/* News | Learning: the main split, so bigger than the Unread/All/Archived tabs. */
+.shelves {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  margin: 0.25rem 0 0.75rem;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.shelves button {
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--muted);
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.shelves button.active {
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.filter-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.5rem 0 0;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 0.9rem;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -248,16 +289,21 @@ select {
   padding: 0;
 }
 
-.issue-row a {
+.issue-row {
   display: grid;
   gap: 0.15rem;
   padding: 0.9rem 0;
   border-bottom: 1px solid var(--border);
+}
+
+.issue-row .row-link {
+  display: grid;
+  gap: 0.15rem;
   color: inherit;
   text-decoration: none;
 }
 
-.issue-row a:hover .subject {
+.issue-row .row-link:hover .subject {
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
@@ -331,6 +377,20 @@ select {
   color: var(--muted);
 }
 
+.meta .topic {
+  padding: 0 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  text-decoration: none;
+  line-height: 1.5;
+}
+
+.meta a.topic:hover {
+  border-color: var(--muted);
+  color: var(--fg);
+}
+
 .rated {
   display: inline-flex;
   margin-left: 0.25rem;
@@ -383,6 +443,15 @@ select {
 .issue-publication a {
   color: var(--muted);
   text-decoration: none;
+}
+
+.shelf-line {
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+}
+
+.shelf-line button.link {
+  font-size: inherit;
 }
 
 .issue-header h1 {

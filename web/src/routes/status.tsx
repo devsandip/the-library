@@ -22,6 +22,7 @@ export function Status() {
   };
 
   const stats = status?.lastRunStats;
+  const enrich = status?.lastEnrich;
   return (
     <section class="status">
       <h1>Status</h1>
@@ -48,6 +49,24 @@ export function Status() {
             <>
               <dt>Last error</dt>
               <dd class="error">{status.lastError}</dd>
+            </>
+          )}
+          {enrich && (
+            <>
+              <dt>Claude</dt>
+              <dd>
+                {enrich.classified} sorted, {enrich.embedded} embedded
+                {enrich.waitingForTopics > 0 &&
+                  `, ${enrich.waitingForTopics} waiting for the topic list`}
+                {enrich.deferred > 0 && `, ${enrich.deferred} left for the next run`}
+                {`, ${enrich.errors} errors`}
+              </dd>
+              {enrich.errorSamples.length > 0 && (
+                <>
+                  <dt>Claude error</dt>
+                  <dd class="error">{enrich.errorSamples[0]}</dd>
+                </>
+              )}
             </>
           )}
         </dl>

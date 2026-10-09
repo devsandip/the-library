@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { useRoute } from "preact-iso";
-import type { IssueDetailResponse, Rating, ReaderState } from "@library/core/types";
+import type { IssueDetailResponse, Rating, ReaderState, Shelf } from "@library/core/types";
 import { ApiError } from "../api.js";
 import { BASE } from "../config.js";
 import { useApp } from "../context.js";
@@ -64,6 +64,7 @@ export function Issue() {
     void change({ rating: next === 0 ? undefined : next }, () => api.rate(id, next));
   };
   const setState = (state: ReaderState) => void change({ state }, () => api.setState(id, state));
+  const moveTo = (shelf: Shelf) => void change({ shelf }, () => api.setShelf(id, shelf));
 
   if (issue.status === "loading") return <p class="muted">Loading...</p>;
   if (issue.status === "error") {
@@ -78,6 +79,7 @@ export function Issue() {
   }
 
   const d = issue.data;
+  const other: Shelf = d.shelf === "learning" ? "news" : "learning";
   return (
     <article class="issue">
       <header class="issue-header">
@@ -92,6 +94,24 @@ export function Issue() {
           <time dateTime={d.receivedAt}>{relativeTime(d.receivedAt)}</time> · {d.readMinutes} min
           read
         </p>
+        {d.shelf && (
+          <p class="muted shelf-line">
+            {SHELF_LABEL[d.shelf]}
+            {d.topic && ` · ${d.topic}`}
+            {" · "}
+            <button type="button" class="link" onClick={() => moveTo(other)} disabled={busy}>
+              Move to {SHELF_LABEL[other]}
+            </button>
+          </p>
+        )}
+        {d.state === "archived" && d.autoArchived && (
+          <p class="muted small">
+            Archived automatically:{" "}
+            {d.autoArchived === "promo"
+              ? "Claude marked it as a promo."
+              : "news left unread for a week."}
+          </p>
+        )}
       </header>
 
       <div class="action-bar" role="toolbar" aria-label="Issue actions">
@@ -150,6 +170,8 @@ export function Issue() {
     </article>
   );
 }
+
+const SHELF_LABEL: Record<Shelf, string> = { news: "News", learning: "Learning" };
 
 /** Prefer real Back (keeps list filters and scroll) when we came from inside the app. */
 function backIfPossible(e: MouseEvent) {

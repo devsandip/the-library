@@ -22,6 +22,7 @@ import {
   retryOnConflict,
   s3Keys,
   senderItemKey,
+  TOPICS_KEY,
 } from "@library/core";
 import type {
   IssueDetailResponse,
@@ -33,7 +34,10 @@ import type {
   SenderDetailResponse,
   SenderListItem,
   SenderPatch,
+  Shelf,
+  ShelfSetBy,
   StatusResponse,
+  Topic,
   View,
 } from "@library/core/types";
 import { badRequest, conflict, notFound } from "./errors.js";
@@ -54,7 +58,10 @@ export function toListItem(i: Item): IssueListItem {
     rating: i.rating as Rating | undefined,
     viewOnlineUrl: i.viewOnlineUrl as string | undefined,
     summary: i.summary as string | undefined,
-    topics: i.topics as string[] | undefined,
+    shelf: i.shelf as Shelf | undefined,
+    topic: i.topic as string | undefined,
+    promo: i.promo as boolean | undefined,
+    autoArchived: i.autoArchived as IssueListItem["autoArchived"],
     scoreReason: i.scoreReason as string | undefined,
   };
 }
@@ -66,6 +73,7 @@ export function toSender(s: Item): SenderListItem {
     publication: s.publication as string,
     muted: Boolean(s.muted),
     mustRead: Boolean(s.mustRead),
+    shelf: s.shelf as Shelf | undefined,
     up: (s.up as number | undefined) ?? 0,
     down: (s.down as number | undefined) ?? 0,
     issueCount: (s.issueCount as number | undefined) ?? 0,
@@ -105,13 +113,43 @@ function updateExpression(set: Record<string, unknown>, remove: string[]) {
   return { expr, names, values };
 }
 
+type Filter = { expr: string; names: Record<string, string>; values: Record<string, unknown> };
+
 interface IndexQuery {
   index: string;
   pkAttr: string;
   skAttr: string;
   pkValue: string;
-  filter?: { expr: string; names: Record<string, string>; values: Record<string, unknown> };
+  filter?: Filter;
 }
+
+/** AND filters together; each one uses its own placeholder prefix. */
+function andFilters(...filters: (Filter | undefined)[]): Filter | undefined {
+  const fs = filters.filter((f): f is Filter => f !== undefined);
+  if (fs.length <= 1) return fs[0];
+  return {
+    expr: fs.map((f) => `(${f.expr})`).join(" AND "),
+    names: Object.assign({}, ...fs.map((f) => f.names)) as Record<string, string>,
+    values: Object.assign({}, ...fs.map((f) => f.values)) as Record<string, unknown>,
+  };
+}
+
+/** News also holds issues Claude has not sorted yet. */
+function shelfFilter(shelf: Shelf): Filter {
+  return shelf === "news"
+    ? {
+        expr: "attribute_not_exists(#sh) OR #sh = :sh",
+        names: { "#sh": "shelf" },
+        values: { ":sh": "news" },
+      }
+    : { expr: "#sh = :sh", names: { "#sh": "shelf" }, values: { ":sh": "learning" } };
+}
+
+const topicFilter = (topic: string): Filter => ({
+  expr: "#tp = :tp",
+  names: { "#tp": "topic" },
+  values: { ":tp": topic },
+});
 
 const VIEW_STATES: Record<View, IssueState[]> = {
   unread: ["unread"],
@@ -179,7 +217,7 @@ export class DynamoRepo implements RepoPort {
 
   // ---------- issues ----------
 
-  private unreadQuery(filter?: IndexQuery["filter"]): IndexQuery {
+  private unreadQuery(filter?: Filter): IndexQuery {
     return {
       index: INDEX.unread,
       pkAttr: "gsi2pk",
@@ -190,14 +228,14 @@ export class DynamoRepo implements RepoPort {
   }
 
   /** One view as one index stream. Muted senders are hidden everywhere but Archived. */
-  private viewQuery(view: View, muted: string[], senderId?: string): IndexQuery {
+  private viewQuery(view: View, muted: string[], senderId?: string, extra?: Filter): IndexQuery {
     if (senderId) {
       return {
         index: INDEX.bySender,
         pkAttr: "gsi3pk",
         skAttr: "gsi3sk",
         pkValue: `SENDER#${senderId}`,
-        filter: inFilter("state", "st", VIEW_STATES[view]),
+        filter: andFilters(inFilter("state", "st", VIEW_STATES[view]), extra),
       };
     }
     const q: IndexQuery =
@@ -209,11 +247,13 @@ export class DynamoRepo implements RepoPort {
             skAttr: "gsi1sk",
             pkValue: view === "archived" ? PARTITION.archive : PARTITION.inbox,
           };
-    if (view === "archived") return q; // explicit view: show everything archived
-    // DynamoDB allows 100 values in IN; muting more than 100 senders is not a real scenario.
-    return muted.length
-      ? { ...q, filter: inFilter("senderId", "m", muted.slice(0, 100), true) }
-      : q;
+    // Archived is an explicit view: show everything archived. DynamoDB allows 100 values in IN;
+    // muting more than 100 senders is not a real scenario.
+    const hideMuted =
+      view !== "archived" && muted.length
+        ? inFilter("senderId", "m", muted.slice(0, 100), true)
+        : undefined;
+    return { ...q, filter: andFilters(hideMuted, extra) };
   }
 
   private decodeCursor(cursor: string | undefined, q: IndexQuery): Item | undefined {
@@ -251,15 +291,20 @@ export class DynamoRepo implements RepoPort {
     const senders = await this.listSenders();
     const muted = senders.filter((s) => s.muted).map((s) => s.senderId);
     const starred = new Set(senders.filter((s) => s.mustRead).map((s) => s.senderId));
+    const extra = andFilters(
+      opts.shelf ? shelfFilter(opts.shelf) : undefined,
+      opts.topic ? topicFilter(opts.topic) : undefined,
+    );
     const page =
       view === "unread" && !opts.senderId
         ? await this.listUnread(
             [...starred].filter((id) => !muted.includes(id)),
             muted,
             opts,
+            extra,
           )
         : await this.readStream(
-            this.viewQuery(view, muted, opts.senderId),
+            this.viewQuery(view, muted, opts.senderId, extra),
             opts.limit,
             opts.cursor,
           );
@@ -277,10 +322,15 @@ export class DynamoRepo implements RepoPort {
     must: string[],
     muted: string[],
     opts: ListOptions,
+    extra?: Filter,
   ): Promise<IssueListResponse> {
-    const first = must.length ? this.unreadQuery(inFilter("senderId", "mr", must)) : undefined;
+    const first = must.length
+      ? this.unreadQuery(andFilters(inFilter("senderId", "mr", must), extra))
+      : undefined;
     const hide = [...must, ...muted];
-    const rest = this.unreadQuery(hide.length ? inFilter("senderId", "x", hide, true) : undefined);
+    const rest = this.unreadQuery(
+      andFilters(hide.length ? inFilter("senderId", "x", hide, true) : undefined, extra),
+    );
     const at = decodePhase(opts.cursor);
 
     if (at.phase === 1 && first) {
@@ -430,6 +480,26 @@ export class DynamoRepo implements RepoPort {
     return toListItem({ ...item, state });
   }
 
+  async setShelf(id: string, shelf: Shelf): Promise<IssueListItem> {
+    const item = await this.mustGetIssue(id);
+    if (item.shelf === shelf && item.shelfSetBy === "sandip") return toListItem(item);
+    const now = new Date().toISOString();
+    await this.transact([
+      {
+        Update: {
+          TableName: this.table,
+          Key: issueKey(id),
+          UpdateExpression: "SET #sh = :sh, #by = :by",
+          ConditionExpression: "attribute_exists(pk)",
+          ExpressionAttributeNames: { "#sh": "shelf", "#by": "shelfSetBy" },
+          ExpressionAttributeValues: { ":sh": shelf, ":by": "sandip" },
+        },
+      },
+      this.event(id, now, { type: "shelf", value: shelf, prev: (item.shelf as string) ?? null }),
+    ]);
+    return toListItem({ ...item, shelf, shelfSetBy: "sandip" });
+  }
+
   async setRating(id: string, value: Rating | 0): Promise<IssueListItem> {
     const item = await this.mustGetIssue(id);
     const prev = (item.rating as Rating | undefined) ?? 0;
@@ -521,7 +591,9 @@ export class DynamoRepo implements RepoPort {
   }
 
   async updateSender(senderId: string, patch: SenderPatch): Promise<SenderListItem> {
-    const u = updateExpression({ ...patch }, []);
+    const { shelf, ...flags } = patch;
+    const set: Record<string, unknown> = { ...flags, ...(shelf ? { shelf } : {}) };
+    const u = updateExpression(set, shelf === null ? ["shelf"] : []);
     try {
       const res = await this.ddb.send(
         new UpdateCommand({
@@ -530,15 +602,89 @@ export class DynamoRepo implements RepoPort {
           UpdateExpression: u.expr,
           ConditionExpression: "attribute_exists(pk)",
           ExpressionAttributeNames: u.names,
-          ExpressionAttributeValues: u.values,
+          // A patch that only clears the shelf has no values, and DynamoDB rejects an empty map.
+          ExpressionAttributeValues: Object.keys(u.values).length ? u.values : undefined,
           ReturnValues: "ALL_NEW",
         }),
       );
+      if (shelf !== undefined) await this.reshelveSender(senderId, shelf);
       return toSender(res.Attributes!);
     } catch (err) {
       if (isConditionFailure(err)) throw notFound("sender not found");
       throw err;
     }
+  }
+
+  /**
+   * Apply a sender's "always" shelf to its issues, or hand them back to Claude when it is cleared.
+   * Issues Sandip moved himself keep his choice.
+   */
+  private async reshelveSender(senderId: string, shelf: Shelf | null): Promise<void> {
+    const issues: Item[] = [];
+    let start: Item | undefined;
+    do {
+      const res: QueryCommandOutput = await this.query({
+        IndexName: INDEX.bySender,
+        KeyConditionExpression: "gsi3pk = :p",
+        ExpressionAttributeValues: { ":p": `SENDER#${senderId}` },
+        ProjectionExpression: "id, shelfAuto, shelfSetBy",
+        ExclusiveStartKey: start,
+      });
+      issues.push(...(res.Items ?? []));
+      start = res.LastEvaluatedKey;
+    } while (start);
+
+    const names = { "#sh": "shelf", "#by": "shelfSetBy" };
+    const update = (i: Item) => {
+      const by = i.shelfSetBy as ShelfSetBy | undefined;
+      if (by === "sandip") return undefined;
+      if (shelf) {
+        return {
+          UpdateExpression: "SET #sh = :sh, #by = :by",
+          ConditionExpression: "attribute_not_exists(#by) OR #by <> :sandip",
+          ExpressionAttributeValues: { ":sh": shelf, ":by": "sender", ":sandip": "sandip" },
+        };
+      }
+      if (by !== "sender") return undefined;
+      return i.shelfAuto
+        ? {
+            UpdateExpression: "SET #sh = :sh, #by = :by",
+            ConditionExpression: "#by = :sender",
+            ExpressionAttributeValues: { ":sh": i.shelfAuto, ":by": "claude", ":sender": "sender" },
+          }
+        : {
+            UpdateExpression: "REMOVE #sh, #by",
+            ConditionExpression: "#by = :sender",
+            ExpressionAttributeValues: { ":sender": "sender" },
+          };
+    };
+    const writes = issues
+      .map((i) => ({ id: i.id as string, u: update(i) }))
+      .filter((w) => w.u !== undefined);
+    for (let n = 0; n < writes.length; n += 10) {
+      await Promise.all(
+        writes.slice(n, n + 10).map(({ id, u }) =>
+          this.ddb
+            .send(
+              new UpdateCommand({
+                TableName: this.table,
+                Key: issueKey(id),
+                ExpressionAttributeNames: names,
+                ...u!,
+              }),
+            )
+            .catch((err: unknown) => {
+              // Sandip moved it in the meantime: his choice stands.
+              if (!isConditionFailure(err)) throw err;
+            }),
+        ),
+      );
+    }
+  }
+
+  async listTopics(): Promise<Topic[]> {
+    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: TOPICS_KEY }));
+    return (res.Item?.topics as Topic[] | undefined) ?? [];
   }
 
   // ---------- status ----------
@@ -552,6 +698,7 @@ export class DynamoRepo implements RepoPort {
       lastRunAt: res.Item?.lastRunAt as string | undefined,
       lastRunStats: res.Item?.lastRunStats as StatusResponse["lastRunStats"],
       lastError: (res.Item?.lastError as string | null | undefined) ?? null,
+      lastEnrich: res.Item?.lastEnrich as StatusResponse["lastEnrich"],
     };
   }
 

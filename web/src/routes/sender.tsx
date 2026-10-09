@@ -1,6 +1,6 @@
 import { useState } from "preact/hooks";
 import { useRoute } from "preact-iso";
-import type { SenderPatch } from "@library/core/types";
+import type { SenderPatch, Shelf } from "@library/core/types";
 import { BASE } from "../config.js";
 import { useApp } from "../context.js";
 import { StarIcon } from "../components/icons.js";
@@ -18,7 +18,8 @@ export function Sender() {
   const update = async (patch: SenderPatch) => {
     const before = sender.data;
     if (!before) return;
-    sender.set({ ...before, ...patch });
+    const { shelf, ...flags } = patch;
+    sender.set({ ...before, ...flags, ...("shelf" in patch ? { shelf: shelf ?? undefined } : {}) });
     setSaving(true);
     setError(undefined);
     try {
@@ -75,6 +76,18 @@ export function Sender() {
         >
           {s.muted ? "Unmute" : "Mute sender"}
         </button>
+        <select
+          aria-label="Shelf for this newsletter"
+          value={s.shelf ?? ""}
+          disabled={saving}
+          onChange={(e) =>
+            update({ shelf: ((e.target as HTMLSelectElement).value || null) as Shelf | null })
+          }
+        >
+          <option value="">Claude decides each issue</option>
+          <option value="news">Always News</option>
+          <option value="learning">Always Learning</option>
+        </select>
         {s.unsubscribeUrl && (
           <a href={s.unsubscribeUrl} target="_blank" rel="noopener noreferrer">
             Unsubscribe at source

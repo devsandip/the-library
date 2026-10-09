@@ -31,6 +31,8 @@ function setup(overrides: Partial<RepoPort> = {}) {
     listIssues: vi.fn(async () => ({ items: [issue] })),
     getIssue: vi.fn(async () => ({ ...issue, fromAddr: "a@b.c", html: "<p>x</p>" })),
     setState: vi.fn(async (_id, state) => ({ ...issue, state })),
+    setShelf: vi.fn(async (_id, shelf) => ({ ...issue, shelf })),
+    listTopics: vi.fn(async () => [{ name: "AI", description: "Models and tools" }]),
     setRating: vi.fn(async (_id, value) => ({ ...issue, rating: value === 0 ? undefined : value })),
     logOpen: vi.fn(async () => undefined),
     listSenders: vi.fn(async () => [sender]),
@@ -77,18 +79,29 @@ describe("routing and validation", () => {
       limit: 30,
       cursor: undefined,
       senderId: undefined,
+      shelf: undefined,
+      topic: undefined,
     });
   });
 
-  it("passes view, limit, cursor and sender through", async () => {
+  it("passes view, limit, cursor, sender, shelf and topic through", async () => {
     const { repo, call } = setup();
     await call("GET", "/issues", {
-      query: { view: "all", limit: "5", cursor: "c", sender: "s0123456789ab" },
+      query: {
+        view: "all",
+        limit: "5",
+        cursor: "c",
+        sender: "s0123456789ab",
+        shelf: "learning",
+        topic: "AI",
+      },
     });
     expect(repo.listIssues).toHaveBeenCalledWith("all", {
       limit: 5,
       cursor: "c",
       senderId: "s0123456789ab",
+      shelf: "learning",
+      topic: "AI",
     });
   });
 
@@ -98,6 +111,8 @@ describe("routing and validation", () => {
     [{ limit: "101" }, "limit must be"],
     [{ limit: "2.5" }, "limit must be"],
     [{ sender: "bytebytego@substack.com" }, "sender is not"],
+    [{ shelf: "opinion" }, "shelf must be"],
+    [{ topic: "x".repeat(61) }, "topic must be"],
   ])("rejects bad list query %o", async (query, msg) => {
     const res = await setup().call("GET", "/issues", { query });
     expect(res.status).toBe(400);
@@ -115,6 +130,22 @@ describe("routing and validation", () => {
     );
     expect((await call("PATCH", "/issues/abc123", { body: "{not json" })).status).toBe(400);
     expect((await call("PATCH", "/issues/abc123")).status).toBe(400);
+    expect((await call("PATCH", "/issues/abc123", { body: {} })).status).toBe(400);
+  });
+
+  it("PATCH shelf moves an issue; a bad shelf is a 400", async () => {
+    const { call, repo } = setup();
+    const moved = await call("PATCH", "/issues/abc123", { body: { shelf: "learning" } });
+    expect(moved.body.shelf).toBe("learning");
+    expect(repo.setShelf).toHaveBeenCalledWith("abc123", "learning");
+    expect(repo.setState).not.toHaveBeenCalled();
+    expect((await call("PATCH", "/issues/abc123", { body: { shelf: "later" } })).status).toBe(400);
+  });
+
+  it("serves the topic list", async () => {
+    const res = await setup().call("GET", "/topics");
+    expect(res.status).toBe(200);
+    expect(res.body.topics).toEqual([{ name: "AI", description: "Models and tools" }]);
   });
 
   it("rating accepts 1, -1 and 0 only", async () => {
@@ -159,7 +190,17 @@ describe("routing and validation", () => {
     expect((await patch({ mustRead: 1 })).status).toBe(400);
     expect((await patch({})).status).toBe(400);
     expect((await patch({ other: true })).status).toBe(400);
+    expect((await patch({ shelf: "later" })).status).toBe(400);
     expect(repo.updateSender).not.toHaveBeenCalled();
+  });
+
+  it("PATCH sender sets or clears its shelf", async () => {
+    const { call, repo } = setup();
+    const patch = (body: unknown) => call("PATCH", "/senders/s0123456789ab", { body });
+    expect((await patch({ shelf: "learning" })).status).toBe(200);
+    expect(repo.updateSender).toHaveBeenLastCalledWith("s0123456789ab", { shelf: "learning" });
+    expect((await patch({ shelf: null })).status).toBe(200);
+    expect(repo.updateSender).toHaveBeenLastCalledWith("s0123456789ab", { shelf: null });
   });
 
   it("ingest starts a run and returns 202; status returns 200", async () => {

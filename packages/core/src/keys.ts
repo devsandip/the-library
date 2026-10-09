@@ -8,6 +8,10 @@ export const eventKey = (id: string, at: string, rand: string) => ({
   sk: `EVT#${at}#${rand}`,
 });
 export const INGEST_STATE_KEY = { pk: "STATE", sk: "INGEST" } as const;
+/** The topic list Claude proposed (`pnpm topics`). */
+export const TOPICS_KEY = { pk: "CONFIG", sk: "TOPICS" } as const;
+/** Titan embedding of an issue, kept out of the META item so it never lands in an index. */
+export const embeddingKey = (id: string) => ({ pk: `ISSUE#${id}`, sk: "EMB" });
 
 export const INDEX = {
   /** INBOX (unread + read) | ARCHIVE | SENDERS */

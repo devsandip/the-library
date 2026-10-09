@@ -8,22 +8,31 @@ import type {
   SenderListItem,
   SenderListResponse,
   SenderPatch,
+  Shelf,
   StatusResponse,
+  TopicListResponse,
   View,
 } from "@library/core/types";
 import type { Auth } from "./auth.js";
 import type { AppConfig } from "./config.js";
 
+export interface ListIssuesOptions {
+  view: View;
+  shelf?: Shelf;
+  topic?: string;
+  sender?: string;
+  cursor?: string;
+  limit?: number;
+}
+
 /** What the UI needs from the backend. The HTTP client and the dev mock both implement it. */
 export interface LibraryApi {
-  listIssues(opts: {
-    view: View;
-    sender?: string;
-    cursor?: string;
-    limit?: number;
-  }): Promise<IssueListResponse>;
+  listIssues(opts: ListIssuesOptions): Promise<IssueListResponse>;
   getIssue(id: string): Promise<IssueDetailResponse>;
   setState(id: string, state: ReaderState): Promise<IssueListItem>;
+  /** Move an issue to the other shelf; Claude never moves it back. */
+  setShelf(id: string, shelf: Shelf): Promise<IssueListItem>;
+  listTopics(): Promise<TopicListResponse>;
   rate(id: string, value: Rating | 0): Promise<IssueListItem>;
   logOpen(id: string): Promise<void>;
   listSenders(): Promise<SenderListResponse>;
@@ -76,8 +85,10 @@ export class HttpLibraryApi implements LibraryApi {
     return json;
   }
 
-  listIssues(opts: { view: View; sender?: string; cursor?: string; limit?: number }) {
+  listIssues(opts: ListIssuesOptions) {
     const q = new URLSearchParams({ view: opts.view });
+    if (opts.shelf) q.set("shelf", opts.shelf);
+    if (opts.topic) q.set("topic", opts.topic);
     if (opts.sender) q.set("sender", opts.sender);
     if (opts.cursor) q.set("cursor", opts.cursor);
     if (opts.limit) q.set("limit", String(opts.limit));
@@ -88,6 +99,12 @@ export class HttpLibraryApi implements LibraryApi {
   }
   setState(id: string, state: ReaderState) {
     return this.request<IssueListItem>("PATCH", `/issues/${encodeURIComponent(id)}`, { state });
+  }
+  setShelf(id: string, shelf: Shelf) {
+    return this.request<IssueListItem>("PATCH", `/issues/${encodeURIComponent(id)}`, { shelf });
+  }
+  listTopics() {
+    return this.request<TopicListResponse>("GET", "/topics");
   }
   rate(id: string, value: Rating | 0) {
     return this.request<IssueListItem>("POST", `/issues/${encodeURIComponent(id)}/rating`, {

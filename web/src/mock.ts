@@ -12,10 +12,13 @@ import type {
   SenderListItem,
   SenderListResponse,
   SenderPatch,
+  Shelf,
   StatusResponse,
+  Topic,
+  TopicListResponse,
   View,
 } from "@library/core/types";
-import type { LibraryApi } from "./api.js";
+import type { LibraryApi, ListIssuesOptions } from "./api.js";
 
 const HOUR = 3_600_000;
 const now = Date.now();
@@ -53,6 +56,27 @@ const subjects = [
   "A field guide to pricing pages",
 ];
 
+const topics: Topic[] = [
+  { name: "AI", description: "Models, tools and the AI industry" },
+  { name: "Engineering", description: "Systems, architecture and engineering practice" },
+  { name: "Product", description: "Product management craft" },
+  { name: "Business", description: "Companies, markets and deals" },
+];
+
+/** Claude's call per subject above; the sixth issue is not sorted yet (shows under News). */
+const sorted: [Shelf, string][] = [
+  ["learning", "Engineering"],
+  ["news", "AI"],
+  ["learning", "Product"],
+  ["learning", "Engineering"],
+  ["news", "AI"],
+  ["news", ""],
+  ["learning", "Engineering"],
+  ["learning", "Product"],
+  ["learning", "Engineering"],
+  ["news", "Business"],
+];
+
 /** Offline placeholder image, so mock mode makes no network requests. */
 const PLACEHOLDER_IMAGE =
   "data:image/svg+xml," +
@@ -74,6 +98,8 @@ const issues: (IssueListItem & { html: string })[] = subjects.map((subject, i) =
     readMinutes: 3 + (i % 7),
     state: i > 7 ? "read" : "unread",
     viewOnlineUrl: `https://example.test/p/${i + 1}`,
+    ...(i === 5 ? {} : { shelf: sorted[i]![0], topic: sorted[i]![1] || undefined }),
+    summary: i === 5 ? undefined : `A one-line summary of "${subject}", as Claude writes it.`,
     html: sampleHtml(subject, s.publication),
   };
 });
@@ -104,12 +130,7 @@ function find(id: string) {
 }
 
 export class MockLibraryApi implements LibraryApi {
-  async listIssues(opts: {
-    view: View;
-    sender?: string;
-    cursor?: string;
-    limit?: number;
-  }): Promise<IssueListResponse> {
+  async listIssues(opts: ListIssuesOptions): Promise<IssueListResponse> {
     await delay();
     const muted = new Set(senders.filter((s) => s.muted).map((s) => s.senderId));
     const must = new Set(senders.filter((s) => s.mustRead).map((s) => s.senderId));
@@ -118,7 +139,9 @@ export class MockLibraryApi implements LibraryApi {
         statesFor[opts.view].includes(i.state) &&
         (opts.sender
           ? i.senderId === opts.sender
-          : opts.view === "archived" || !muted.has(i.senderId)),
+          : opts.view === "archived" || !muted.has(i.senderId)) &&
+        (!opts.shelf || (i.shelf ?? "news") === opts.shelf) &&
+        (!opts.topic || i.topic === opts.topic),
     );
     // Unread lists Must Read newsletters first, like the API.
     const all =
@@ -151,6 +174,16 @@ export class MockLibraryApi implements LibraryApi {
     i.state = state;
     return strip(i);
   }
+  async setShelf(id: string, shelf: Shelf) {
+    await delay(80);
+    const i = find(id);
+    i.shelf = shelf;
+    return strip(i);
+  }
+  async listTopics(): Promise<TopicListResponse> {
+    await delay();
+    return { topics };
+  }
   async rate(id: string, value: Rating | 0) {
     await delay(80);
     const i = find(id);
@@ -180,7 +213,14 @@ export class MockLibraryApi implements LibraryApi {
   async updateSender(senderId: string, patch: SenderPatch) {
     await delay(80);
     const s = senders.find((x) => x.senderId === senderId)!;
-    Object.assign(s, patch);
+    const { shelf, ...flags } = patch;
+    Object.assign(s, flags);
+    if (shelf) {
+      s.shelf = shelf;
+      for (const i of issues) if (i.senderId === senderId) i.shelf = shelf;
+    } else if (shelf === null) {
+      delete s.shelf;
+    }
     return { ...s };
   }
   async refreshNow() {
