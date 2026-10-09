@@ -16,6 +16,7 @@ import {
   PARTITION,
   issueIndexAttributes,
   issueKey,
+  retryOnConflict,
   s3Keys,
   senderIndexAttributes,
   senderItemKey,
@@ -29,6 +30,8 @@ type Filtered = Extract<ProcessedMessage, { kind: "filtered" }>;
 export class Store {
   private readonly ddb: DynamoDBDocumentClient;
   private readonly s3: S3Client;
+  /** Tail of each sender's write queue (see serializeBySender). */
+  private readonly senderQueues = new Map<string, Promise<unknown>>();
 
   constructor(
     private readonly table: string,
@@ -91,6 +94,26 @@ export class Store {
       this.putObject(keys.text, p.text, "text/plain; charset=utf-8"),
     ]);
 
+    await this.serializeBySender(p.senderId, () => this.writeIssueAndSender(p, keys));
+  }
+
+  /**
+   * Run `fn` after any earlier write for the same sender finishes. Every issue from a sender
+   * updates that sender's item, and DynamoDB rejects writes that overlap on one item, so writes
+   * for one sender go one at a time; different senders still write in parallel.
+   */
+  private serializeBySender<T>(senderId: string, fn: () => Promise<T>): Promise<T> {
+    const previous = this.senderQueues.get(senderId) ?? Promise.resolve();
+    const run = previous.then(fn);
+    const tail = run.catch(() => undefined);
+    this.senderQueues.set(senderId, tail);
+    void tail.then(() => {
+      if (this.senderQueues.get(senderId) === tail) this.senderQueues.delete(senderId);
+    });
+    return run;
+  }
+
+  private async writeIssueAndSender(p: Newsletter, keys: ReturnType<typeof s3Keys>): Promise<void> {
     const index = issueIndexAttributes({
       id: p.id,
       senderId: p.senderId,
@@ -99,9 +122,11 @@ export class Store {
     });
     const senderIndex = senderIndexAttributes(p.senderId, p.publication);
 
-    // Issue put and sender count move together; the condition makes a re-run a no-op.
-    const stored = await this.ddb
-      .send(
+    // Issue put and sender count move together; the condition makes a re-run a no-op, which is
+    // also what makes retrying a conflicting transaction safe. Conflicts can still come from
+    // another process (the API updating the same sender), hence the retry.
+    const stored = await retryOnConflict(() =>
+      this.ddb.send(
         new TransactWriteCommand({
           TransactItems: [
             {
@@ -156,7 +181,8 @@ export class Store {
             },
           ],
         }),
-      )
+      ),
+    )
       .then(() => true)
       .catch((err) => (ignoreConditionFailure(err), false));
 
@@ -168,8 +194,8 @@ export class Store {
    * condition there would cancel the issue write; here it just means an older issue arrived late.
    */
   private async touchSender(p: Newsletter): Promise<void> {
-    await this.ddb
-      .send(
+    await retryOnConflict(() =>
+      this.ddb.send(
         new UpdateCommand({
           TableName: this.table,
           Key: senderItemKey(p.senderId),
@@ -182,8 +208,8 @@ export class Store {
             ...(p.unsubscribeUrl ? { ":unsub": p.unsubscribeUrl } : {}),
           },
         }),
-      )
-      .catch(ignoreConditionFailure);
+      ),
+    ).catch(ignoreConditionFailure);
   }
 
   /** Stored newsletters (inbox or archive) received since `sinceIso`: what reprocessing needs. */

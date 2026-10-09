@@ -19,6 +19,7 @@ import {
   issueIndexAttributes,
   issueKey,
   PARTITION,
+  retryOnConflict,
   s3Keys,
   senderItemKey,
 } from "@library/core";
@@ -285,7 +286,10 @@ export class DynamoRepo implements RepoPort {
 
   private async transact(items: NonNullable<TransactWriteCommandInput["TransactItems"]>) {
     try {
-      await this.ddb.send(new TransactWriteCommand({ TransactItems: items }));
+      // An ingest run may be bumping the same sender's counters right now: retry that clash.
+      await retryOnConflict(() =>
+        this.ddb.send(new TransactWriteCommand({ TransactItems: items })),
+      );
     } catch (err) {
       if (isConditionFailure(err)) throw conflict();
       throw err;

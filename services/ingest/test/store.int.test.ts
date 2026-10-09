@@ -5,7 +5,16 @@
 import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
-import { INDEX, issueKey, s3Keys, senderIdentity, senderItemKey } from "@library/core";
+import {
+  INDEX,
+  issueKey,
+  processMessage,
+  s3Keys,
+  senderIdentity,
+  senderItemKey,
+} from "@library/core";
+import { Store } from "../src/store.js";
+import { eml, LABEL_NEWSLETTERS } from "../../../packages/core/test/fixtures.js";
 import {
   docClient,
   devStack,
@@ -92,5 +101,36 @@ describe("Store on dev", () => {
       const head = await s3.send(new HeadObjectCommand({ Bucket: stack.contentBucket, Key: key }));
       expect(head.ContentLength).toBeGreaterThan(0);
     }
+  });
+  it("parallel issues from one sender all land (transaction conflicts are retried)", async () => {
+    // Reproduces the first prod backfill: issues from one sender written at the same moment all
+    // update that sender's item, and DynamoDB cancels the colliding transactions.
+    const raw = eml({
+      from: '"Conflict Test" <conflict-test@example.test>',
+      subject: "Parallel write test",
+      html: "<p>One of many issues from the same sender.</p>",
+    });
+    const store = new Store(stack.tableName, stack.contentBucket);
+    const ids = Array.from({ length: 20 }, (_, i) => `fx-conflict-${i}`);
+    const processed = await Promise.all(
+      ids.map((id, i) =>
+        processMessage({
+          id,
+          raw,
+          labelIds: [LABEL_NEWSLETTERS],
+          internalDate: String(1791000000000 + i),
+        }),
+      ),
+    );
+    await Promise.all(
+      processed.map((p) => {
+        if (p.kind !== "newsletter") throw new Error("fixture should be a newsletter");
+        return store.putNewsletter(p, raw);
+      }),
+    );
+    const sender = await get(
+      senderItemKey(senderIdentity("conflict-test@example.test", "").senderId),
+    );
+    expect(sender?.issueCount).toBe(20);
   });
 });

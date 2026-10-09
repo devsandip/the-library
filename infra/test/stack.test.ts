@@ -124,11 +124,11 @@ describe("data and ingest", () => {
     });
   });
 
-  it("prod schedule: every 2h 06-22 IST, no retries, created disabled", () => {
+  it("prod schedule: every 2h 06-22 IST, no retries, enabled", () => {
     synth("prod").hasResourceProperties("AWS::Scheduler::Schedule", {
       ScheduleExpression: "cron(0 6-22/2 * * ? *)",
       ScheduleExpressionTimezone: "Asia/Kolkata",
-      State: "DISABLED",
+      State: "ENABLED",
       Target: Match.objectLike({ RetryPolicy: Match.objectLike({ MaximumRetryAttempts: 0 }) }),
     });
   });
@@ -137,6 +137,16 @@ describe("data and ingest", () => {
     const t = synth("dev");
     t.resourceCountIs("AWS::Scheduler::Schedule", 0);
     t.resourceCountIs("AWS::CloudWatch::Alarm", 0);
+  });
+
+  it("prod alarms when no clean run happened in a day (missing data counts)", () => {
+    synth("prod").hasResourceProperties("AWS::CloudWatch::Alarm", {
+      MetricName: "IngestSucceeded",
+      Namespace: "TheLibrary",
+      ComparisonOperator: "LessThanThreshold",
+      Period: 86400,
+      TreatMissingData: "breaching",
+    });
   });
 
   it("prod alarms on any ingest error", () => {

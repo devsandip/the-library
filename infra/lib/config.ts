@@ -32,5 +32,5 @@ export const CONTENT_SECURITY_POLICY = [
 /** Alarm emails (SNS subscription must be confirmed once from the inbox). */
 export const ALARM_EMAIL = "dev.sandip@gmail.com";
 
-/** Off until Gmail is connected (build plan R5); otherwise every run fails and alarms. */
-export const INGEST_SCHEDULE_ENABLED = false;
+/** On since Gmail was connected and the backfill ran (2026-10-09, build plan R5). */
+export const INGEST_SCHEDULE_ENABLED = true;

@@ -16,16 +16,76 @@ export interface GmailRawMessage {
 
 const API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
+/**
+ * Gmail allows 250 quota units per user per second and a message get costs 5, so an unpaced
+ * burst of parallel fetches (a backfill) hits its rate limit, which Gmail reports as 403 or 429.
+ * The first prod backfill still drew rateLimitExceeded at 20 requests/s, so start at most one
+ * request every 100 ms (10/s). A scheduled run fetches a handful of messages, so speed is moot.
+ */
+const MIN_INTERVAL_MS = 100;
+const MAX_ATTEMPTS = 6;
+const RATE_LIMIT_REASONS = new Set([
+  "rateLimitExceeded",
+  "userRateLimitExceeded",
+  "RATE_LIMIT_EXCEEDED",
+  "RESOURCE_EXHAUSTED",
+]);
+
 export class GmailAuthError extends Error {}
+
+export interface GmailOptions {
+  fetchFn?: typeof fetch;
+  sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
+  minIntervalMs?: number;
+}
+
+interface GoogleError {
+  error?: {
+    status?: string;
+    message?: string;
+    errors?: { reason?: string }[];
+    details?: { reason?: string }[];
+  };
+}
+
+/** Google's reason for a failed call, from whichever field this API version filled in. */
+function errorReasons(body: GoogleError): string[] {
+  const e = body.error;
+  if (!e) return [];
+  return [
+    ...(e.errors ?? []).map((x) => x.reason ?? ""),
+    ...(e.details ?? []).map((x) => x.reason ?? ""),
+    e.status ?? "",
+  ].filter(Boolean);
+}
 
 export class Gmail {
   private accessToken?: string;
   private expiresAt = 0;
+  private nextSlot = 0;
+  private readonly fetchFn: typeof fetch;
+  private readonly sleep: (ms: number) => Promise<void>;
+  private readonly now: () => number;
+  private readonly minIntervalMs: number;
 
   constructor(
     private readonly creds: GmailCredentials,
-    private readonly fetchFn: typeof fetch = fetch,
-  ) {}
+    opts: GmailOptions = {},
+  ) {
+    this.fetchFn = opts.fetchFn ?? fetch;
+    this.sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+    this.now = opts.now ?? Date.now;
+    this.minIntervalMs = opts.minIntervalMs ?? MIN_INTERVAL_MS;
+  }
+
+  /** Reserve the next request slot. Synchronous reservation, so parallel callers queue up. */
+  private async pace(): Promise<void> {
+    const now = this.now();
+    const start = Math.max(now, this.nextSlot);
+    this.nextSlot = start + this.minIntervalMs;
+    if (start > now) await this.sleep(start - now);
+  }
 
   private async token(): Promise<string> {
     if (this.accessToken && Date.now() < this.expiresAt - 60_000) return this.accessToken;
@@ -53,16 +113,26 @@ export class Gmail {
     return this.accessToken;
   }
 
-  private async get<T>(path: string, attempt = 0): Promise<T> {
-    const res = await this.fetchFn(`${API}${path}`, {
-      headers: { authorization: `Bearer ${await this.token()}` },
-    });
-    if ((res.status === 429 || res.status >= 500) && attempt < 3) {
-      await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
-      return this.get<T>(path, attempt + 1);
+  /** GET with pacing, and exponential backoff on throttling (429, rate-limit 403s) and 5xx. */
+  private async get<T>(path: string): Promise<T> {
+    for (let attempt = 1; ; attempt++) {
+      await this.pace();
+      const res = await this.fetchFn(`${API}${path}`, {
+        headers: { authorization: `Bearer ${await this.token()}` },
+      });
+      if (res.ok) return (await res.json()) as T;
+
+      const reasons = errorReasons((await res.json().catch(() => ({}))) as GoogleError);
+      const throttled =
+        res.status === 429 ||
+        (res.status === 403 && reasons.some((r) => RATE_LIMIT_REASONS.has(r)));
+      if ((!throttled && res.status < 500) || attempt >= MAX_ATTEMPTS) {
+        const why = reasons.length ? ` (${reasons.join(", ")})` : "";
+        throw new Error(`Gmail GET ${path.split("?")[0]} failed: ${res.status}${why}`);
+      }
+      const backoff = Math.min(1000 * 2 ** (attempt - 1), 16_000);
+      await this.sleep(backoff + Math.floor(Math.random() * 500));
     }
-    if (!res.ok) throw new Error(`Gmail GET ${path.split("?")[0]} failed: ${res.status}`);
-    return (await res.json()) as T;
   }
 
   async listMessageIds(query: string, max = 2000): Promise<string[]> {
