@@ -21,7 +21,8 @@
     "gmail:auth": "tsx scripts/gmail-auth.ts",
     "gmail:check": "tsx scripts/gmail-check.ts",
     "backfill": "tsx scripts/backfill.ts",
-    "reprocess": "tsx scripts/reprocess.ts"
+    "reprocess": "tsx scripts/reprocess.ts",
+    "rebuild-senders": "tsx scripts/rebuild-senders.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-amplify": "^3.1148.0",

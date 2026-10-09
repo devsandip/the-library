@@ -81,12 +81,16 @@ export function classify(msg: {
 
 interface SenderAlias {
   match: RegExp;
-  /** Canonical readable identity shared by every matching address. */
-  key: string;
+  /** Canonical readable identity shared by every matching address. Default: the address without any +tag. */
+  key?: string;
   publication: string;
 }
 
-/** Merge several From addresses into one publication. */
+/**
+ * Publication names by address. Merges several addresses into one newsletter, and names
+ * newsletters whose From name is a person or changes from issue to issue. After changing this,
+ * deploy and run `pnpm rebuild-senders` so stored issues follow.
+ */
 const SENDER_ALIASES: SenderAlias[] = [
   {
     match: /^pragmaticengineer(\+.*)?@substack\.com$/,
@@ -98,12 +102,32 @@ const SENDER_ALIASES: SenderAlias[] = [
     key: "lenny@substack.com",
     publication: "Lenny's Newsletter",
   },
-  {
-    match: /^bytebytego@substack\.com$/,
-    key: "bytebytego@substack.com",
-    publication: "ByteByteGo",
-  },
+  { match: /^bytebytego@substack\.com$/, publication: "ByteByteGo" },
+  { match: /^casey@platformer\.news$/, publication: "Platformer" },
+  { match: /^systemdesignone@substack\.com$/, publication: "System Design Newsletter" },
+  { match: /^algomaster@substack\.com$/, publication: "AlgoMaster" },
+  { match: /^sayhello@producttalk\.org$/, publication: "Product Talk" },
+  { match: /^lewislin(\+.*)?@substack\.com$/, publication: "Lewis C. Lin's Newsletter" },
+  { match: /^sdcourse(\+.*)?@substack\.com$/, publication: "System Design Course" },
+  { match: /^systemdr(\+.*)?@substack\.com$/, publication: "System Design Roadmap" },
+  { match: /^subscriptions@theverge\.com$/, publication: "The Verge" },
+  { match: /^optimizer@theverge\.com$/, publication: "Optimizer" },
+  { match: /^installer@theverge\.com$/, publication: "Installer" },
+  { match: /^thestepback@theverge\.com$/, publication: "The Stepback" },
+  { match: /^email@theatlantic\.com$/, publication: "The Atlantic" },
 ];
+
+/**
+ * Addresses that send several newsletters, told apart only by the From name (every TLDR edition
+ * comes from one address). Each name becomes its own sender.
+ */
+const SPLIT_BY_NAME: RegExp[] = [/^dan@tldrnewsletter\.com$/, /^snigdha@thejuggernaut\.com$/];
+
+const slug = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 
 /** Keep list from the PRD. Matched against the From display name and address. */
 const KEEP_LIST: RegExp[] = [
@@ -125,15 +149,19 @@ const KEEP_LIST: RegExp[] = [
 ];
 
 /**
- * senderKey is readable (alias key, or the address without any +tag). senderId is an opaque,
- * URL-safe hash of it, so "@" and "/" never travel through the two proxies in front of the API.
+ * senderKey is readable (alias key, or the address without any +tag, plus "#<name>" for addresses
+ * split by From name). senderId is an opaque, URL-safe hash of it, so "@" and "/" never travel
+ * through the two proxies in front of the API.
  */
 export function senderIdentity(fromAddr: string, fromName: string) {
   const addr = fromAddr.toLowerCase().trim();
+  const name = fromName.trim();
   const alias = SENDER_ALIASES.find((a) => a.match.test(addr));
-  const senderKey = alias?.key ?? addr.replace(/\+[^@]*@/, "@");
+  const base = alias?.key ?? addr.replace(/\+[^@]*@/, "@");
+  const split = !alias && name !== "" && SPLIT_BY_NAME.some((re) => re.test(addr));
+  const senderKey = split ? `${base}#${slug(name) || name.toLowerCase()}` : base;
   const senderId = `s${createHash("sha256").update(senderKey).digest("hex").slice(0, 12)}`;
-  const publication = alias?.publication ?? (fromName.trim() || addr.split("@")[0] || addr);
+  const publication = alias?.publication ?? (name || addr.split("@")[0] || addr);
   const onKeepList = KEEP_LIST.some(
     (re) => re.test(fromName) || re.test(addr) || re.test(publication),
   );

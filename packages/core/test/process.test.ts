@@ -56,7 +56,7 @@ describe("per-fixture metadata", () => {
       raw: f.platformerLabeled,
       labels: [f.LABEL_NEWSLETTERS],
       senderKey: "casey@platformer.news",
-      publication: "Casey Newton",
+      publication: "Platformer",
       keep: true,
       view: "https://www.platformer.news/ai-search",
       unsub: "https://platformer.news/unsubscribe?id=42",
@@ -65,7 +65,7 @@ describe("per-fixture metadata", () => {
       name: "TLDR (plain text)",
       raw: f.tldrPlainText,
       labels: [f.LABEL_MECO],
-      senderKey: "dan@tldrnewsletter.com",
+      senderKey: "dan@tldrnewsletter.com#tldr-ai",
       publication: "TLDR AI",
       keep: true,
       view: undefined,
@@ -188,6 +188,57 @@ describe("sources", () => {
       "news@example.com",
     );
     expect(senderIdentity("news@example.com", "").publication).toBe("news");
+  });
+
+  it("splits an address that sends several newsletters by From name", () => {
+    const dev = senderIdentity("dan@tldrnewsletter.com", "TLDR Dev");
+    const it_ = senderIdentity("Dan@TLDRnewsletter.com", " TLDR IT ");
+    expect(dev).toMatchObject({
+      senderKey: "dan@tldrnewsletter.com#tldr-dev",
+      publication: "TLDR Dev",
+    });
+    expect(it_).toMatchObject({
+      senderKey: "dan@tldrnewsletter.com#tldr-it",
+      publication: "TLDR IT",
+    });
+    expect(dev.senderId).not.toBe(it_.senderId);
+    // No name to split on: fall back to the address alone.
+    expect(senderIdentity("dan@tldrnewsletter.com", "").senderKey).toBe("dan@tldrnewsletter.com");
+  });
+
+  it("names newsletters by address when the From name is a person or changes", () => {
+    const cases: [string, string, string][] = [
+      ["casey@platformer.news", "Casey Newton", "Platformer"],
+      ["systemdesignone@substack.com", "Neo Kim", "System Design Newsletter"],
+      ["algomaster@substack.com", "Ashish Pratap Singh", "AlgoMaster"],
+      ["sayhello@producttalk.org", "Teresa Torres", "Product Talk"],
+      ["optimizer@theverge.com", "Victoria Song, The Verge", "Optimizer"],
+      ["installer@theverge.com", "Jay Peters from Installer", "Installer"],
+      // The part before " from " is the newsletter here, so no general " from " rule.
+      ["sdcourse@substack.com", "System Design Course from Systemdr", "System Design Course"],
+    ];
+    for (const [addr, name, publication] of cases) {
+      expect(senderIdentity(addr, name).publication).toBe(publication);
+      // Renaming keeps the sender: the key is still the address.
+      expect(senderIdentity(addr, name).senderId).toBe(senderIdentity(addr, "").senderId);
+    }
+  });
+
+  it("keeps one sender when the From name changes every issue", () => {
+    const a = senderIdentity("thestepback@theverge.com", "Andrew J. Hawkins, The Verge");
+    const b = senderIdentity("thestepback@theverge.com", "Terrence O'Brien, The Verge");
+    expect(a.senderId).toBe(b.senderId);
+    expect(a.publication).toBe("The Stepback");
+  });
+
+  it("merges +tag sections of one publication under its alias", () => {
+    const deep = senderIdentity(
+      "lewislin+deep-dives@substack.com",
+      "Lewis C. Lin from Lewis C. Lin’s Newsletter",
+    );
+    const main = senderIdentity("lewislin@substack.com", "Lewis C. Lin");
+    expect(deep.senderId).toBe(main.senderId);
+    expect(deep.publication).toBe("Lewis C. Lin's Newsletter");
   });
 
   it("gmailQuery ORs labels and senders", () => {

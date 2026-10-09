@@ -83,7 +83,7 @@ describe("Store on dev", () => {
       [
         "bytebytego@substack.com",
         "casey@platformer.news",
-        "dan@tldrnewsletter.com",
+        "dan@tldrnewsletter.com#tldr-ai",
         "hello@example-weekly.test",
         "lenny@substack.com",
         "pragmaticengineer@substack.com",
@@ -93,6 +93,16 @@ describe("Store on dev", () => {
     expect(bbg).toMatchObject({ muted: false, up: 0, down: 0, onKeepList: true });
     expect(bbg?.lastSeenAt).toBe("2026-10-01T12:00:00.000Z");
     expect(bbg?.unsubscribeUrl).toContain("bytebytego.substack.com");
+    expect(senders.find((s) => s.senderKey === "casey@platformer.news")?.publication).toBe(
+      "Platformer",
+    );
+  });
+
+  it("keeps each issue's From name, so sender rules can be re-applied later", async () => {
+    expect(await get(issueKey("fx-platformer"))).toMatchObject({
+      fromName: "Casey Newton",
+      publication: "Platformer",
+    });
   });
 
   it("writes raw, html and text objects for each newsletter", async () => {

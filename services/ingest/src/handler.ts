@@ -2,6 +2,7 @@ import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
 import { Gmail, type GmailCredentials } from "./gmail.js";
 import { ingest } from "./ingest.js";
 import { reprocess } from "./reprocess.js";
+import { rebuildSenders } from "./senders.js";
 import { Store } from "./store.js";
 
 const { TABLE_NAME, BUCKET_NAME, GMAIL_PARAM, STAGE } = process.env;
@@ -44,9 +45,21 @@ export interface IngestEvent {
   maxMessages?: number;
   /** Re-run the pipeline on stored issues instead of fetching (`pnpm reprocess`). */
   reprocess?: { days?: number };
+  /** Re-key issues and rebuild sender items after a sender-rule change (`pnpm rebuild-senders`). */
+  rebuildSenders?: { apply?: boolean };
 }
 
 export async function handler(event: IngestEvent = {}) {
+  if (event.rebuildSenders) {
+    const report = await rebuildSenders(store, { apply: event.rebuildSenders.apply === true });
+    console.log(JSON.stringify({ level: "info", msg: "rebuild senders done", ...report }));
+    if (report.errors > 0) {
+      throw new Error(
+        `rebuild finished with ${report.errors} errors: ${report.errorSamples.join("; ")}`,
+      );
+    }
+    return report;
+  }
   if (event.reprocess) {
     const stats = await reprocess(store, { days: event.reprocess.days ?? 30 });
     console.log(JSON.stringify({ level: "info", msg: "reprocess done", ...stats }));

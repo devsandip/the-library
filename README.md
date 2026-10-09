@@ -91,6 +91,7 @@ Then set `INGEST_SCHEDULE_ENABLED = true` in `infra/lib/config.ts` and deploy. T
 
 - **"ingest failed" alarm email.** Open https://sandip.dev/thelibrary/status for the last error. `invalid_grant` means the Gmail token was revoked (password change, removed access, or the app was left in Testing): rerun `pnpm gmail:auth`. Anything else: CloudWatch logs for the ingest Lambda. Failed messages retry on the next run automatically.
 - **A newsletter is missing or noise is getting through.** Edit `packages/core/src/sources.ts` (labels, sender allowlist, noise rules, sender aliases), add a fixture test, deploy.
+- **A newsletter shows the wrong name, or two newsletters are merged into one sender.** Add an alias or a split-by-name rule in `packages/core/src/sources.ts`, add a test, deploy, then `AWS_PROFILE=admin pnpm rebuild-senders` to see the plan and `pnpm rebuild-senders --apply` to re-key stored issues. Read state, ratings and mutes are kept.
 - **An issue renders badly.** Fix the sanitizer or extractor in `packages/core`, add a fixture test, deploy, then `AWS_PROFILE=admin pnpm reprocess` to rebuild the last 30 days (raw messages are kept 30 days; state and ratings are untouched).
 - **Remove the app from sandip.dev.** `AWS_PROFILE=admin pnpm amplify-proxy --remove`.
 - **The distribution was replaced** (rare). Rerun `pnpm amplify-proxy --apply`; the rule points at the distribution domain.
@@ -114,5 +115,5 @@ services/ingest/   Gmail client, ingest loop, Lambda handler
 services/api/      reader API: routes, DynamoDB repository, Lambda handler
 web/               Preact app (base path /thelibrary/)
 infra/             CDK app: one stack per stage
-scripts/           amplify-proxy, check-hosting, create-user, gmail-auth, gmail-check, backfill, seed-dev
+scripts/           amplify-proxy, check-hosting, create-user, gmail-auth, gmail-check, backfill, reprocess, rebuild-senders, seed-dev
 ```

@@ -156,7 +156,7 @@ All four GSIs are defined before the first deploy because CloudFormation adds on
 
 | Entity | pk | sk | Notes |
 |---|---|---|---|
-| Issue | `ISSUE#<gmailMsgId>` | `META` | `senderId`, `publication`, `fromAddr`, `subject`, `receivedAt`, `snippet`, `viewOnlineUrl`, `unsubscribeUrl`, `wordCount`, `readMinutes`, `state` (`unread`\|`read`\|`archived`\|`filtered`), `rating` (`1`\|`-1`), `ratedAt`, `s3Keys`, `labelIds`. Phase 2 adds `summary`, `topics`, `score`, `scoreReason`. |
+| Issue | `ISSUE#<gmailMsgId>` | `META` | `senderId`, `publication`, `fromAddr`, `fromName` (kept so sender rules can be re-applied after the raw message expires), `subject`, `receivedAt`, `snippet`, `viewOnlineUrl`, `unsubscribeUrl`, `wordCount`, `readMinutes`, `state` (`unread`\|`read`\|`archived`\|`filtered`), `rating` (`1`\|`-1`), `ratedAt`, `s3Keys`, `labelIds`. Phase 2 adds `summary`, `topics`, `score`, `scoreReason`. |
 | Embedding (P2) | `ISSUE#<id>` | `EMB` | 512 float32 as binary. |
 | Event | `ISSUE#<id>` | `EVT#<iso>#<rand>` | `type` (`rating`\|`state`\|`open`), `value`, `prev`. Append-only. |
 | Sender | `SENDER#<senderId>` | `META` | `senderKey` (readable, e.g. `pragmaticengineer@substack.com`), `publication`, `addresses` (set), `muted`, `onKeepList`, `up`, `down`, `issueCount`, `lastSeenAt`, `unsubscribeUrl`. |
@@ -164,6 +164,8 @@ All four GSIs are defined before the first deploy because CloudFormation adds on
 | Digest (P2) | `DIGEST#<yyyy-mm-dd>` | `META` | Top-N issue IDs shown that day. |
 
 `senderId` is opaque: `s` + the first 12 hex characters of SHA-256 of the canonical sender key (alias key, or the From address lowercased with any `+tag` removed). It is URL-safe, so `@` and `/` never travel through two proxies.
+
+Sender rules live in `packages/core/src/sources.ts`. Aliases name a newsletter by address (Platformer, not "Casey Newton") and merge several addresses into one. Addresses that send several newsletters, told apart only by the From name (every TLDR edition comes from `dan@tldrnewsletter.com`), get `#<name>` appended to the key, so each edition is its own sender. After changing the rules, `pnpm rebuild-senders` re-keys stored issues and recomputes every sender item from its issues (counts, ratings, addresses, names), keeping flags such as `muted`. It runs inside the ingest Lambda, whose concurrency of 1 keeps it from overlapping an ingest run.
 
 | Index | pk | sk | Present on | Serves |
 |---|---|---|---|---|
