@@ -52,6 +52,13 @@ const subjects = [
   "A field guide to pricing pages",
 ];
 
+/** Offline placeholder image, so mock mode makes no network requests. */
+const PLACEHOLDER_IMAGE =
+  "data:image/svg+xml," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600"><rect width="1200" height="600" fill="#d9d4c7"/><path d="M0 480 L300 300 L520 420 L800 220 L1200 460 V600 H0Z" fill="#b8b09c"/></svg>',
+  );
+
 const issues: (IssueListItem & { html: string })[] = subjects.map((subject, i) => {
   const s = senders[i % senders.length]!;
   s.issueCount++;
@@ -69,13 +76,6 @@ const issues: (IssueListItem & { html: string })[] = subjects.map((subject, i) =
     html: sampleHtml(subject, s.publication),
   };
 });
-
-/** Offline placeholder image, so mock mode makes no network requests. */
-const PLACEHOLDER_IMAGE =
-  "data:image/svg+xml," +
-  encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600"><rect width="1200" height="600" fill="#d9d4c7"/><path d="M0 480 L300 300 L520 420 L800 220 L1200 460 V600 H0Z" fill="#b8b09c"/></svg>',
-  );
 
 function sampleHtml(subject: string, publication: string): string {
   return `<table width="600" align="center" style="font-family:Georgia,serif;color:#222"><tr><td>

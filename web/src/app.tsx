@@ -6,7 +6,10 @@ import { BASE, loadConfig } from "./config.js";
 import { Ctx, type AppContext } from "./context.js";
 import { Header } from "./components/header.js";
 import { Home } from "./routes/home.js";
+import { Issue } from "./routes/issue.js";
 import { NotFound } from "./routes/not-found.js";
+import { Sender } from "./routes/sender.js";
+import { Senders } from "./routes/senders.js";
 import { Status } from "./routes/status.js";
 
 type Boot =
@@ -59,6 +62,9 @@ export function App() {
         <main class="page">
           <Router>
             <Route path={`${BASE}/`} component={Home} />
+            <Route path={`${BASE}/issue/:id`} component={Issue} />
+            <Route path={`${BASE}/senders`} component={Senders} />
+            <Route path={`${BASE}/senders/:senderId`} component={Sender} />
             <Route path={`${BASE}/status`} component={Status} />
             <Route default component={NotFound} />
           </Router>

@@ -9,6 +9,7 @@ export function Header() {
         The Library
       </a>
       <nav>
+        <a href={`${BASE}/senders`}>Senders</a>
         <a href={`${BASE}/status`}>Status</a>
         {auth ? (
           <button type="button" class="link" onClick={() => void auth.signOut()}>

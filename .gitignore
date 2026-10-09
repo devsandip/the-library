@@ -17,3 +17,6 @@ coverage/
 # Session resume files
 /RESUME.md
 /resume/
+
+# Local preview config for the desktop app
+/.claude/launch.json
