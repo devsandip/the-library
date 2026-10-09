@@ -1,0 +1,93 @@
+import { Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
+import {
+  AccountRecovery,
+  CfnManagedLoginBranding,
+  FeaturePlan,
+  ManagedLoginVersion,
+  Mfa,
+  OAuthScope,
+  UserPool,
+  UserPoolClient,
+  UserPoolClientIdentityProvider,
+} from "aws-cdk-lib/aws-cognito";
+import { Construct } from "constructs";
+import { BASE_PATH, COGNITO_DOMAIN_PREFIX } from "./config.js";
+
+export interface AuthProps {
+  /** Origins the app is served from; each gets a callback and sign-out URL. */
+  origins: string[];
+}
+
+/**
+ * Single-user Cognito: no self sign-up, TOTP required, managed login on the prefix domain.
+ * The branding resource matters: without one, a CloudFormation-created client's managed login
+ * page shows an error instead of the sign-in form.
+ */
+export class Auth extends Construct {
+  readonly userPool: UserPool;
+  readonly client: UserPoolClient;
+  readonly issuer: string;
+
+  constructor(scope: Construct, id: string, props: AuthProps) {
+    super(scope, id);
+    const stack = Stack.of(this);
+
+    this.userPool = new UserPool(this, "Pool", {
+      userPoolName: "thelibrary",
+      featurePlan: FeaturePlan.ESSENTIALS,
+      selfSignUpEnabled: false,
+      signInAliases: { email: true },
+      signInCaseSensitive: false,
+      autoVerify: { email: true },
+      mfa: Mfa.REQUIRED,
+      mfaSecondFactor: { otp: true, sms: false, email: false },
+      accountRecovery: AccountRecovery.EMAIL_ONLY,
+      passwordPolicy: {
+        minLength: 12,
+        requireLowercase: false,
+        requireUppercase: false,
+        requireDigits: false,
+        requireSymbols: false,
+      },
+      userInvitation: {
+        emailSubject: "The Library: your temporary password",
+        emailBody:
+          "Sign in at https://sandip.dev/thelibrary/ with {username} and the temporary password {####}. You will set your own password and add an authenticator app.",
+      },
+      deletionProtection: true,
+      removalPolicy: RemovalPolicy.RETAIN,
+    });
+
+    this.userPool.addDomain("Domain", {
+      cognitoDomain: { domainPrefix: COGNITO_DOMAIN_PREFIX },
+      managedLoginVersion: ManagedLoginVersion.NEWER_MANAGED_LOGIN,
+    });
+
+    const urls = (suffix: string) => props.origins.map((o) => `${o}${BASE_PATH}${suffix}`);
+    this.client = this.userPool.addClient("Web", {
+      userPoolClientName: "web",
+      generateSecret: false,
+      authFlows: { userSrp: true },
+      oAuth: {
+        flows: { authorizationCodeGrant: true },
+        scopes: [OAuthScope.OPENID, OAuthScope.EMAIL],
+        callbackUrls: urls("/auth/callback"),
+        logoutUrls: urls("/"),
+      },
+      supportedIdentityProviders: [UserPoolClientIdentityProvider.COGNITO],
+      preventUserExistenceErrors: true,
+      accessTokenValidity: Duration.minutes(60),
+      idTokenValidity: Duration.minutes(60),
+      refreshTokenValidity: Duration.days(30),
+      enableTokenRevocation: true,
+    });
+
+    new CfnManagedLoginBranding(this, "Branding", {
+      userPoolId: this.userPool.userPoolId,
+      clientId: this.client.userPoolClientId,
+      useCognitoProvidedValues: true,
+    });
+
+    this.issuer = `https://cognito-idp.${stack.region}.amazonaws.com/${this.userPool.userPoolId}`;
+  }
+}

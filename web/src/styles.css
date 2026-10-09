@@ -1,0 +1,183 @@
+/* The Library: typography first, dark-friendly. The theme is a garnish, not a costume. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #fbfaf7;
+  --surface: #ffffff;
+  --fg: #1d1d1b;
+  --muted: #6b6a66;
+  --border: #e4e2dc;
+  --accent: #2f5d8a;
+  --machine: #e3b505; /* the yellow box */
+  --danger: #b3261e;
+  --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --serif: "Iowan Old Style", "Charter", Georgia, "Times New Roman", serif;
+  --tap: 44px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121211;
+    --surface: #1b1b1a;
+    --fg: #ecebe6;
+    --muted: #9b9a94;
+    --border: #2c2c2a;
+    --accent: #8fb8de;
+    --machine: #f5c518;
+    --danger: #f2948d;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 var(--ui);
+  -webkit-text-size-adjust: 100%;
+}
+
+a {
+  color: var(--accent);
+}
+
+h1,
+h2 {
+  font-family: var(--serif);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+h1 {
+  font-size: 1.75rem;
+  margin: 0.5rem 0 1rem;
+}
+
+button {
+  font: inherit;
+  min-height: var(--tap);
+  padding: 0 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+button.link {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  padding: 0;
+  min-height: auto;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.error {
+  color: var(--danger);
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: calc(0.5rem + env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) 0.5rem
+    max(1rem, env(safe-area-inset-left));
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+.site-header nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.wordmark {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--fg);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+}
+
+.page {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1rem max(1rem, env(safe-area-inset-right)) calc(2rem + env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
+}
+
+.page-message {
+  max-width: 30rem;
+  margin: 20vh auto 0;
+  padding: 0 1rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+.status dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem 1.5rem;
+}
+
+.status dt {
+  color: var(--muted);
+}
+
+.status dd {
+  margin: 0;
+}
+
+/* The Machine's yellow box: corner brackets only (applied to top-ranked items in Phase 2). */
+.yellow-box {
+  position: relative;
+}
+
+.yellow-box::before,
+.yellow-box::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  pointer-events: none;
+  border: 2px solid var(--machine);
+  clip-path: polygon(
+    0 0,
+    14px 0,
+    14px 2px,
+    2px 2px,
+    2px 14px,
+    0 14px,
+    0 0,
+    100% 0,
+    100% 14px,
+    calc(100% - 2px) 14px,
+    calc(100% - 2px) 2px,
+    calc(100% - 14px) 2px,
+    calc(100% - 14px) 0,
+    100% 0
+  );
+}
+
+.yellow-box::after {
+  transform: rotate(180deg);
+}

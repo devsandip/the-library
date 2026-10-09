@@ -4,14 +4,14 @@
 #   scripts/check-hosting.sh                                   # through https://sandip.dev/thelibrary
 #   scripts/check-hosting.sh https://dxxxx.cloudfront.net/thelibrary   # the app distribution directly
 #
-# Echo checks (ECHO=1, default while the R2 echo stub is deployed) prove that methods, query
-# strings, bodies and auth headers survive the proxy chain. Set ECHO=0 once the real API is live.
+# Echo checks (ECHO=1, only while the R2 echo stub was deployed) proved that methods, query
+# strings, bodies and auth headers survive the proxy chain. Default now checks the real API's auth.
 set -uo pipefail
 
 BASE="${1:-https://sandip.dev/thelibrary}"
 BASE="${BASE%/}"
 ORIGIN="$(printf '%s' "$BASE" | sed -E 's#^(https://[^/]+).*#\1#')"
-ECHO="${ECHO:-1}"
+ECHO="${ECHO:-0}"
 FAILS=0
 
 pass() { printf '  PASS  %s\n' "$1"; }
@@ -60,6 +60,17 @@ if [[ "$ECHO" == 1 ]]; then
   check "API cache-control no-store" 'header "$BASE/api/echo" cache-control | grep -qi no-store'
   code="$(curl -s -o /dev/null -w '%{http_code}' -H 'accept-encoding: br, gzip' "$BASE/api/echo?bytes=3000000")"
   check "3 MB response comes through ($code)" '[[ "$code" == 200 ]]'
+fi
+
+if [[ "$ECHO" != 1 ]]; then
+  echo "API auth (real API)"
+  for p in "/api/status" "/api/issues" "/api/senders"; do
+    code="$(status "$BASE$p")"
+    check "GET $p without a token is 401 ($code)" '[[ "$code" == 401 ]]'
+  done
+  code="$(status -H 'authorization: Bearer not-a-real-token' "$BASE/api/status")"
+  check "GET /api/status with a forged token is 401 ($code)" '[[ "$code" == 401 ]]'
+  check "config.json names the Cognito client" 'curl -s "$BASE/config.json" | grep -q clientId'
 fi
 
 if [[ "$ORIGIN" == "https://sandip.dev" ]]; then

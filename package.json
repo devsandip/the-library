@@ -16,7 +16,8 @@
     "amplify-proxy": "tsx scripts/amplify-proxy.ts",
     "check-hosting": "bash scripts/check-hosting.sh",
     "deploy": "pnpm --filter @library/web build && pnpm cdk deploy -c stage=prod --require-approval never",
-    "seed-dev": "tsx scripts/seed-dev.ts"
+    "seed-dev": "tsx scripts/seed-dev.ts",
+    "create-user": "bash scripts/create-user.sh"
   },
   "devDependencies": {
     "@aws-sdk/client-amplify": "^3.1148.0",

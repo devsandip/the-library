@@ -58,8 +58,6 @@ const PLACEHOLDER_SHELL = `<!doctype html><html lang="en"><head><meta charset="u
 export interface WebProps {
   stage: Stage;
   httpApi: IHttpApi;
-  /** Written to /thelibrary/config.json at deploy time; may contain deploy-time tokens. */
-  config: Record<string, unknown>;
 }
 
 export class Web extends Construct {
@@ -133,15 +131,14 @@ export class Web extends Construct {
         },
       },
     });
-
-    this.deploy(props.config);
   }
 
   /**
    * Two deployments, neither prunes: hashed assets are immutable (old chunks stay for open tabs);
    * the shell and config.json are no-cache because Amplify's cache only clears on Amplify deploys.
+   * `config` becomes /thelibrary/config.json and may contain deploy-time tokens.
    */
-  private deploy(config: Record<string, unknown>) {
+  deploy(config: Record<string, unknown>) {
     const dist = join(REPO_ROOT, "web", "dist");
     const built = existsSync(join(dist, "index.html"));
     const prefix = BASE_PATH.slice(1);

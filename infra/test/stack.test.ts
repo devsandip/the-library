@@ -139,3 +139,68 @@ describe("data and ingest", () => {
     });
   });
 });
+
+describe("auth and API (prod)", () => {
+  const t = synth("prod");
+
+  it("user pool: one user, no self sign-up, TOTP required, retained", () => {
+    t.hasResource("AWS::Cognito::UserPool", {
+      DeletionPolicy: "Retain",
+      Properties: Match.objectLike({
+        UserPoolTier: "ESSENTIALS",
+        MfaConfiguration: "ON",
+        EnabledMfas: ["SOFTWARE_TOKEN_MFA"],
+        AdminCreateUserConfig: Match.objectLike({ AllowAdminCreateUserOnly: true }),
+        DeletionProtection: "ACTIVE",
+      }),
+    });
+  });
+
+  it("managed login v2 on the fixed prefix, with a branding resource", () => {
+    t.hasResourceProperties("AWS::Cognito::UserPoolDomain", {
+      Domain: "thelibrary-sandip",
+      ManagedLoginVersion: 2,
+    });
+    t.hasResourceProperties("AWS::Cognito::ManagedLoginBranding", {
+      UseCognitoProvidedValues: true,
+    });
+  });
+
+  it("public PKCE client with sandip.dev callbacks and revocation", () => {
+    t.hasResourceProperties("AWS::Cognito::UserPoolClient", {
+      GenerateSecret: false,
+      AllowedOAuthFlows: ["code"],
+      AllowedOAuthScopes: ["openid", "email"],
+      CallbackURLs: Match.arrayWith(["https://sandip.dev/thelibrary/auth/callback"]),
+      LogoutURLs: Match.arrayWith(["https://sandip.dev/thelibrary/"]),
+      EnableTokenRevocation: true,
+    });
+  });
+
+  it("every API route requires a Cognito JWT", () => {
+    t.hasResourceProperties("AWS::ApiGatewayV2::Authorizer", {
+      AuthorizerType: "JWT",
+      IdentitySource: ["$request.header.Authorization"],
+    });
+    t.hasResourceProperties("AWS::ApiGatewayV2::Route", {
+      RouteKey: "ANY /thelibrary/api/{proxy+}",
+      AuthorizationType: "JWT",
+    });
+    t.resourceCountIs("AWS::ApiGatewayV2::Route", 1);
+  });
+
+  it("HTTP API keeps its construct path (replacing it is slow, see spec section 4)", () => {
+    expect(Object.keys(t.findResources("AWS::ApiGatewayV2::Api"))[0]).toMatch(
+      /^ApiHttp[0-9A-F]{8}$/,
+    );
+  });
+});
+
+describe("dev: no auth surface", () => {
+  it("has the API Lambda but no Cognito or HTTP API", () => {
+    const t = synth("dev");
+    t.resourceCountIs("AWS::Cognito::UserPool", 0);
+    t.resourceCountIs("AWS::ApiGatewayV2::Api", 0);
+    expect(Object.keys(t.findOutputs("ApiFunction"))).toHaveLength(1);
+  });
+});
