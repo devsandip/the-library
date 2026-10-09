@@ -48,7 +48,7 @@ export class Ingest extends Construct {
       },
     });
     props.table.grantReadWriteData(this.fn);
-    props.content.grantPut(this.fn);
+    props.content.grantReadWrite(this.fn); // write new issues; read raw/ for reprocess
     // SecureString encrypted with the AWS-managed aws/ssm key: ssm:GetParameter is enough.
     this.fn.addToRolePolicy(
       new PolicyStatement({

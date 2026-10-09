@@ -3,13 +3,17 @@ import {
   BatchGetCommand,
   DynamoDBDocumentClient,
   PutCommand,
+  QueryCommand,
   TransactWriteCommand,
   UpdateCommand,
   type BatchGetCommandOutput,
+  type QueryCommandOutput,
 } from "@aws-sdk/lib-dynamodb";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import {
+  INDEX,
   INGEST_STATE_KEY,
+  PARTITION,
   issueIndexAttributes,
   issueKey,
   s3Keys,
@@ -180,6 +184,88 @@ export class Store {
         }),
       )
       .catch(ignoreConditionFailure);
+  }
+
+  /** Stored newsletters (inbox or archive) received since `sinceIso`: what reprocessing needs. */
+  async recentIssues(sinceIso: string) {
+    const out: { id: string; labelIds: string[]; receivedAt: string; snippet?: string }[] = [];
+    for (const partition of [PARTITION.inbox, PARTITION.archive]) {
+      let start: Record<string, unknown> | undefined;
+      do {
+        const res: QueryCommandOutput = await this.ddb.send(
+          new QueryCommand({
+            TableName: this.table,
+            IndexName: INDEX.list,
+            KeyConditionExpression: "gsi1pk = :p AND gsi1sk >= :since",
+            ExpressionAttributeValues: { ":p": partition, ":since": sinceIso },
+            ProjectionExpression: "id, labelIds, receivedAt, snippet",
+            ExclusiveStartKey: start,
+          }),
+        );
+        for (const i of res.Items ?? []) {
+          out.push({
+            id: i.id as string,
+            labelIds: (i.labelIds as string[] | undefined) ?? [],
+            receivedAt: i.receivedAt as string,
+            snippet: i.snippet as string | undefined,
+          });
+        }
+        start = res.LastEvaluatedKey;
+      } while (start);
+    }
+    return out;
+  }
+
+  /** The original message, while it is still kept (30 days). */
+  async getRaw(id: string): Promise<Buffer | undefined> {
+    try {
+      const res = await this.s3.send(
+        new GetObjectCommand({ Bucket: this.bucket, Key: s3Keys(id).raw }),
+      );
+      return Buffer.from((await res.Body?.transformToByteArray()) ?? []);
+    } catch (err) {
+      if ((err as { name?: string }).name === "NoSuchKey") return undefined;
+      throw err;
+    }
+  }
+
+  /** Replace an issue's derived content after a sanitizer change. Never touches state or rating. */
+  async updateContent(p: Newsletter): Promise<void> {
+    const keys = s3Keys(p.id);
+    await Promise.all([
+      this.putObject(keys.html, p.html, "text/html; charset=utf-8"),
+      this.putObject(keys.text, p.text, "text/plain; charset=utf-8"),
+    ]);
+    const optional = { viewOnlineUrl: p.viewOnlineUrl, unsubscribeUrl: p.unsubscribeUrl };
+    const sets = [
+      "snippet = :snippet",
+      "wordCount = :words",
+      "readMinutes = :minutes",
+      "reprocessedAt = :now",
+    ];
+    const removes: string[] = [];
+    const values: Record<string, unknown> = {
+      ":snippet": p.snippet,
+      ":words": p.wordCount,
+      ":minutes": p.readMinutes,
+      ":now": new Date().toISOString(),
+    };
+    for (const [k, v] of Object.entries(optional)) {
+      if (v === undefined) removes.push(k);
+      else {
+        sets.push(`${k} = :${k}`);
+        values[`:${k}`] = v;
+      }
+    }
+    await this.ddb.send(
+      new UpdateCommand({
+        TableName: this.table,
+        Key: issueKey(p.id),
+        ConditionExpression: "attribute_exists(pk)",
+        UpdateExpression: `SET ${sets.join(", ")}${removes.length ? ` REMOVE ${removes.join(", ")}` : ""}`,
+        ExpressionAttributeValues: values,
+      }),
+    );
   }
 
   async putIngestState(stats: IngestStats): Promise<void> {

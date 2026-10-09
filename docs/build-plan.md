@@ -13,11 +13,11 @@ Every milestone ends with `pnpm test`, `pnpm lint` and `pnpm typecheck` green, a
 
 | Milestone | State |
 |---|---|
-| R0 to R4, R6, R7 | Done. 71 unit tests, 12 integration tests on dev. |
+| R0 to R4, R6, R7 | Done. 71 unit tests, 13 integration tests on dev. |
 | R2 | Done. Amplify rule live; every hosting check passes through `sandip.dev`. |
 | R8 | Reader deployed to https://sandip.dev/thelibrary/. Waiting on Sandip: create the login (`pnpm create-user`), sign in, try it on iPhone and Mac. |
 | R5 | Tooling ready (`gmail:auth`, `gmail:check`, `backfill`, staleness alarm). Waiting on Sandip's Google Cloud setup (README "Connect Gmail"). |
-| R9 | README done. Forced-error alarm test, `reprocess`, budget and `robots.txt` still open. |
+| R9 | README and `pnpm reprocess` done (integration-tested on dev). Forced-error alarm test waits for the SNS confirmation; budget waits for a week of tagged costs; `robots.txt` belongs to the sandip.dev repo. |
 
 ## Phase 1 (rebuild)
 

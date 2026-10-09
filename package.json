@@ -20,7 +20,8 @@
     "create-user": "bash scripts/create-user.sh",
     "gmail:auth": "tsx scripts/gmail-auth.ts",
     "gmail:check": "tsx scripts/gmail-check.ts",
-    "backfill": "tsx scripts/backfill.ts"
+    "backfill": "tsx scripts/backfill.ts",
+    "reprocess": "tsx scripts/reprocess.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-amplify": "^3.1148.0",
