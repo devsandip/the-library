@@ -114,6 +114,12 @@ Inserted first in the `sandip.dev` app's custom rules; existing rules (www to ap
 
 `scripts/amplify-proxy.ts` reads the distribution domain from stack outputs, shows a diff (`--dry-run`, the default), applies with `--apply`, and `--remove` takes it out. It never touches other rules.
 
+**Live since 2026-10-09** (approved by Sandip), targeting `dg0r0gfgrfwem.cloudfront.net`. If the distribution is ever replaced, rerun `pnpm amplify-proxy --apply`.
+
+**Spike result (2026-10-09): every check passed through `https://sandip.dev/thelibrary`, no fallback needed.** Deep links serve the shell, one CSP and the `X-Robots-Tag` arrive, missing assets 404, encoded query strings and dotted paths arrive intact, the `Authorization` header and a custom header both arrive, POST/PATCH/PUT/DELETE bodies arrive, API responses are not cached, a 3 MB response works, and the root site carries none of our headers. Amplify already redirects `/thelibrary` to `/thelibrary/`.
+
+**Operational note:** a newly created HTTP API took about 16 minutes to get a public DNS record (the first one was replaced for that reason, the second one too took minutes), and CloudFront edges cache the failed lookup for up to 15 minutes, so the API path returns intermittent 502s for a while after the API is created. Replacing the HTTP API is therefore a slow, disruptive change; keep its construct ID stable.
+
 ### Caching rules (Amplify's cache sits in front of ours)
 
 Amplify proxies with its managed cache policy: it honors origin `Cache-Control`, and its cache clears only on an Amplify deploy, never on our CDK deploy. So:
