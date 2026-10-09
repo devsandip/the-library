@@ -9,15 +9,17 @@ Milestones for rebuilding Phase 1 from scratch, riskiest unknown first. Design d
 
 Every milestone ends with `pnpm test`, `pnpm lint` and `pnpm typecheck` green, and one commit on `main` pushed to the private repo. The first build attempt is kept, uncommitted, in `scratch/first-pass/` for reference; pieces are reused only after review.
 
+Open work (fixes, new features, the rest of Phase 2) is tracked as [GitHub issues](https://github.com/devsandip/the-library/issues). This file keeps the plan for each phase.
+
 ## Status (2026-10-09)
 
 | Milestone | State |
 |---|---|
-| R0 to R4, R6, R7 | Done. 71 unit tests, 13 integration tests on dev. |
+| R0 to R4, R6, R7 | Done. 86 unit tests, 14 integration tests on dev. |
 | R2 | Done. Amplify rule live; every hosting check passes through `sandip.dev`. |
-| R8 | Reader deployed to https://sandip.dev/thelibrary/. Waiting on Sandip: create the login (`pnpm create-user`), sign in, try it on iPhone and Mac. |
-| R5 | Tooling ready (`gmail:auth`, `gmail:check`, `backfill`, staleness alarm). Waiting on Sandip's Google Cloud setup (README "Connect Gmail"). |
-| R9 | README and `pnpm reprocess` done (integration-tested on dev). Forced-error alarm test waits for the SNS confirmation; budget waits for a week of tagged costs; `robots.txt` belongs to the sandip.dev repo. |
+| R5 | Done. 4-week backfill: 549 messages, 394 newsletters, 155 filtered, 0 errors. Two-hourly schedule and staleness alarm on. |
+| R8 | Live, and Sandip has signed in. Left: rate, archive and reopen issues on iPhone and Mac. |
+| R9 | README and `pnpm reprocess` done. The errors alarm emailed during the first backfill attempt, so alerting works end to end. Left: a week with no alarms, the AWS Budget (#6), the `sandip.dev` repo change (#7). |
 
 ## Phase 1 (rebuild)
 
@@ -45,6 +47,8 @@ Every milestone ends with `pnpm test`, `pnpm lint` and `pnpm typecheck` green, a
 | R9 | Decide on the `robots.txt` and shared-origin note in the `sandip.dev` repo. |
 
 ## Phase 2: ranking (after ~1 week of Phase 1 ratings)
+
+Proposed changes to this phase (Must Read, categories, ranking as a sort) are in issues #2 to #5 and land here when they are built.
 
 | # | Milestone | Done when |
 |---|---|---|

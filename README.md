@@ -7,6 +7,7 @@ Live at **https://sandip.dev/thelibrary/** (behind Cognito sign-in with an authe
 - Product brief: [docs/prd.md](docs/prd.md)
 - Technical spec: [docs/architecture.md](docs/architecture.md)
 - Build plan and status: [docs/build-plan.md](docs/build-plan.md)
+- Backlog: [GitHub issues](https://github.com/devsandip/the-library/issues)
 
 ## How it fits together
 
@@ -95,6 +96,14 @@ Then set `INGEST_SCHEDULE_ENABLED = true` in `infra/lib/config.ts` and deploy. T
 - **The distribution was replaced** (rare). Rerun `pnpm amplify-proxy --apply`; the rule points at the distribution domain.
 - **Changing the HTTP API.** Avoid replacing it (keep its construct ID): a new API took about 16 minutes to get a DNS record, during which the API returns 502s.
 - **Cost.** About $0.20/month in Phase 1. Every resource is tagged `project=thelibrary`.
+
+## Backlog
+
+Open work lives in [GitHub issues](https://github.com/devsandip/the-library/issues). Each issue notes what it depends on.
+
+- Labels: `bug`, `enhancement`, `chore`, and `needs-decision` for anything waiting on Sandip.
+- When work on an issue starts, its design notes go in `docs/features/<name>.md`, and the commit that finishes it says `Closes #N`.
+- `docs/build-plan.md` keeps the phase plan; the issues carry status.
 
 ## Repo layout
 
