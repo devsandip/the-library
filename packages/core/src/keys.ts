@@ -1,0 +1,84 @@
+/** DynamoDB key layout. See docs/architecture.md section 5. */
+import type { IssueState, Rating } from "./types.js";
+
+export const issueKey = (id: string) => ({ pk: `ISSUE#${id}`, sk: "META" });
+export const senderItemKey = (senderId: string) => ({ pk: `SENDER#${senderId}`, sk: "META" });
+export const eventKey = (id: string, at: string, rand: string) => ({
+  pk: `ISSUE#${id}`,
+  sk: `EVT#${at}#${rand}`,
+});
+export const INGEST_STATE_KEY = { pk: "STATE", sk: "INGEST" } as const;
+
+export const INDEX = {
+  /** INBOX (unread + read) | ARCHIVE | SENDERS */
+  list: "gsi1",
+  /** Sparse: unread issues only. */
+  unread: "gsi2",
+  /** SENDER#<senderId> */
+  bySender: "gsi3",
+  /** Sparse: rated issues only (Phase 2 taste profile). */
+  rated: "gsi4",
+} as const;
+
+export const PARTITION = {
+  inbox: "INBOX",
+  archive: "ARCHIVE",
+  senders: "SENDERS",
+  unread: "UNREAD",
+  rated: "RATED",
+} as const;
+
+const ISSUE_INDEX_ATTRS = [
+  "gsi1pk",
+  "gsi1sk",
+  "gsi2pk",
+  "gsi2sk",
+  "gsi3pk",
+  "gsi3sk",
+  "gsi4pk",
+  "gsi4sk",
+] as const;
+export type IssueIndexAttr = (typeof ISSUE_INDEX_ATTRS)[number];
+
+/**
+ * Every index attribute an issue should carry, computed from its target state and rating.
+ * Attributes listed in `remove` must be removed in the same write, so an issue can never sit in
+ * an index that no longer matches its state.
+ */
+export function issueIndexAttributes(issue: {
+  id: string;
+  senderId: string;
+  receivedAt: string;
+  state: IssueState;
+  rating?: Rating;
+  ratedAt?: string;
+}): { set: Partial<Record<IssueIndexAttr, string>>; remove: IssueIndexAttr[] } {
+  const sk = `${issue.receivedAt}#${issue.id}`;
+  const set: Partial<Record<IssueIndexAttr, string>> = {};
+  if (issue.state !== "filtered") {
+    set.gsi1pk = issue.state === "archived" ? PARTITION.archive : PARTITION.inbox;
+    set.gsi1sk = sk;
+    set.gsi3pk = `SENDER#${issue.senderId}`;
+    set.gsi3sk = sk;
+    if (issue.state === "unread") {
+      set.gsi2pk = PARTITION.unread;
+      set.gsi2sk = sk;
+    }
+    if (issue.rating && issue.ratedAt) {
+      set.gsi4pk = PARTITION.rated;
+      set.gsi4sk = `${issue.ratedAt}#${issue.id}`;
+    }
+  }
+  return { set, remove: ISSUE_INDEX_ATTRS.filter((a) => !(a in set)) };
+}
+
+export const senderIndexAttributes = (senderId: string, publication: string) => ({
+  gsi1pk: PARTITION.senders,
+  gsi1sk: `${publication.toLowerCase()}#${senderId}`,
+});
+
+export const s3Keys = (id: string) => ({
+  raw: `raw/${id}.eml`,
+  html: `html/${id}.html`,
+  text: `text/${id}.txt`,
+});

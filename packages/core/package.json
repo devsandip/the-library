@@ -4,9 +4,21 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts"
   },
   "scripts": {
     "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "html-to-text": "^10.0.1",
+    "htmlparser2": "^12.0.0",
+    "mailparser": "^3.9.37",
+    "sanitize-html": "^2.18.0"
+  },
+  "devDependencies": {
+    "@types/html-to-text": "^9.0.4",
+    "@types/mailparser": "^3.9.0",
+    "@types/sanitize-html": "^2.16.2"
   }
 }
