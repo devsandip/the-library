@@ -598,6 +598,50 @@ export class Store {
     return true;
   }
 
+  /**
+   * Undo a rule's archive when the rule misfired: back to unread, and open to the rules again.
+   * Returns whether it was restored.
+   */
+  async restoreFromRule(id: string): Promise<boolean> {
+    const now = new Date().toISOString();
+    try {
+      await this.ddb.send(
+        new UpdateCommand({
+          TableName: this.table,
+          Key: issueKey(id),
+          UpdateExpression:
+            "SET #st = :unread, gsi1pk = :inbox, gsi2pk = :unreadIdx, gsi2sk = gsi1sk, " +
+            "stateChangedAt = :now REMOVE autoArchived",
+          ConditionExpression: "#st = :archived AND attribute_exists(autoArchived)",
+          ExpressionAttributeNames: { "#st": "state" },
+          ExpressionAttributeValues: {
+            ":unread": "unread",
+            ":inbox": PARTITION.inbox,
+            ":unreadIdx": PARTITION.unread,
+            ":now": now,
+            ":archived": "archived",
+          },
+        }),
+      );
+    } catch (err) {
+      if ((err as { name?: string }).name === "ConditionalCheckFailedException") return false;
+      throw err;
+    }
+    await this.ddb.send(
+      new PutCommand({
+        TableName: this.table,
+        Item: {
+          ...eventKey(id, now, randomUUID().slice(0, 8)),
+          type: "state",
+          value: "unread",
+          prev: "archived",
+          by: "rule-undo",
+        },
+      }),
+    );
+    return true;
+  }
+
   /** Unread issues on the News shelf received before `cutoffIso`, not yet archived by a rule. */
   async unreadNewsBefore(cutoffIso: string): Promise<{ id: string; senderId: string }[]> {
     const out: { id: string; senderId: string }[] = [];
@@ -649,6 +693,7 @@ export class Store {
       "#auto": "shelfAuto",
       "#topic": "topic",
       "#promo": "promo",
+      "#selling": "selling",
       "#at": "enrichedAt",
       "#model": "enrichModel",
     };
@@ -657,11 +702,12 @@ export class Store {
       ":auto": c.shelf,
       ":topic": c.topic,
       ":promo": c.promo,
+      ":selling": c.selling,
       ":at": new Date().toISOString(),
       ":model": MODELS.classify,
     };
     const base =
-      "SET #sum = :sum, #auto = :auto, #topic = :topic, #promo = :promo, #at = :at, #model = :model";
+      "SET #sum = :sum, #auto = :auto, #topic = :topic, #promo = :promo, #selling = :selling, #at = :at, #model = :model";
     try {
       await this.ddb.send(
         new UpdateCommand({

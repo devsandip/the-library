@@ -124,7 +124,7 @@ describe("data and ingest", () => {
     });
   });
 
-  it("ingest may call Haiku 5.5 (any US region) and Titan embeddings, nothing else", () => {
+  it("ingest may call Haiku 4.5 or 5.5 (any US region) and Titan embeddings, nothing else", () => {
     const policies = Object.values(synth("prod").findResources("AWS::IAM::Policy"));
     const statements = policies.flatMap(
       (p) => p.Properties.PolicyDocument.Statement as { Action: unknown; Resource: unknown }[],
@@ -133,10 +133,14 @@ describe("data and ingest", () => {
     expect(bedrock).toHaveLength(1);
     expect(bedrock[0]!.Action).toBe("bedrock:InvokeModel");
     const resources = JSON.stringify(bedrock[0]!.Resource);
+    expect(resources).toContain(":inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0");
+    expect(resources).toContain(
+      ":bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+    );
     expect(resources).toContain(":inference-profile/us.anthropic.claude-haiku-5-5");
     expect(resources).toContain(":bedrock:*::foundation-model/anthropic.claude-haiku-5-5");
     expect(resources).toContain("::foundation-model/amazon.titan-embed-text-v2:0");
-    expect((bedrock[0]!.Resource as unknown[]).length).toBe(3);
+    expect((bedrock[0]!.Resource as unknown[]).length).toBe(5);
   });
 
   it("prod schedule: every 2h 06-22 IST, no retries, enabled", () => {

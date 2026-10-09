@@ -4,6 +4,7 @@ import type { ModelPort } from "../src/bedrock.js";
 import {
   archiveOldNews,
   classifyRequest,
+  compactText,
   enrich,
   parseClassification,
   parseTopics,
@@ -76,7 +77,7 @@ function fakes(opts: {
           summary: "  A sentence  about it. ",
           shelf: "learning",
           topic: "engineering",
-          promo: opts.promo ?? false,
+          selling: opts.promo ? "promo" : "ad-supported",
         },
         inputTokens: 1000,
         outputTokens: 40,
@@ -109,17 +110,17 @@ describe("classification request and parsing", () => {
   it("normalizes a good answer and matches topics case-insensitively", () => {
     expect(
       parseClassification(
-        { summary: " Two\n lines ", shelf: "news", topic: "ai", promo: true },
+        { summary: " Two\n lines ", shelf: "news", topic: "ai", selling: "promo" },
         topics,
       ),
-    ).toEqual({ summary: "Two lines", shelf: "news", topic: "AI", promo: true });
+    ).toEqual({ summary: "Two lines", shelf: "news", topic: "AI", selling: "promo", promo: true });
   });
 
   it("rejects answers outside the schema", () => {
-    const ok = { summary: "S", shelf: "news", topic: "AI", promo: false };
+    const ok = { summary: "S", shelf: "news", topic: "AI", selling: "ad-supported" };
     expect(() => parseClassification({ ...ok, shelf: "opinion" }, topics)).toThrow("bad shelf");
     expect(() => parseClassification({ ...ok, topic: "Sports" }, topics)).toThrow("unknown topic");
-    expect(() => parseClassification({ ...ok, promo: "no" }, topics)).toThrow("promo");
+    expect(() => parseClassification({ ...ok, selling: "yes" }, topics)).toThrow("bad selling");
     expect(() => parseClassification({ ...ok, summary: " " }, topics)).toThrow("summary");
   });
 
@@ -130,6 +131,14 @@ describe("classification request and parsing", () => {
       parseTopics({ topics: [...topics, { name: "ai", description: "again" }] }),
     ).toThrow("unusable");
     expect(() => parseTopics({})).toThrow("no topic list");
+  });
+});
+
+describe("compactText", () => {
+  it("drops invisible preview padding and collapses whitespace", () => {
+    expect(compactText("Week 27\u00a0\u2007\u034f\u200c \n\n Lesson\u00ad text")).toBe(
+      "Week 27 Lesson text",
+    );
   });
 });
 

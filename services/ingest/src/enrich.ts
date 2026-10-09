@@ -1,6 +1,7 @@
 /**
  * Enrichment: Claude reads each stored issue once and returns a one-line summary, its shelf (News
- * or Learning), one topic from the topic list, and whether it is a promo. Titan adds an embedding
+ * or Learning), one topic from the topic list, and how much of it is selling (a promo is archived).
+ * Titan adds an embedding
  * for Phase 2 ranking. Runs after every ingest for new issues (retrying recent failures) and on
  * demand for the backlog (`pnpm enrich`). The topic list is proposed once (`pnpm topics`).
  */
@@ -16,10 +17,27 @@ const READER =
 /** How much of an issue Claude reads: roughly the first 1,500 tokens. */
 const MAX_TEXT_CHARS = 6000;
 
+/** Newsletters pad their preview text with invisible characters; drop them before cutting. */
+export function compactText(text: string): string {
+  return text
+    .replace(/[\u034f\u00ad\u200b-\u200d\u2060\ufeff]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Three answers rather than yes/no: asked "is this a promo?", Haiku flagged most issues that merely
+ * carry a sponsor slot (158 of 396 on the first backlog run). Only "promo" is archived.
+ */
+export const SELLING = ["none", "ad-supported", "promo"] as const;
+export type Selling = (typeof SELLING)[number];
+
 export interface Classification {
   summary: string;
   shelf: Shelf;
   topic: string;
+  selling: Selling;
+  /** selling === "promo" */
   promo: boolean;
 }
 
@@ -39,14 +57,20 @@ export function classifyRequest(
         '"learning" if it would still be worth reading in three months: explanations, deep ' +
         "dives, how-tos, frameworks, case studies, interviews about craft, essays.",
       "- topic: the one topic below that fits best.",
-      "- promo: true only if the issue mainly sells something: a subscription offer, a course or " +
-        "cohort sale, an event or webinar invite, or sponsored content only. A normal issue that " +
-        "carries an ad is not a promo.",
+      "- selling: how much of the issue is selling something.",
+      '  "promo": the whole issue exists to sell: a subscription or upgrade offer, a course or ' +
+        "cohort enrollment, an event or webinar invite, a launch of the sender's own paid " +
+        "product, or a post marked sponsored. Nothing else of substance is in it.",
+      '  "ad-supported": a normal issue (news, analysis, a tutorial, an essay, a list of links, ' +
+        "practice questions) that also carries sponsor slots, ads or a plug for the sender's " +
+        "course. Most newsletters are this.",
+      '  "none": no ads at all.',
+      '  When unsure between "promo" and "ad-supported", answer "ad-supported".',
       "",
       "Topics:",
       ...topics.map((t) => `- ${t.name}: ${t.description}`),
     ].join("\n"),
-    user: `Newsletter: ${issue.publication}\nSubject: ${issue.subject}\n\n${issue.text.slice(0, MAX_TEXT_CHARS)}`,
+    user: `Newsletter: ${issue.publication}\nSubject: ${issue.subject}\n\n${compactText(issue.text).slice(0, MAX_TEXT_CHARS)}`,
     tool: {
       name: "classify_issue",
       description: "Record how this newsletter issue is sorted for the reader.",
@@ -56,9 +80,9 @@ export function classifyRequest(
           summary: { type: "string", description: "One sentence, at most 25 words." },
           shelf: { type: "string", enum: ["news", "learning"] },
           topic: { type: "string", enum: topics.map((t) => t.name) },
-          promo: { type: "boolean" },
+          selling: { type: "string", enum: [...SELLING] },
         },
-        required: ["summary", "shelf", "topic", "promo"],
+        required: ["summary", "shelf", "topic", "selling"],
       },
     },
     maxTokens: 300,
@@ -75,8 +99,15 @@ export function parseClassification(input: unknown, topics: Topic[]): Classifica
   const asked = String(o.topic).toLowerCase();
   const topic = topics.find((t) => t.name.toLowerCase() === asked)?.name;
   if (!topic) throw new Error(`unknown topic: ${String(o.topic)}`);
-  if (typeof o.promo !== "boolean") throw new Error("classification has no promo flag");
-  return { summary: summary.slice(0, 300), shelf: o.shelf, topic, promo: o.promo };
+  const selling = SELLING.find((s) => s === o.selling);
+  if (!selling) throw new Error(`bad selling: ${String(o.selling)}`);
+  return {
+    summary: summary.slice(0, 300),
+    shelf: o.shelf,
+    topic,
+    selling,
+    promo: selling === "promo",
+  };
 }
 
 export function topicsRequest(issues: { publication: string; subject: string }[]): ToolRequest {
@@ -87,6 +118,10 @@ export function topicsRequest(issues: { publication: string; subject: string }[]
       "Call propose_topics with 6 to 9 topics that group these issues by subject matter. Group " +
         "by subject, not by format: whether an issue is news or a deep dive is tracked " +
         'separately, so never use topics like "News" or "Deep dives".',
+      "Shape the list around the reader's interests: each interest that appears in the issues " +
+        "gets its own topic, and product management and system design are separate topics " +
+        "(never fold product management into engineering). Do not split one area into several " +
+        "topics just because it has many issues: AI gets at most two.",
       "Each topic has a short name (one to three words) and a one-line description of what " +
         "belongs in it. Together the topics should cover every issue; add a broad catch-all only " +
         "if some issues fit nowhere else.",
@@ -138,7 +173,10 @@ export function embeddingInput(i: {
   summary?: string;
   text: string;
 }): string {
-  return [i.publication, i.subject, i.summary, i.text].filter(Boolean).join("\n\n").slice(0, 8000);
+  return [i.publication, i.subject, i.summary, compactText(i.text)]
+    .filter(Boolean)
+    .join("\n\n")
+    .slice(0, 8000);
 }
 
 /** A stored issue as enrichment sees it. */

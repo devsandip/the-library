@@ -99,7 +99,7 @@ Then set `INGEST_SCHEDULE_ENABLED = true` in `infra/lib/config.ts` and deploy. T
 - **Remove the app from sandip.dev.** `AWS_PROFILE=admin pnpm amplify-proxy --remove`.
 - **The distribution was replaced** (rare). Rerun `pnpm amplify-proxy --apply`; the rule points at the distribution domain.
 - **Changing the HTTP API.** Avoid replacing it (keep its construct ID): a new API took about 16 minutes to get a DNS record, during which the API returns 502s.
-- **Summaries or tabs missing.** `/status` shows Claude's last run. "Waiting for the topic list": run `pnpm topics --apply`. `AccessDeniedException ... not available for this account`: the AWS account has not completed Anthropic's one-time use-case form (Bedrock console, Model catalog, Claude Haiku 5.5). Then `pnpm enrich --days 30` catches up.
+- **Summaries or tabs missing.** `/status` shows Claude's last run. "Waiting for the topic list": run `pnpm topics --apply`. `AccessDeniedException ... not available for this account`: the AWS account has not completed Anthropic's one-time use-case form (Bedrock console, Model catalog), or the model in `MODELS.classify` (`services/ingest/src/bedrock.ts`) is not enabled for the account. Haiku 5.5 was not, as of 2026-10-09; Haiku 4.5 is. Then `pnpm enrich --days 30` catches up.
 - **Cost.** About $0.20/month in Phase 1. Every resource is tagged `project=thelibrary`.
 
 ## Backlog

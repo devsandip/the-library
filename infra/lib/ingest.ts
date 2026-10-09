@@ -60,14 +60,16 @@ export class Ingest extends Construct {
       }),
     );
 
-    // Enrichment (keep in step with MODELS in services/ingest/src/bedrock.ts): Claude Haiku 5.5
-    // through the US cross-region inference profile, which may run in any US region, and Titan
-    // Text Embeddings V2 in this region.
+    // Enrichment (keep in step with MODELS in services/ingest/src/bedrock.ts): Claude Haiku 4.5,
+    // or 5.5 once the account has it, through US cross-region inference profiles, which may run in
+    // any US region; and Titan Text Embeddings V2 in this region.
     this.fn.addToRolePolicy(
       new PolicyStatement({
         effect: Effect.ALLOW,
         actions: ["bedrock:InvokeModel"],
         resources: [
+          `arn:${stack.partition}:bedrock:${stack.region}:${stack.account}:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0`,
+          `arn:${stack.partition}:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0`,
           `arn:${stack.partition}:bedrock:${stack.region}:${stack.account}:inference-profile/us.anthropic.claude-haiku-5-5`,
           `arn:${stack.partition}:bedrock:*::foundation-model/anthropic.claude-haiku-5-5`,
           `arn:${stack.partition}:bedrock:${stack.region}::foundation-model/amazon.titan-embed-text-v2:0`,
