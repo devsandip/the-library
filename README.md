@@ -49,12 +49,18 @@ These steps were done once in October 2026; they are here for a rebuild or a new
 
 In the [Google Cloud console](https://console.cloud.google.com/), signed in as the Gmail account that receives the newsletters:
 
-1. Create a project called `the-library`.
+1. Create a project called `the-library` (project picker at the top > **New project**), and make sure it is selected in the picker.
 2. APIs & Services > Library: enable the **Gmail API**.
-3. Google Auth Platform > Branding / Audience: user type **External**, app name "The Library", your email as support and developer contact. Add yourself as a test user.
-4. Data Access: add the scope `https://www.googleapis.com/auth/gmail.readonly`.
-5. Audience: **Publish app** (status "In production"). Apps left in "Testing" get refresh tokens that expire after 7 days, which would quietly break ingest every week. Personal use does not need Google's verification; you will click through an "unverified app" warning once.
-6. Clients: **Create client**, type **Desktop app**, and download the JSON file.
+3. Navigation menu > **Google Auth platform** (or open https://console.cloud.google.com/auth/overview). A new project shows "Google Auth platform not configured yet": click **Get started**. The wizard asks for:
+   - **App information:** App name "The Library", User support email: your Gmail. **Next**.
+   - **Audience:** **External**. **Next**.
+   - **Contact information:** your Gmail. **Next**.
+   - **Finish:** tick "I agree to the Google API Services: User Data Policy", **Continue**, then **Create**.
+
+   Only after this do **Branding**, **Audience**, **Clients** and **Data Access** appear in the left menu.
+4. **Data Access** > **Add or remove scopes**: paste `https://www.googleapis.com/auth/gmail.readonly` under "Manually add scopes", **Add to table**, **Update**, then **Save**.
+5. **Audience** > **Publish app** (status changes from "Testing" to "In production"). Apps left in Testing get refresh tokens that expire after 7 days, which would quietly break ingest every week. Personal use does not need Google's verification: you will click through a "Google hasn't verified this app" warning once (Advanced > Go to The Library). Unverified apps are capped at 100 users, which does not matter here.
+6. **Clients** > **Create client**: Application type **Desktop app**, name "The Library CLI", **Create**, then **Download JSON**.
 
 Then, on your Mac:
 
