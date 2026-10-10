@@ -11,6 +11,7 @@ import {
   INTERESTS_KEY,
   issueIndexAttributes,
   issueKey,
+  NARRATIVE_KEY,
   senderIdentity,
   TOPICS_KEY,
 } from "@library/core";
@@ -461,6 +462,37 @@ describe("API on dev", () => {
       irrelevant: 0,
     });
     await call("POST", `/issues/${digest[0]}/rating`, { body: { value: 0 } });
+
+    // The day in brief (#18) comes along while it is less than a day old.
+    expect(r.body.narrative).toBeUndefined();
+    const thread = {
+      title: "One thread",
+      text: "What happened.",
+      sources: [{ issueId: "fx-tldr", publication: "TLDR" }],
+    };
+    const putNarrative = (at: string) =>
+      ddb.send(
+        new PutCommand({
+          TableName: stack.tableName,
+          Item: {
+            ...NARRATIVE_KEY,
+            at,
+            threads: [thread],
+            stories: 9,
+            newsletters: 3,
+            storyKeys: ["fx-tldr#01"],
+            model: "m",
+          },
+        }),
+      );
+    await putNarrative(new Date().toISOString());
+    expect((await call<SummaryResponse>("GET", "/summary")).body.narrative).toMatchObject({
+      threads: [thread],
+      stories: 9,
+      newsletters: 3,
+    });
+    await putNarrative(new Date(Date.now() - 25 * 3_600_000).toISOString());
+    expect((await call<SummaryResponse>("GET", "/summary")).body.narrative).toBeUndefined();
   });
 
   it("related: the closest issue by topic, muted newsletters left out", async () => {

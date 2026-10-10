@@ -10,6 +10,7 @@ import { useAsync } from "../hooks.js";
 import { PANES, useMedia, WIDE } from "../media.js";
 import { backIfPossible, clickInPlace } from "../nav.js";
 import { IssueReader } from "../components/issue-reader.js";
+import { DayInBrief } from "../components/narrative.js";
 import { ArchiveIcon, BackIcon, StarIcon, ThumbDown, ThumbUp } from "../components/icons.js";
 import { SwipeUnder, useSwipe, useSwipeRating, type SwipeActions } from "../components/swipe.js";
 
@@ -153,6 +154,8 @@ export function Summary() {
   const top = items.filter((i) => digest.has(i.id));
   const rest = items.filter((i) => !digest.has(i.id));
   const stats = summary.data?.digestStats;
+  const narrative = summary.data?.narrative;
+  const openHere = (id: string) => route(`${BASE}/summary?issue=${encodeURIComponent(id)}`, true);
   // Archived lines are no longer candidates.
   const candidates = Math.max(0, (summary.data?.candidates ?? 0) - gone.size);
   const minutes = skimMinutes(items.map((i) => i.summary ?? i.subject));
@@ -163,9 +166,7 @@ export function Summary() {
       issue={i}
       selected={i.id === open}
       phone={!wide}
-      onOpen={
-        panes ? (id) => route(`${BASE}/summary?issue=${encodeURIComponent(id)}`, true) : undefined
-      }
+      onOpen={panes ? openHere : undefined}
       onArchive={(id) => void archive(id)}
       swipe={wide ? undefined : rating.actions(i)}
     />
@@ -183,6 +184,8 @@ export function Summary() {
         </p>
       )}
       {error && <p class="error list-note">{error}</p>}
+      {/* Today's news as threads (#18); with the reading pane, it fills the pane instead. */}
+      {narrative && !panes && <DayInBrief narrative={narrative} foldable />}
       {summary.status === "ok" && items.length === 0 && (
         <div class="empty">
           <p class="empty-title">No new numbers.</p>
@@ -257,8 +260,13 @@ export function Summary() {
               onChange={(id, change) => {
                 if (change.state) hide([id], change.state === "archived");
               }}
-              onOpen={(id) => route(`${BASE}/summary?issue=${encodeURIComponent(id)}`, true)}
+              onOpen={openHere}
             />
+          ) : narrative ? (
+            <div class="pane-brief">
+              <DayInBrief narrative={narrative} foldable={false} onOpen={openHere} />
+              <p class="muted pane-brief-hint">Pick a line to read the issue here.</p>
+            </div>
           ) : (
             <div class="reader-empty">
               <p class="empty-title">Pick a line to read the issue here.</p>

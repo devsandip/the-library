@@ -24,6 +24,7 @@ import {
   INDEX,
   INGEST_STATE_KEY,
   INTERESTS_KEY,
+  NARRATIVE_KEY,
   issueIndexAttributes,
   issueKey,
   PARTITION,
@@ -46,6 +47,7 @@ import type {
   IssueListItem,
   IssueListResponse,
   IssueState,
+  Narrative,
   Rating,
   ReaderState,
   RelatedItem,
@@ -802,16 +804,18 @@ export class DynamoRepo implements RepoPort {
     const byId = new Map(items.map((i) => [i.id as string, i]));
     const picked = pickTop(ranked, limit);
     const day = readerDay(now);
-    const [digest, digestStats] = await Promise.all([
+    const [digest, digestStats, narrative] = await Promise.all([
       this.todaysDigest(
         day,
         picked.slice(0, DIGEST_SIZE).map((r) => r.id),
       ),
       this.digestStats(now),
+      this.narrative(now),
     ]);
     return {
       digest,
       digestStats,
+      ...(narrative ? { narrative } : {}),
       items: picked.map((r) => {
         const item = toListItem(byId.get(r.id)!);
         return {
@@ -904,6 +908,19 @@ export class DynamoRepo implements RepoPort {
       if (!isConditionFailure(err)) throw err;
       return ((await logged())?.ids as string[] | undefined) ?? top;
     }
+  }
+
+  /** The latest narrative of the day's news (#18), if it was written in the last 24 hours. */
+  private async narrative(now: number): Promise<Narrative | undefined> {
+    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: NARRATIVE_KEY }));
+    const n = res.Item;
+    if (!n || now - Date.parse(n.at as string) > 24 * 3_600_000) return undefined;
+    return {
+      at: n.at as string,
+      threads: n.threads as Narrative["threads"],
+      stories: n.stories as number,
+      newsletters: n.newsletters as number,
+    };
   }
 
   /**

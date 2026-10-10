@@ -8,6 +8,8 @@ export const eventKey = (id: string, at: string, rand: string) => ({
   sk: `EVT#${at}#${rand}`,
 });
 export const INGEST_STATE_KEY = { pk: "STATE", sk: "INGEST" } as const;
+/** The latest narrative of the day's news (#18), with the story keys it was written from. */
+export const NARRATIVE_KEY = { pk: "STATE", sk: "NARRATIVE" } as const;
 /** The topic list Claude proposed (`pnpm topics`). */
 export const TOPICS_KEY = { pk: "CONFIG", sk: "TOPICS" } as const;
 /** The five interests, embedded once by enrichment; they seed the ranking's taste profile. */

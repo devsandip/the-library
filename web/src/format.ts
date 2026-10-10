@@ -1,4 +1,4 @@
-import type { DigestStats } from "@library/core/types";
+import type { DigestStats, Narrative } from "@library/core/types";
 
 /** "3h ago", "yesterday", "Oct 2". */
 export function relativeTime(iso: string, now = Date.now()): string {
@@ -33,4 +33,10 @@ export function digestLine(s: DigestStats): string {
     `Boxed top 5s, last 14 days: ${s.relevant} of ${s.shown} rated Relevant (${pct}%), ` +
     `${s.irrelevant} Irrelevant. The aim is 60%.`
   );
+}
+
+/** Under the narrative's heading (#18): what it was written from, and when. */
+export function narrativeLine(n: Narrative, now = Date.now()): string {
+  const papers = n.newsletters === 1 ? "1 newsletter" : `${n.newsletters} newsletters`;
+  return `From ${n.stories} stories in ${papers}, updated ${relativeTime(n.at, now)}.`;
 }

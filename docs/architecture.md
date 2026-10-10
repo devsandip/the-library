@@ -166,6 +166,7 @@ All four GSIs are defined before the first deploy because CloudFormation adds on
 | Sender | `SENDER#<senderId>` | `META` | `senderKey` (readable, e.g. `pragmaticengineer@substack.com`), `publication`, `addresses` (set), `muted`, `mustRead` (Sandip's star, seeded once from the PRD keep list), `shelf` ("always News/Learning"; unset means Claude decides per issue), `up`, `down`, `issueCount`, `lastSeenAt`, `unsubscribeUrl`. |
 | Ingest state | `STATE` | `INGEST` | `lastRunAt`, `lastRunStats`, `lastError`. |
 | Digest (P2) | `DIGEST#<yyyy-mm-dd>` | `META` | `ids`: the Summary's top 5 the first time it is shown on that day (IST), `at`. Written once a day by `GET /summary` (issue #5). |
+| Narrative | `STATE` | `NARRATIVE` | The day in brief (#18), overwritten by each new version: `at`, `threads` (`title`, `text`, `sources` as issue id and publication), `stories`, `newsletters`, `storyKeys` (what the next run compares against), `model`. |
 
 `senderId` is opaque: `s` + the first 12 hex characters of SHA-256 of the canonical sender key (alias key, or the From address lowercased with any `+tag` removed). It is URL-safe, so `@` and `/` never travel through two proxies.
 
@@ -201,7 +202,7 @@ HTTP API, one route `ANY /thelibrary/api/{proxy+}` behind the Cognito JWT author
 | PATCH | `/thelibrary/api/senders/{senderId}` | `{ "muted"?, "mustRead"?, "shelf"?: "news" \| "learning" \| null }`, at least one. Setting `shelf` moves the sender's issues there (except ones Sandip moved); `null` hands them back to Claude's call. |
 | GET | `/thelibrary/api/topics` | The topic list. The web shows the News/Learning tabs once it is non-empty. |
 | GET | `/thelibrary/api/unread-counts` | Unread issues counted by sender, shelf and topic (muted senders included), for the numbers on the tabs, topic chips and sender picker. The web works out every combination of filters from this one list. |
-| GET | `/thelibrary/api/summary` | The 20 most relevant unread News issues from the last two weeks, best first and at most three from one newsletter, each with a `scoreReason`, plus how many were scored. Scored at read time (section 11). The first call of the day logs the top 5 as the day's digest; every call returns it (`digest`) with the success measure (`digestStats`). |
+| GET | `/thelibrary/api/summary` | The 20 most relevant unread News issues from the last two weeks, best first and at most three from one newsletter, each with a `scoreReason`, plus how many were scored. Scored at read time (section 11). The first call of the day logs the top 5 as the day's digest; every call returns it (`digest`) with the success measure (`digestStats`), and the day in brief (`narrative`, #18) while it is less than a day old. |
 | POST | `/thelibrary/api/ingest` | Async "refresh now". |
 | GET | `/thelibrary/api/status` | Last ingest run, counts, the success measure (`digestStats`). |
 
@@ -225,7 +226,7 @@ HTTP API, one route `ANY /thelibrary/api/{proxy+}` behind the Cognito JWT author
 - **Look (issue #12; Sandip picked a combination on 2026-10-10, replacing the earlier Clean list):** two layouts split at 760px (`web/src/media.ts`). **Phone: briefing cards** (direction D): always dark, Figtree for the interface and Literata for reading, one yellow accent. Home has a header with the date, Summary and Status; News | Learning as two pills; Must Read as a sideways row of large cards; the rest as cards under their topic headings in Claude's order. **Mac: two-pane** (direction C): IBM Plex Sans and Serif, one teal accent, light by default and the phone's dark palette in dark mode. A sidebar sits beside every page (News, Learning, Summary, topic chips, the sender list with search and checkboxes, Manage senders, Status), where Topics and Senders each fold shut from their heading and the browser remembers which are folded (`localStorage`); Home is a list column grouped Must Read / Everything else; from 1100px a reading pane opens issues beside the list (`?issue=<id>`, which replaces the history entry). All four typefaces are self-hosted from `@fontsource` packages (bundled into `assets/`, so no third-party requests and no CSP change); browsers fetch only the faces a layout uses. Shared data (topics, senders, the unread tally) lives in `web/src/library.tsx` and refreshes on every route change.
 - Routes: `/` (home list), `/summary`, `/issue/:id`, `/senders`, `/senders/:senderId`, `/auth/callback`, `/status`.
 - **Home filters**, all in the URL so Back restores them: the News | Learning tabs with unread counts; senders (several at once, Must Read first, with search: a bottom sheet on the phone with picked senders as removable chips, checkboxes in the Mac sidebar); topic chips (several at once; switching tabs clears them, picked senders stay; tapping a topic heading on the phone, or the topic on an open issue, switches its chip on); a view menu (Unread, All, Archived) and a check-Gmail button. Counts come from `/unread-counts` through `web/src/counts.ts`.
-- **Summary page** (`/summary`, issue #11): the 20 most relevant unread News issues (at most three from one newsletter), each as the newsletter, Claude's one line and the reason it ranks there, with archive per line and "Mark all read" to bring up the next ones. Today's digest (the top 5 as first shown) carries the yellow box, and a line under the list gives the success measure, also on Status. One card of lines on the phone; a list column with the reading pane on the Mac.
+- **Summary page** (`/summary`, issue #11): the 20 most relevant unread News issues (at most three from one newsletter), each as the newsletter, Claude's one line and the reason it ranks there, with archive per line and "Mark all read" to bring up the next ones. Today's digest (the top 5 as first shown) carries the yellow box, and a line under the list gives the success measure, also on Status. One card of lines on the phone; a list column with the reading pane on the Mac. **The day in brief** (#18) sits above the list in a card that folds shut (remembered in `localStorage`); on the Mac with the reading pane it fills the pane until an issue is opened, and its newsletter links open their issues there.
 - **Swipe to rate** (issue #13, phone only): on Home's topic cards, the Summary and a sender's page, swipe right to rate Relevant, left to rate Irrelevant and archive, with "Archived. Undo" for five seconds. Past 40% of the row's width, or a quick flick, commits; anything less springs back, and a swipe that would change nothing resists. Touch only, with `touch-action: pan-y` so scrolling stays native; the Must Read row scrolls sideways, so its cards do not swipe. Rules in `web/src/gesture.ts`, the gesture and Undo in `web/src/components/swipe.tsx`; no API change.
 - **Related** (issue #20, `web/src/components/related.tsx`): under the newsletter, on the issue page and in the reading pane, "Earlier" and "Since" with the newsletter, date and Claude's line for each. In the pane, a related issue opens in the pane. Nothing shows when nothing is close.
 - **Issue page** (`web/src/components/issue-reader.tsx`, also the reading pane): on the Mac, Claude's summary sits in a box under the headline (issue #14) and the actions are a row of labelled buttons; the phone keeps the headline alone, with the actions in a bar at the bottom.
@@ -302,6 +303,15 @@ Claude splits every issue into its stories and stories about the same event are 
 - **When:** after enrichment on every scheduled run, for the last 14 days, inside the run's time budget; `pnpm stories --days 30` for the backlog. A split that fails three times is left alone (`--force` retries). Like enrichment, it never fails the ingest run; `/status` shows the last run's line.
 - **Cost:** about 0.6 cents per issue. The backlog (357 issues, 2,210 stories, 2026-10-10) took 1.12 million tokens in and 225,000 out: $2.25. About $3 a month at ~25 issues a day.
 
+### The day in brief (`services/ingest/src/narrative.ts`, issue #18)
+
+Today's news as 3 to 6 threads, each a short paragraph naming the newsletters it came from; decisions and the probe are in `docs/features/narrative.md`.
+
+- **Input:** News stories from issues received in the last 24 hours (the issue's shelf; promos and muted newsletters left out), merged by event so a story several newsletters carried appears once, with its newsletters listed.
+- **Call:** one forced tool call to Haiku (`write_narrative`): threads of one development each, every story in a thread about that development, plain sentences, only what the stories say, no em-dashes (any that slip through become commas). Thread story ids are checked against the input; sources are the issues behind them.
+- **When:** after the story index on every scheduled run, if there are at least 8 News stories, at least 6 hours have passed since the last version, and at least 5 stories are new to it; never after the run's 9-minute mark. `pnpm narrative --force` writes one now. It never fails the ingest run.
+- **Cost:** about a cent per version (39 stories: 3,900 tokens in, 700 out), at most four a day: about $1 a month.
+
 ## 12. Cost (steady state, ~25 issues/day)
 
 | Item | Phase 1 | Phase 2 |
@@ -314,9 +324,10 @@ Claude splits every issue into its stories and stories about the same event are 
 | Titan embeddings ($0.02 per M tokens) | n/a | ~$0.03 |
 | Haiku 5.5 enrichment (~25 issues/day) | n/a | ~$1.50 |
 | Story index: Haiku 4.5 reading whole issues (#15) | n/a | ~$3 |
-| **Total** | **~$0.20/month** | **~$4.40 to $4.80/month** |
+| The day in brief, up to 4 versions a day (#18) | n/a | ~$1 |
+| **Total** | **~$0.20/month** | **~$5.40 to $5.80/month** |
 
-An AWS Budget filtered on `project=thelibrary` alerts at $6 (set up in R9, once the cost-allocation tag is active; it was $2 before the story index).
+An AWS Budget filtered on `project=thelibrary` alerts at $8 (set up in R9, once the cost-allocation tag is active; it was $2 before the story index and the day in brief).
 
 ## 13. Phase 3 readiness (audio briefing)
 

@@ -215,6 +215,8 @@ export interface EnrichCandidate {
   shelfSetBy?: ShelfSetBy;
   enriched: boolean;
   embedded: boolean;
+  /** The effective shelf, once enriched. */
+  shelf?: Shelf;
   /** Claude marked it as a promo. */
   promo?: boolean;
   /** Split into stories (#15). */

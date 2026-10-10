@@ -22,6 +22,7 @@ import {
   INDEX,
   INGEST_STATE_KEY,
   INTERESTS_KEY,
+  NARRATIVE_KEY,
   PARTITION,
   TOPICS_KEY,
   issueIndexAttributes,
@@ -49,6 +50,7 @@ import { EMBED_DIMENSIONS, MODELS } from "./bedrock.js";
 import type { Classification, EnrichCandidate } from "./enrich.js";
 import { mapLimit } from "./ingest.js";
 import type { SenderFields, SenderPlan, StoredIssue, StoredSender } from "./senders.js";
+import type { StoredNarrative, StoryText } from "./narrative.js";
 import type { NewStory, StoredStory } from "./stories.js";
 
 type Newsletter = Extract<ProcessedMessage, { kind: "newsletter" }>;
@@ -523,7 +525,7 @@ export class Store {
             KeyConditionExpression: "gsi1pk = :p AND gsi1sk >= :since",
             ExpressionAttributeValues: { ":p": partition, ":since": sinceIso },
             ProjectionExpression:
-              "id, senderId, publication, subject, receivedAt, summary, shelfSetBy, enrichedAt, embeddedAt, promo, storiedAt, storyAttempts",
+              "id, senderId, publication, subject, receivedAt, summary, shelf, shelfSetBy, enrichedAt, embeddedAt, promo, storiedAt, storyAttempts",
             ExclusiveStartKey: start,
           }),
         );
@@ -536,6 +538,7 @@ export class Store {
             receivedAt: i.receivedAt as string,
             summary: i.summary as string | undefined,
             shelfSetBy: i.shelfSetBy as ShelfSetBy | undefined,
+            shelf: i.shelf as Shelf | undefined,
             enriched: Boolean(i.enrichedAt),
             embedded: Boolean(i.embeddedAt),
             promo: i.promo === true,
@@ -846,9 +849,37 @@ export class Store {
 
   // ---------- story index (#15) ----------
 
-  /** Stories received between two times (inclusive), oldest first. */
+  /** Stories received between two times (inclusive), oldest first, with their vectors. */
   async storiesBetween(fromIso: string, toIso: string): Promise<StoredStory[]> {
-    const out: StoredStory[] = [];
+    const items = await this.queryStories(fromIso, toIso, "senderId, vector");
+    return items.map((i) => ({
+      key: storyRef(i.id as string, i.n as number),
+      issueId: i.id as string,
+      n: i.n as number,
+      senderId: i.senderId as string,
+      receivedAt: i.receivedAt as string,
+      names: (i.names as string[] | undefined) ?? [],
+      vector: toVector(i.vector as Uint8Array),
+      eventId: i.eventId as string | undefined,
+    }));
+  }
+
+  /** Stories received between two times (inclusive), oldest first, with what they say. */
+  async storyTexts(fromIso: string, toIso: string): Promise<StoryText[]> {
+    const items = await this.queryStories(fromIso, toIso, "headline, summary");
+    return items.map((i) => ({
+      key: storyRef(i.id as string, i.n as number),
+      issueId: i.id as string,
+      receivedAt: i.receivedAt as string,
+      headline: i.headline as string,
+      summary: i.summary as string,
+      names: (i.names as string[] | undefined) ?? [],
+      eventId: (i.eventId as string | undefined) ?? storyRef(i.id as string, i.n as number),
+    }));
+  }
+
+  private async queryStories(fromIso: string, toIso: string, extra: string) {
+    const out: Record<string, unknown>[] = [];
     let start: Record<string, unknown> | undefined;
     do {
       const res: QueryCommandOutput = await this.ddb.send(
@@ -861,26 +892,30 @@ export class Store {
             ":from": fromIso,
             ":to": `${toIso}\uffff`,
           },
-          ProjectionExpression: "id, n, senderId, receivedAt, #names, vector, eventId",
+          ProjectionExpression: `id, n, receivedAt, #names, eventId, ${extra}`,
           ExpressionAttributeNames: { "#names": "names" },
           ExclusiveStartKey: start,
         }),
       );
-      for (const i of res.Items ?? []) {
-        out.push({
-          key: storyRef(i.id as string, i.n as number),
-          issueId: i.id as string,
-          n: i.n as number,
-          senderId: i.senderId as string,
-          receivedAt: i.receivedAt as string,
-          names: (i.names as string[] | undefined) ?? [],
-          vector: toVector(i.vector as Uint8Array),
-          eventId: i.eventId as string | undefined,
-        });
-      }
+      out.push(...(res.Items ?? []));
       start = res.LastEvaluatedKey;
     } while (start);
     return out;
+  }
+
+  // ---------- narrative (#18) ----------
+
+  async getNarrative(): Promise<StoredNarrative | undefined> {
+    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: NARRATIVE_KEY }));
+    if (!res.Item) return undefined;
+    const { pk: _pk, sk: _sk, ...narrative } = res.Item;
+    return narrative as StoredNarrative;
+  }
+
+  async putNarrative(narrative: StoredNarrative): Promise<void> {
+    await this.ddb.send(
+      new PutCommand({ TableName: this.table, Item: { ...NARRATIVE_KEY, ...narrative } }),
+    );
   }
 
   /** Replace an issue's stories, then mark the issue as split. */

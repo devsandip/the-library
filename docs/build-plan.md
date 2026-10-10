@@ -58,6 +58,7 @@ Reshaped by issues #2 to #5 (2026-10-09): Must Read shipped (#2); enrichment and
 | P2.3 | Rank sort, reason line, yellow box on top 5, topic filter, digest logging. | Ranked list with reasons; one digest row per day. **Summary page done** (reasons, yellow box on the day's top 5, digest logged on the first Summary of each day); the "Best first" sort inside the tabs waits for ratings. |
 | P2.4 | Success metric: rolling 14-day share of digest items rated Relevant. | Visible in the app; target >= 60%. **Done** (under the Summary and on Status), counting from 2026-10-10. |
 | P2.5 | Story index (#15): Claude splits each issue into stories (headline, summary, names, source link), Titan embeds each, and stories about the same event are linked across newsletters. Groundwork for #16 to #23. | Every non-promo issue split; linking thresholds checked against prod pairs; backlog cost logged. **Done** (2026-10-10): 357 issues, 2,210 stories, $2.25; cutoffs 0.70, or 0.55 with a shared name. |
+| P2.6 | The day in brief (#18): today's News stories, merged by event, written as 3 to 6 threads by one Claude call, at most every 6 hours when 5 or more stories are new; above the Summary's list, or in the Mac's empty reading pane. | A narrative on prod's Summary with sources linked; cost logged. |
 
 ## Phase 3 (optional, later)
 
