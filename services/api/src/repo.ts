@@ -25,6 +25,7 @@ import {
   INGEST_STATE_KEY,
   INTERESTS_KEY,
   NARRATIVE_KEY,
+  NOW_READING_KEY,
   openIndexAttributes,
   issueIndexAttributes,
   issueKey,
@@ -52,6 +53,7 @@ import type {
   IssueListResponse,
   IssueState,
   Narrative,
+  NowReadingResponse,
   Rating,
   ReaderState,
   RelatedItem,
@@ -463,7 +465,7 @@ export class DynamoRepo implements RepoPort {
   }
 
   async getIssue(id: string): Promise<IssueDetailResponse> {
-    const item = await this.mustGetIssue(id);
+    const [item, place] = await Promise.all([this.mustGetIssue(id), this.nowReadingItem()]);
     const keys = s3Keys(id);
     // Sanitized HTML expires after a year; the clean text is kept forever.
     let html = await this.readObject(keys.html);
@@ -473,11 +475,14 @@ export class DynamoRepo implements RepoPort {
       const escaped = text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
       html = `<pre style="white-space:pre-wrap;font-family:inherit">${escaped}</pre>`;
     }
+    const position = place?.issueId === id ? (place.position as number) : 0;
     return {
       ...toListItem(item),
       fromAddr: item.fromAddr as string,
       unsubscribeUrl: item.unsubscribeUrl as string | undefined,
       html,
+      // The reader goes back to the place in the issue Now reading points at (#44).
+      ...(position > 0 && position < 1 ? { position } : {}),
     };
   }
 
@@ -599,11 +604,81 @@ export class DynamoRepo implements RepoPort {
   }
 
   async logOpen(id: string): Promise<void> {
-    await this.mustGetIssue(id);
+    const [, place] = await Promise.all([this.mustGetIssue(id), this.nowReadingItem()]);
     const now = new Date().toISOString();
     // Indexed by time for read history (#42).
     const open = { type: "open", ...openIndexAttributes(id, now) };
-    await this.ddb.send(new PutCommand(this.event(id, now, open).Put));
+    // Now reading (#44) points at the issue opened last. Reopening it keeps the place, unless it
+    // was finished: then it starts again from the top.
+    const kept = place?.issueId === id ? (place.position as number) : 0;
+    await Promise.all([
+      this.ddb.send(new PutCommand(this.event(id, now, open).Put)),
+      this.putNowReading(id, kept < 1 ? kept : 0, now),
+    ]);
+  }
+
+  // ---------- now reading (#44) ----------
+
+  private async nowReadingItem(): Promise<Item | undefined> {
+    const res = await this.ddb.send(
+      new GetCommand({ TableName: this.table, Key: NOW_READING_KEY }),
+    );
+    return res.Item;
+  }
+
+  /** Point Now reading at an issue from `now`: rating it after that hides it. */
+  private async putNowReading(id: string, position: number, now: string): Promise<void> {
+    await this.ddb.send(
+      new PutCommand({
+        TableName: this.table,
+        Item: { ...NOW_READING_KEY, issueId: id, position, since: now, at: now },
+      }),
+    );
+  }
+
+  /**
+   * Save the place in an issue, 0 to 1, where 1 means finished. Usually the issue Now reading
+   * already points at. A place saved in another issue means it is being read again (an older
+   * window, after another device opened something), so Now reading moves back to it; finishing
+   * such an issue leaves Now reading alone.
+   */
+  async savePosition(id: string, position: number): Promise<void> {
+    const now = new Date().toISOString();
+    try {
+      await this.ddb.send(
+        new UpdateCommand({
+          TableName: this.table,
+          Key: NOW_READING_KEY,
+          UpdateExpression: "SET #p = :p, #at = :at",
+          ConditionExpression: "#id = :id",
+          ExpressionAttributeNames: { "#p": "position", "#at": "at", "#id": "issueId" },
+          ExpressionAttributeValues: { ":p": position, ":at": now, ":id": id },
+        }),
+      );
+    } catch (err) {
+      if (!isConditionFailure(err)) throw err;
+      await this.mustGetIssue(id);
+      if (position < 1) await this.putNowReading(id, position, now);
+    }
+  }
+
+  /** The issue to come back to, unless it was finished, archived, or rated after it was opened. */
+  async nowReading(): Promise<NowReadingResponse> {
+    const place = await this.nowReadingItem();
+    if (!place || (place.position as number) >= 1) return {};
+    const res = await this.ddb.send(
+      new GetCommand({ TableName: this.table, Key: issueKey(place.issueId as string) }),
+    );
+    const item = res.Item;
+    if (!item || item.state === "filtered" || item.state === "archived") return {};
+    if (item.rating && (item.ratedAt as string) >= (place.since as string)) return {};
+    return {
+      nowReading: {
+        issue: toListItem(item),
+        position: place.position as number,
+        at: place.at as string,
+      },
+    };
   }
 
   // ---------- read history (#42) ----------

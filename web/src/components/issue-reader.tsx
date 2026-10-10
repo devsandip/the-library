@@ -9,6 +9,7 @@ import { useAsync } from "../hooks.js";
 import { useLibrary } from "../library.js";
 import { backIfPossible } from "../nav.js";
 import { NewsletterFrame } from "./newsletter-frame.js";
+import { useReadingPlace } from "./now-reading.js";
 import { Related } from "./related.js";
 import { ArchiveIcon, BackIcon, ExternalIcon, ThumbDown, ThumbUp, UnreadIcon } from "./icons.js";
 
@@ -34,7 +35,7 @@ export function IssueReader({
   onOpen?: (id: string) => void;
 }) {
   const { api } = useApp();
-  const { counts } = useLibrary();
+  const { counts, nowReading } = useLibrary();
   const issue = useAsync(() => api.getIssue(id), [id]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string>();
@@ -50,13 +51,32 @@ export function IssueReader({
     const data = issue.data;
     if (!data || opened.current === data.id) return;
     opened.current = data.id;
-    void api.logOpen(data.id).catch(() => undefined);
+    // The open also points Now reading at this issue (#44).
+    void api.logOpen(data.id).then(nowReading.reload, () => undefined);
     if (data.state === "unread") {
       issue.set({ ...data, state: "read" });
       onChange?.(data.id, { state: "read" });
       void api.setState(data.id, "read").then(counts.reload, () => undefined);
     }
   }, [issue.data]);
+
+  // Now reading (#44): back to the place in the issue, and the place saved while reading.
+  const onFit = useReadingPlace(id, issue.data?.position, (issueId, place, keepalive) => {
+    // The card in the sidebar keeps up; a finished issue leaves Now reading.
+    nowReading.set((cur) => {
+      const n = cur.nowReading;
+      if (n?.issue.id !== issueId) return cur;
+      return place >= 1
+        ? {}
+        : { nowReading: { ...n, position: place, at: new Date().toISOString() } };
+    });
+    const pointed = nowReading.data?.nowReading?.issue.id === issueId;
+    void api.savePosition(issueId, place, keepalive).then(
+      // A place saved in another issue moves Now reading to it.
+      () => !pointed && place < 1 && nowReading.reload(),
+      () => undefined,
+    );
+  });
 
   /** Optimistic update; on failure revert, and on a conflict show the fresh copy. */
   const change = async (patch: Partial<IssueListItem>, send: () => Promise<unknown>) => {
@@ -69,6 +89,8 @@ export function IssueReader({
     try {
       await send();
       if ("state" in patch || "shelf" in patch) counts.reload();
+      // Archiving or rating an issue ends Now reading on it.
+      if ("state" in patch || "rating" in patch) nowReading.reload();
     } catch (err) {
       issue.set(before);
       const undo: Partial<IssueListItem> = {};
@@ -268,7 +290,7 @@ export function IssueReader({
       )}
       {notice && <p class="notice">{notice}</p>}
 
-      <NewsletterFrame html={d.html} title={d.subject} />
+      <NewsletterFrame html={d.html} title={d.subject} onFit={onFit} />
       <Related id={d.id} onOpen={onOpen} />
     </article>
   );

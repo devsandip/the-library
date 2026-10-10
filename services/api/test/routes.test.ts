@@ -35,6 +35,10 @@ function setup(overrides: Partial<RepoPort> = {}) {
     listTopics: vi.fn(async () => [{ name: "AI", description: "Models and tools" }]),
     setRating: vi.fn(async (_id, value) => ({ ...issue, rating: value === 0 ? undefined : value })),
     logOpen: vi.fn(async () => undefined),
+    nowReading: vi.fn(async () => ({
+      nowReading: { issue, position: 0.4, at: "2026-10-10T03:00:00.000Z" },
+    })),
+    savePosition: vi.fn(async () => undefined),
     related: vi.fn(async () => ({ earlier: [{ ...issue, similarity: 0.41 }], since: [] })),
     listSenders: vi.fn(async () => [sender]),
     getSender: vi.fn(async () => ({ ...sender, addresses: [], issues: [issue] })),
@@ -235,6 +239,30 @@ describe("routing and validation", () => {
     expect((await call("POST", "/issues/abc123/events", { body: { type: "dwell" } })).status).toBe(
       400,
     );
+  });
+
+  it("now reading: serves the issue to come back to and saves the place", async () => {
+    const { call, repo } = setup();
+    const r = await call("GET", "/now-reading");
+    expect(r.status).toBe(200);
+    expect(r.body.nowReading).toMatchObject({ issue: { id: "abc123" }, position: 0.4 });
+
+    const put = (body: unknown) => call("PUT", "/now-reading", { body });
+    expect((await put({ id: "abc123", position: 0.25 })).status).toBe(204);
+    expect(repo.savePosition).toHaveBeenCalledWith("abc123", 0.25);
+    expect((await put({ id: "abc123", position: 1 })).status).toBe(204);
+    expect((await put({ id: "abc123", position: 0 })).status).toBe(204);
+    for (const bad of [
+      { id: "abc123", position: 1.5 },
+      { id: "abc123", position: -0.1 },
+      { id: "abc123", position: "0.5" },
+      { id: "abc123" },
+      { id: "../etc", position: 0.5 },
+      { position: 0.5 },
+    ]) {
+      expect((await put(bad)).status).toBe(400);
+    }
+    expect((await call("POST", "/now-reading", { body: { id: "abc123" } })).status).toBe(405);
   });
 
   it("senders: list, detail, mute, star", async () => {

@@ -10,6 +10,7 @@ import type {
   IssueListItem,
   IssueListResponse,
   Narrative,
+  NowReadingResponse,
   Rating,
   ReaderState,
   RelatedResponse,
@@ -302,7 +303,7 @@ const PLACEHOLDER_IMAGE =
     '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600"><rect width="1200" height="600" fill="#d9d4c7"/><path d="M0 480 L300 300 L520 420 L800 220 L1200 460 V600 H0Z" fill="#b8b09c"/></svg>',
   );
 
-const issues: (IssueListItem & { html: string })[] = ROWS.map(
+const issues: (IssueListItem & { html: string; ratedAt?: string })[] = ROWS.map(
   ([publication, shelf, topic, subject, summary, hours, minutes, state], i) => {
     const s = senders.find((x) => x.publication === publication)!;
     s.issueCount++;
@@ -325,14 +326,22 @@ const issues: (IssueListItem & { html: string })[] = ROWS.map(
   },
 );
 
+/** A few screens long, in numbered parts, so the place in an issue (#44) can be seen. */
 function sampleHtml(subject: string, publication: string): string {
+  const parts = [1, 2, 3, 4, 5, 6]
+    .map(
+      (n) => `<h2 style="font-size:20px">Part ${n}</h2>
+<p>${`This is placeholder body text for part ${n}, for local development. `.repeat(10)}</p>
+${n % 2 ? `<img src="${PLACEHOLDER_IMAGE}" width="600" alt="illustration ${n}">` : ""}`,
+    )
+    .join("\n");
   return `<table width="600" align="center" style="font-family:Georgia,serif;color:#222"><tr><td>
 <p style="font-size:12px;color:#888">${publication}</p>
 <h1 style="font-size:28px;line-height:1.2">${subject}</h1>
 <p>Newsletters arrive as 600 pixel wide tables like this one. The reader frame makes them fit a phone screen without breaking the layout.</p>
-<img src="${PLACEHOLDER_IMAGE}" width="600" alt="illustration">
-<p>${"This is placeholder body text for local development. ".repeat(12)}</p>
+${parts}
 <p><a href="https://example.test/read-more">Read the full post</a></p>
+<p style="font-size:12px;color:#888">You are reading ${publication}. Unsubscribe any time.</p>
 </td></tr></table>`;
 }
 
@@ -342,7 +351,11 @@ const statesFor: Record<View, ReaderState[]> = {
   all: ["unread", "read"],
   archived: ["archived"],
 };
-const strip = ({ html: _html, ...item }: IssueListItem & { html: string }): IssueListItem => item;
+const strip = ({
+  html: _html,
+  ratedAt: _ratedAt,
+  ...item
+}: IssueListItem & { html: string; ratedAt?: string }): IssueListItem => item;
 const mustSet = () => new Set(senders.filter((s) => s.mustRead).map((s) => s.senderId));
 const withStar = (i: IssueListItem): IssueListItem =>
   mustSet().has(i.senderId) ? { ...i, mustRead: true } : i;
@@ -355,6 +368,22 @@ function find(id: string) {
 
 /** Today's top 5 as first shown, like the API's digest log. */
 let mockDigest: string[] | undefined;
+
+/** Now reading (#44): starts a third of the way into an issue, as if read on another device. */
+let mockPlace: { issueId: string; position: number; since: string; at: string } | undefined = {
+  issueId: "mock-3",
+  position: 0.35,
+  since: new Date(now - 3 * HOUR).toISOString(),
+  at: new Date(now - 2 * HOUR).toISOString(),
+};
+
+/** The API's rules: hidden once finished, archived, or rated after it was opened. */
+function mockNowReading(): NowReadingResponse {
+  if (!mockPlace || mockPlace.position >= 1) return {};
+  const i = issues.find((x) => x.id === mockPlace!.issueId);
+  if (!i || i.state === "archived" || (i.rating && i.ratedAt! >= mockPlace.since)) return {};
+  return { nowReading: { issue: strip(i), position: mockPlace.position, at: mockPlace.at } };
+}
 
 /** A stand-in for the success measure: three earlier days, plus today's digest as rated so far. */
 function digestStats(): DigestStats {
@@ -464,11 +493,13 @@ export class MockLibraryApi implements LibraryApi {
   async getIssue(id: string): Promise<IssueDetailResponse> {
     await delay();
     const i = find(id);
+    const position = mockPlace?.issueId === id ? mockPlace.position : 0;
     return {
       ...withStar(strip(i)),
       html: i.html,
       fromAddr: "hello@example.test",
       unsubscribeUrl: "https://example.test/unsubscribe",
+      ...(position > 0 && position < 1 ? { position } : {}),
     };
   }
   async setState(id: string, state: ReaderState) {
@@ -556,11 +587,25 @@ export class MockLibraryApi implements LibraryApi {
     if (i.rating === 1) s.up--;
     if (i.rating === -1) s.down--;
     i.rating = value === 0 ? undefined : value;
+    i.ratedAt = value === 0 ? undefined : new Date().toISOString();
     if (value === 1) s.up++;
     if (value === -1) s.down++;
     return strip(i);
   }
-  async logOpen() {}
+  async logOpen(id: string) {
+    const at = new Date().toISOString();
+    const kept = mockPlace?.issueId === id ? mockPlace.position : 0;
+    mockPlace = { issueId: id, position: kept < 1 ? kept : 0, since: at, at };
+  }
+  async nowReading(): Promise<NowReadingResponse> {
+    await delay();
+    return mockNowReading();
+  }
+  async savePosition(id: string, position: number) {
+    const at = new Date().toISOString();
+    if (mockPlace?.issueId === id) Object.assign(mockPlace, { position, at });
+    else if (position < 1) mockPlace = { issueId: id, position, since: at, at };
+  }
   async listSenders(): Promise<SenderListResponse> {
     await delay();
     return { items: [...senders].sort((a, b) => a.publication.localeCompare(b.publication)) };

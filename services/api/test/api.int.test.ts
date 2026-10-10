@@ -22,6 +22,7 @@ import type {
   HistoryResponse,
   IssueDetailResponse,
   IssueListResponse,
+  NowReadingResponse,
   RelatedResponse,
   SenderDetailResponse,
   SenderListResponse,
@@ -569,5 +570,64 @@ describe("API on dev", () => {
     expect(earlier.body.items.map((i) => i.id)).toEqual(["fx-pragmatic"]);
     expect(earlier.body.nextDay).toBe(today);
     expect((await call("GET", "/history", { query: { day: "2026-02-30" } })).status).toBe(400);
+  });
+
+  it("now reading: the last issue opened, its place, and when it hides", async () => {
+    const open = (id: string) => call("POST", `/issues/${id}/events`, { body: { type: "open" } });
+    const save = (id: string, position: number) =>
+      call("PUT", "/now-reading", { body: { id, position } });
+    const current = async () => (await call<NowReadingResponse>("GET", "/now-reading")).body;
+    const placeIn = async (id: string) =>
+      (await call<IssueDetailResponse>("GET", `/issues/${id}`)).body.position;
+    for (const id of ["fx-pragmatic", "fx-tldr"]) {
+      await call("POST", `/issues/${id}/rating`, { body: { value: 0 } });
+    }
+
+    expect((await open("fx-pragmatic")).status).toBe(204);
+    expect((await current()).nowReading).toMatchObject({
+      issue: { id: "fx-pragmatic" },
+      position: 0,
+    });
+    expect((await save("fx-pragmatic", 0.4)).status).toBe(204);
+    expect((await current()).nowReading?.position).toBe(0.4);
+    // The reader gets the place with the issue, and reopening keeps it.
+    expect(await placeIn("fx-pragmatic")).toBe(0.4);
+    await open("fx-pragmatic");
+    expect((await current()).nowReading?.position).toBe(0.4);
+
+    // Opening another issue moves Now reading there, from the top.
+    await open("fx-lenny");
+    expect((await current()).nowReading).toMatchObject({ issue: { id: "fx-lenny" }, position: 0 });
+    expect(await placeIn("fx-pragmatic")).toBeUndefined();
+
+    // A place saved in the first issue (an older window still open on it) moves it back.
+    await save("fx-pragmatic", 0.5);
+    expect((await current()).nowReading).toMatchObject({
+      issue: { id: "fx-pragmatic" },
+      position: 0.5,
+    });
+    // Finishing an issue Now reading does not point at leaves it alone.
+    await save("fx-lenny", 1);
+    expect((await current()).nowReading?.issue.id).toBe("fx-pragmatic");
+
+    // Finished: nothing to come back to. Reopening starts from the top.
+    await save("fx-pragmatic", 1);
+    expect((await current()).nowReading).toBeUndefined();
+    expect(await placeIn("fx-pragmatic")).toBeUndefined();
+    await open("fx-pragmatic");
+    expect((await current()).nowReading?.position).toBe(0);
+
+    // Rated after it was opened, or archived: hidden.
+    await call("POST", "/issues/fx-pragmatic/rating", { body: { value: 1 } });
+    expect((await current()).nowReading).toBeUndefined();
+    await open("fx-tldr");
+    expect((await current()).nowReading?.issue.id).toBe("fx-tldr");
+    await call("PATCH", "/issues/fx-tldr", { body: { state: "archived" } });
+    expect((await current()).nowReading).toBeUndefined();
+
+    expect((await save("does-not-exist", 0.5)).status).toBe(404);
+    expect((await save("fx-tldr", 2)).status).toBe(400);
+    await call("PATCH", "/issues/fx-tldr", { body: { state: "read" } });
+    await call("POST", "/issues/fx-pragmatic/rating", { body: { value: 0 } });
   });
 });

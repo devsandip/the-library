@@ -427,6 +427,64 @@ a.pill:hover {
   background: var(--raised);
 }
 
+/* Now reading (#44): the way back to the last issue opened, under the header and in the sidebar. */
+.now-reading {
+  display: grid;
+  gap: 2px;
+  margin-top: 14px;
+  padding: 12px 14px 12px;
+  border-radius: var(--radius);
+  background: var(--raised);
+  color: var(--fg);
+}
+
+.now-reading:hover {
+  color: var(--fg);
+}
+
+.now-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+.now-label svg {
+  width: 16px;
+  height: 16px;
+}
+
+.now-title {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.now-meta {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.now-bar {
+  display: block;
+  height: 3px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.now-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
 /* News | Learning */
 .shelves {
   display: grid;
@@ -863,6 +921,23 @@ a.pill:hover {
 
 .side-nav a.on .n {
   color: inherit;
+}
+
+.sidebar .now-reading {
+  margin: 14px 0 4px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 0.9375rem;
+}
+
+.sidebar .now-reading:hover {
+  border-color: var(--control);
+}
+
+.sidebar .now-reading.on {
+  border-color: var(--accent);
 }
 
 .side-label {
