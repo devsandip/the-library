@@ -82,3 +82,27 @@ Append-only session log. Newest entry at the bottom.
 
 - Written on the schedule, not when the Summary opens: the API Lambda times out at 15 seconds.
 - On a wide Mac it fills the empty reading pane, so the list column keeps the top 5 in view.
+
+## 2026-10-10: Read history, four backlog items, the journal
+
+**Did:**
+
+- Filed #41 (tap for a summary, double tap to open), #42 (read history), #43 (Save for later) and #44 (Now reading). Read history got a new `priority` label, as Sandip asked.
+- Built read history (#42, PR #45): `GET /history?day=` and a History page that pages by day, skipping empty days. Open events are indexed by time in `gsi1` under `OPENS`; `pnpm history-backfill` indexed the 18 opens logged before, so history starts on 2026-10-09.
+- Deployed to prod; `pnpm check-hosting` passes. Prod returns 9 issues for 2026-10-10 and 7 for 2026-10-09.
+- Bootstrapped the journal (`journal/INDEX.md` and four entries). It is not committed: the journal skill asks for Sandip's review first.
+
+**State now:**
+
+- Prod has everything through PR #45.
+- The journal waits in the session worktree (`.claude/worktrees/open-backlog-items-7dd3ce/journal/`) for Sandip's review.
+
+**Next:**
+
+- Commit the journal once Sandip has read it.
+- Then Save for later (#43) or Now reading (#44). Each has open questions in its issue.
+
+**Decisions:**
+
+- Read history indexes the open events that already exist rather than keeping a separate history. One row per issue per day, at its latest open.
+- The reader-day helpers moved to `@library/core/days`, shared by the API and the web app.
