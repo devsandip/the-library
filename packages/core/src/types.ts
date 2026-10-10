@@ -112,11 +112,25 @@ export interface RelatedResponse {
   since: RelatedItem[];
 }
 
+/** How the Summary's daily top 5 fared over the last 14 days: the PRD's success measure (#5). */
+export interface DigestStats {
+  /** Days with a digest logged. */
+  days: number;
+  /** Issues those digests held, each counted once. */
+  shown: number;
+  /** Of those, rated Relevant and Irrelevant by now. */
+  relevant: number;
+  irrelevant: number;
+}
+
 /** GET /summary: the most relevant unread News, best first, each with a `scoreReason`. */
 export interface SummaryResponse {
   items: IssueListItem[];
   /** Unread News issues from the last two weeks that were scored. */
   candidates: number;
+  /** Today's digest: the top 5 as first shown today. They carry the yellow box. */
+  digest?: string[];
+  digestStats?: DigestStats;
 }
 
 export interface SenderDetailResponse extends SenderListItem {
@@ -161,6 +175,7 @@ export interface StatusResponse {
   lastRunStats?: IngestStats;
   lastError?: string | null;
   lastEnrich?: EnrichStats;
+  digestStats?: DigestStats;
 }
 
 export interface ApiError {

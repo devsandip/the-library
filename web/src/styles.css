@@ -1284,6 +1284,28 @@ a.pill:hover {
   text-align: center;
 }
 
+.summary-list + .summary-list {
+  margin-top: 18px;
+}
+
+/* The Mac's list column scrolls, so the top 5's corner brackets sit inside it. */
+.pane-list .summary-list.yellow-box::before,
+.pane-list .summary-list.yellow-box::after {
+  inset: 4px;
+}
+
+/* The success measure under the Summary (#5). */
+.digest-line {
+  margin: 0 0 24px;
+  font-size: 0.75rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+.pane-list .digest-line {
+  margin: 0 20px 24px;
+}
+
 .mark-all .pill {
   color: var(--accent-text);
 }

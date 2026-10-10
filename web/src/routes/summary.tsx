@@ -4,7 +4,7 @@ import type { IssueListItem } from "@library/core/types";
 import { BASE } from "../config.js";
 import { useApp } from "../context.js";
 import { issueHref } from "../filters.js";
-import { todayLine } from "../format.js";
+import { digestLine, todayLine } from "../format.js";
 import { patchIssue } from "../groups.js";
 import { useAsync } from "../hooks.js";
 import { PANES, useMedia, WIDE } from "../media.js";
@@ -149,6 +149,10 @@ export function Summary() {
     }
   };
 
+  const digest = new Set(summary.data?.digest ?? []);
+  const top = items.filter((i) => digest.has(i.id));
+  const rest = items.filter((i) => !digest.has(i.id));
+  const stats = summary.data?.digestStats;
   // Archived lines are no longer candidates.
   const candidates = Math.max(0, (summary.data?.candidates ?? 0) - gone.size);
   const minutes = skimMinutes(items.map((i) => i.summary ?? i.subject));
@@ -187,7 +191,17 @@ export function Summary() {
       )}
       {items.length > 0 && (
         <>
-          <ol class="summary-list">{items.map(row)}</ol>
+          {/* Today's top 5 as first shown, in the yellow box (#5); the rest below, best first. */}
+          {top.length > 0 && (
+            <ol class="summary-list yellow-box" aria-label="Today's top 5">
+              {top.map(row)}
+            </ol>
+          )}
+          {rest.length > 0 && (
+            <ol class="summary-list" start={top.length + 1}>
+              {rest.map(row)}
+            </ol>
+          )}
           <p class="mark-all">
             <button type="button" class="pill" onClick={markAllRead} disabled={busy}>
               {busy
@@ -199,6 +213,7 @@ export function Summary() {
           </p>
         </>
       )}
+      {stats && stats.shown > 0 && <p class="digest-line">{digestLine(stats)}</p>}
     </>
   );
   const subline = summary.status === "ok" && (

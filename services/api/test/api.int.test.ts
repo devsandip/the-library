@@ -446,6 +446,21 @@ describe("API on dev", () => {
     for (const i of r.body.items) expect(i.scoreReason?.length).toBeGreaterThan(0);
     expect(r.body.items.find((i) => i.id === "fx-platformer")?.mustRead).toBe(true);
     await call("PATCH", `/senders/${CASEY}`, { body: { mustRead: false } });
+
+    // Today's digest is the top 5 as first shown, the same on every later call (#5).
+    const digest = r.body.digest ?? [];
+    expect(digest.length).toBeGreaterThan(0);
+    expect(digest.length).toBeLessThanOrEqual(5);
+    expect((await call<SummaryResponse>("GET", "/summary")).body.digest).toEqual(digest);
+    await call("POST", `/issues/${digest[0]}/rating`, { body: { value: 1 } });
+    const status = await call<StatusResponse>("GET", "/status");
+    expect(status.body.digestStats).toEqual({
+      days: 1,
+      shown: digest.length,
+      relevant: 1,
+      irrelevant: 0,
+    });
+    await call("POST", `/issues/${digest[0]}/rating`, { body: { value: 0 } });
   });
 
   it("related: the closest issue by topic, muted newsletters left out", async () => {

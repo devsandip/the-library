@@ -3,6 +3,7 @@
  * Loaded with a dynamic import, so production bundles never include it.
  */
 import type {
+  DigestStats,
   IssueDetailResponse,
   IssueListItem,
   IssueListResponse,
@@ -349,6 +350,20 @@ function find(id: string) {
   return issue;
 }
 
+/** Today's top 5 as first shown, like the API's digest log. */
+let mockDigest: string[] | undefined;
+
+/** A stand-in for the success measure: three earlier days, plus today's digest as rated so far. */
+function digestStats(): DigestStats {
+  const today = issues.filter((i) => mockDigest?.includes(i.id));
+  return {
+    days: 3 + (mockDigest ? 1 : 0),
+    shown: 15 + today.length,
+    relevant: 7 + today.filter((i) => i.rating === 1).length,
+    irrelevant: 3 + today.filter((i) => i.rating === -1).length,
+  };
+}
+
 export class MockLibraryApi implements LibraryApi {
   async listIssues(opts: ListIssuesOptions): Promise<IssueListResponse> {
     await delay();
@@ -456,6 +471,8 @@ export class MockLibraryApi implements LibraryApi {
     return {
       items: scored.slice(0, 20).map((s) => ({ ...withStar(strip(s.i)), scoreReason: s.reason })),
       candidates: news.length,
+      digest: (mockDigest ??= scored.slice(0, 5).map((s) => s.i.id)),
+      digestStats: digestStats(),
     };
   }
   async rate(id: string, value: Rating | 0) {
@@ -507,6 +524,7 @@ export class MockLibraryApi implements LibraryApi {
     await delay();
     return {
       stage: "mock",
+      digestStats: digestStats(),
       lastRunAt: new Date(now - 40 * 60_000).toISOString(),
       lastRunStats: {
         query: "mock",

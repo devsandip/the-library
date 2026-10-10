@@ -16,6 +16,9 @@ import {
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import {
   CANDIDATE_DAYS,
+  DIGEST_DAYS,
+  DIGEST_SIZE,
+  digestKey,
   embeddingKey,
   eventKey,
   INDEX,
@@ -27,6 +30,7 @@ import {
   pickTop,
   rank,
   readerDay,
+  recentDays,
   relatedIssues,
   retryOnConflict,
   s3Keys,
@@ -36,6 +40,7 @@ import {
   type RelatedMatch,
 } from "@library/core";
 import type {
+  DigestStats,
   IssueDetailResponse,
   IssueListItem,
   IssueListResponse,
@@ -801,8 +806,19 @@ export class DynamoRepo implements RepoPort {
       day: readerDay(now),
     });
     const byId = new Map(items.map((i) => [i.id as string, i]));
+    const picked = pickTop(ranked, limit);
+    const day = readerDay(now);
+    const [digest, digestStats] = await Promise.all([
+      this.todaysDigest(
+        day,
+        picked.slice(0, DIGEST_SIZE).map((r) => r.id),
+      ),
+      this.digestStats(now),
+    ]);
     return {
-      items: pickTop(ranked, limit).map((r) => {
+      digest,
+      digestStats,
+      items: picked.map((r) => {
         const item = toListItem(byId.get(r.id)!);
         return {
           ...item,
@@ -866,6 +882,74 @@ export class DynamoRepo implements RepoPort {
         out.push(...(res.Items ?? []));
         start = res.LastEvaluatedKey;
       } while (start);
+    }
+    return out;
+  }
+
+  /**
+   * Today's digest (#5): the Summary's top 5 the first time it is shown in the reader's day, kept
+   * as shown so the success measure can check them later. Later calls return what was logged.
+   */
+  private async todaysDigest(day: string, top: string[]): Promise<string[]> {
+    const logged = async () =>
+      (await this.ddb.send(new GetCommand({ TableName: this.table, Key: digestKey(day) }))).Item;
+    const found = await logged();
+    if (found) return (found.ids as string[] | undefined) ?? [];
+    if (!top.length) return [];
+    try {
+      await this.ddb.send(
+        new PutCommand({
+          TableName: this.table,
+          Item: { ...digestKey(day), ids: top, at: new Date().toISOString() },
+          ConditionExpression: "attribute_not_exists(pk)",
+        }),
+      );
+      return top;
+    } catch (err) {
+      // Another request logged today's first.
+      if (!isConditionFailure(err)) throw err;
+      return ((await logged())?.ids as string[] | undefined) ?? top;
+    }
+  }
+
+  /**
+   * The success measure (#5): of the issues in the last 14 days' digests (each counted once),
+   * how many are rated Relevant and Irrelevant by now. The PRD's aim: 3 of every 5 Relevant.
+   */
+  private async digestStats(now = Date.now()): Promise<DigestStats> {
+    const digests = await this.batchGet(recentDays(now, DIGEST_DAYS).map(digestKey), ["ids"]);
+    const ids = [...new Set(digests.flatMap((d) => (d.ids as string[] | undefined) ?? []))];
+    const rated = await this.batchGet(ids.map(issueKey), ["rating"]);
+    return {
+      days: digests.length,
+      shown: ids.length,
+      relevant: rated.filter((i) => i.rating === 1).length,
+      irrelevant: rated.filter((i) => i.rating === -1).length,
+    };
+  }
+
+  /** BatchGetItem in chunks of 100, retrying what DynamoDB leaves unprocessed. */
+  private async batchGet(keys: Record<string, unknown>[], attributes: string[]): Promise<Item[]> {
+    const out: Item[] = [];
+    const names = Object.fromEntries(attributes.map((a, i) => [`#a${i}`, a]));
+    for (let n = 0; n < keys.length; n += 100) {
+      let todo: Record<string, unknown>[] | undefined = keys.slice(n, n + 100);
+      for (let attempt = 0; todo?.length && attempt < 5; attempt++) {
+        if (attempt) await new Promise((r) => setTimeout(r, 100 * 2 ** attempt));
+        const res: BatchGetCommandOutput = await this.ddb.send(
+          new BatchGetCommand({
+            RequestItems: {
+              [this.table]: {
+                Keys: todo,
+                ProjectionExpression: Object.keys(names).join(", "),
+                ExpressionAttributeNames: names,
+              },
+            },
+          }),
+        );
+        out.push(...(res.Responses?.[this.table] ?? []));
+        todo = res.UnprocessedKeys?.[this.table]?.Keys;
+      }
     }
     return out;
   }
@@ -948,10 +1032,12 @@ export class DynamoRepo implements RepoPort {
   // ---------- status ----------
 
   async status(): Promise<StatusResponse> {
-    const res = await this.ddb.send(
-      new GetCommand({ TableName: this.table, Key: INGEST_STATE_KEY }),
-    );
+    const [res, digestStats] = await Promise.all([
+      this.ddb.send(new GetCommand({ TableName: this.table, Key: INGEST_STATE_KEY })),
+      this.digestStats(),
+    ]);
     return {
+      digestStats,
       stage: this.stage,
       lastRunAt: res.Item?.lastRunAt as string | undefined,
       lastRunStats: res.Item?.lastRunStats as StatusResponse["lastRunStats"],

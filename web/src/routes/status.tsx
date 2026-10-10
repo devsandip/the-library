@@ -2,7 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import type { StatusResponse } from "@library/core/types";
 import { BASE } from "../config.js";
 import { useApp } from "../context.js";
-import { relativeTime } from "../format.js";
+import { digestLine, relativeTime } from "../format.js";
 import { backIfPossible } from "../nav.js";
 import { BackIcon } from "../components/icons.js";
 
@@ -40,6 +40,12 @@ export function Status() {
           <dd>{auth?.email() ?? "mock user"}</dd>
           <dt>Stage</dt>
           <dd>{status.stage}</dd>
+          {status.digestStats && status.digestStats.shown > 0 && (
+            <>
+              <dt>Ranking</dt>
+              <dd>{digestLine(status.digestStats)}</dd>
+            </>
+          )}
           <dt>Last check</dt>
           <dd>{status.lastRunAt ? relativeTime(status.lastRunAt) : "Not yet run"}</dd>
           {stats && (
