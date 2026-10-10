@@ -75,6 +75,15 @@ export function BackIcon() {
   );
 }
 
+/** Points down; turned to point right when a section is folded. */
+export function ChevronIcon() {
+  return (
+    <svg {...base}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
 export function SearchIcon() {
   return (
     <svg {...base}>
