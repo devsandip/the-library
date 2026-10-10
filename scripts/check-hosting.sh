@@ -44,6 +44,9 @@ check "config.json served" '[[ "$(status "$BASE/config.json")" == 200 ]]'
 for page in about privacy terms; do
   check "public $page page loads without sign-in" '[[ "$(status "$BASE/$page.html")" == 200 ]] && ! curl -s "$BASE/$page.html" | grep -q "/src/main\|assets/index-"'
 done
+for icon in favicon.svg:image/svg+xml favicon-32.png:image/png apple-touch-icon.png:image/png; do
+  check "${icon%%:*} is served as ${icon#*:}" '[[ "$(status "$BASE/${icon%%:*}")" == 200 ]] && header "$BASE/${icon%%:*}" content-type | grep -qi "${icon#*:}"'
+done
 check "privacy page states the Gmail scope" 'curl -s "$BASE/privacy.html" | grep -q "gmail.readonly"'
 
 if [[ "$ECHO" == 1 ]]; then

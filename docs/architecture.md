@@ -97,7 +97,8 @@ One bad message is logged and counted; the run continues; the message is retried
 | default `*` | web bucket via OAC, objects under `thelibrary/` | CachingOptimized | Viewer-request CloudFront Function (below). |
 
 SPA function, applied to the default behavior:
-- `/thelibrary/assets/*`, `/thelibrary/config.json`, `/thelibrary/favicon.svg`: pass through.
+- `/thelibrary/assets/*`, `/thelibrary/config.json`: pass through.
+- `/thelibrary/favicon.svg`, `/thelibrary/favicon-32.png`, `/thelibrary/apple-touch-icon.png`: pass through. The tab icon, its PNG fallback for browsers without SVG favicons, and the iPhone home-screen icon (see `scripts/icons.sh`).
 - `/thelibrary/about.html`, `/thelibrary/privacy.html`, `/thelibrary/terms.html`: pass through. Public static pages (no user data) that Google requires as the OAuth app's home page, privacy policy and terms before it can be published to production.
 - Any other path under `/thelibrary/`: rewrite to `/thelibrary/index.html`. No extension guessing: sender URLs use opaque IDs, but this rule means a dot in a path can never cause a 403.
 - `/` or `/thelibrary`: 301 with a **relative** `Location` (`/thelibrary/`), so a proxied request never bounces to the `cloudfront.net` domain.

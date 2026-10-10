@@ -15,6 +15,7 @@
     "cdk": "pnpm --filter @library/infra exec cdk",
     "amplify-proxy": "tsx scripts/amplify-proxy.ts",
     "check-hosting": "bash scripts/check-hosting.sh",
+    "icons": "bash scripts/icons.sh",
     "deploy": "pnpm --filter @library/web build && pnpm cdk deploy -c stage=prod --require-approval never",
     "seed-dev": "tsx scripts/seed-dev.ts",
     "create-user": "bash scripts/create-user.sh",
