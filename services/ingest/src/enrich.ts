@@ -5,6 +5,7 @@
  * for Phase 2 ranking. Runs after every ingest for new issues (retrying recent failures) and on
  * demand for the backlog (`pnpm enrich`). The topic list is proposed once (`pnpm topics`).
  */
+import { INTERESTS } from "@library/core";
 import type { EnrichStats, Shelf, ShelfSetBy, Topic } from "@library/core/types";
 import type { ModelPort, ToolRequest } from "./bedrock.js";
 import { mapLimit } from "./ingest.js";
@@ -164,7 +165,31 @@ export function parseTopics(input: unknown): Topic[] {
   if (topics.length < 4 || topics.length > 12 || distinct !== topics.length) {
     throw new Error(`unusable topic list (${topics.length} topics, ${distinct} distinct)`);
   }
+  // The API takes several topics as one comma-separated parameter.
+  const comma = topics.find((t) => t.name.includes(","));
+  if (comma) throw new Error(`topic names cannot contain commas: "${comma.name}"`);
   return topics;
+}
+
+/**
+ * The five interests seed ranking's taste profile (packages/core/src/rank.ts). Embed them once,
+ * and again whenever the list changes. Returns the embedding tokens spent (0 when up to date).
+ */
+export async function ensureInterests(store: Store, model: ModelPort): Promise<number> {
+  const stored = await store.getInterests();
+  const same =
+    stored?.length === INTERESTS.length &&
+    INTERESTS.every((i, n) => stored[n]?.name === i.name && stored[n]?.text === i.text);
+  if (same) return 0;
+  let tokens = 0;
+  const out: { name: string; text: string; vector: number[] }[] = [];
+  for (const i of INTERESTS) {
+    const e = await model.embed(i.text);
+    tokens += e.tokens;
+    out.push({ ...i, vector: e.vector });
+  }
+  await store.putInterests(out);
+  return tokens;
 }
 
 export function embeddingInput(i: {
@@ -228,6 +253,14 @@ export async function enrich(
     embedTokens: 0,
     durationMs: 0,
   };
+
+  try {
+    stats.embedTokens += await ensureInterests(store, model);
+  } catch (err) {
+    // Ranking falls back to ratings alone; the issues still get enriched.
+    stats.errors++;
+    stats.errorSamples.push(`interests: ${(err as Error).message}`);
+  }
 
   await mapLimit(todo, opts.concurrency ?? 3, async (issue) => {
     if (opts.deadline && Date.now() > opts.deadline) {

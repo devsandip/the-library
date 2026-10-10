@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import type { StatusResponse } from "@library/core/types";
+import { BASE } from "../config.js";
 import { useApp } from "../context.js";
 import { relativeTime } from "../format.js";
 
@@ -71,11 +72,19 @@ export function Status() {
           )}
         </dl>
       )}
-      <p>
+      <div class="status-actions">
         <button type="button" onClick={refresh} disabled={refreshing}>
           {refreshing ? "Checking..." : "Check for new issues"}
         </button>
-      </p>
+        <a class="pill" href={`${BASE}/senders`}>
+          Senders
+        </a>
+        {auth && (
+          <button type="button" onClick={() => void auth.signOut()}>
+            Sign out
+          </button>
+        )}
+      </div>
     </section>
   );
 }

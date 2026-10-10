@@ -20,6 +20,7 @@ import {
   eventKey,
   INDEX,
   INGEST_STATE_KEY,
+  INTERESTS_KEY,
   PARTITION,
   TOPICS_KEY,
   issueIndexAttributes,
@@ -524,6 +525,35 @@ export class Store {
       new PutCommand({
         TableName: this.table,
         Item: { ...TOPICS_KEY, topics, model: MODELS.classify, at: new Date().toISOString() },
+      }),
+    );
+  }
+
+  /** The stored interests (names and texts only), to tell whether they need embedding again. */
+  async getInterests(): Promise<{ name: string; text: string }[] | undefined> {
+    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: INTERESTS_KEY }));
+    const list = res.Item?.interests as { name: string; text: string }[] | undefined;
+    return list?.map(({ name, text }) => ({ name, text }));
+  }
+
+  /** The interest embeddings that seed ranking; the API reads them for the Summary page. */
+  async putInterests(interests: { name: string; text: string; vector: number[] }[]): Promise<void> {
+    for (const i of interests) {
+      if (i.vector.length !== EMBED_DIMENSIONS) throw new Error("embedding has the wrong size");
+    }
+    await this.ddb.send(
+      new PutCommand({
+        TableName: this.table,
+        Item: {
+          ...INTERESTS_KEY,
+          interests: interests.map((i) => ({
+            name: i.name,
+            text: i.text,
+            vector: new Uint8Array(new Float32Array(i.vector).buffer),
+          })),
+          model: MODELS.embed,
+          at: new Date().toISOString(),
+        },
       }),
     );
   }

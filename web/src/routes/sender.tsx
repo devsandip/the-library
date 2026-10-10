@@ -3,7 +3,7 @@ import { useRoute } from "preact-iso";
 import type { SenderPatch, Shelf } from "@library/core/types";
 import { BASE } from "../config.js";
 import { useApp } from "../context.js";
-import { StarIcon } from "../components/icons.js";
+import { BackIcon, StarIcon } from "../components/icons.js";
 import { IssueRow } from "../components/issue-row.js";
 import { useAsync } from "../hooks.js";
 
@@ -47,9 +47,9 @@ export function Sender() {
   const s = sender.data;
   return (
     <section class="sender">
-      <p class="muted">
-        <a href={`${BASE}/senders`}>Senders</a>
-      </p>
+      <a class="back" href={`${BASE}/senders`}>
+        <BackIcon /> Senders
+      </a>
       <h1>{s.publication}</h1>
       <p class="muted">
         {s.issueCount} {s.issueCount === 1 ? "issue" : "issues"} · {s.up} Relevant · {s.down}{" "}
@@ -106,7 +106,7 @@ export function Sender() {
       {s.issues.length === 0 ? (
         <p class="muted">No issues stored.</p>
       ) : (
-        <ul class="issue-list">
+        <ul class="card-list issue-list">
           {s.issues.map((i) => (
             <IssueRow key={i.id} issue={i} showPublication={false} />
           ))}

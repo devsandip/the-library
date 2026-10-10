@@ -38,6 +38,13 @@ function setup(overrides: Partial<RepoPort> = {}) {
     listSenders: vi.fn(async () => [sender]),
     getSender: vi.fn(async () => ({ ...sender, addresses: [], issues: [issue] })),
     updateSender: vi.fn(async (_id, patch) => ({ ...sender, ...patch })),
+    unreadCounts: vi.fn(async () => ({
+      counts: [{ senderId: sender.senderId, shelf: "news" as const, topic: "AI", n: 2 }],
+    })),
+    summary: vi.fn(async () => ({
+      items: [{ ...issue, scoreReason: "From a Must Read newsletter", mustRead: true }],
+      candidates: 1,
+    })),
     status: vi.fn(async () => ({ stage: "test", lastError: null })),
     ...overrides,
   };
@@ -78,9 +85,9 @@ describe("routing and validation", () => {
     expect(repo.listIssues).toHaveBeenCalledWith("unread", {
       limit: 30,
       cursor: undefined,
-      senderId: undefined,
+      senderIds: undefined,
       shelf: undefined,
-      topic: undefined,
+      topics: undefined,
     });
   });
 
@@ -99,10 +106,38 @@ describe("routing and validation", () => {
     expect(repo.listIssues).toHaveBeenCalledWith("all", {
       limit: 5,
       cursor: "c",
-      senderId: "s0123456789ab",
+      senderIds: ["s0123456789ab"],
       shelf: "learning",
-      topic: "AI",
+      topics: ["AI"],
     });
+  });
+
+  it("takes several senders and topics, comma-separated", async () => {
+    const { repo, call } = setup();
+    await call("GET", "/issues", {
+      query: { sender: "s0123456789ab,s00000000000f", topic: "AI & LLMs,System Design" },
+    });
+    expect(repo.listIssues).toHaveBeenCalledWith(
+      "unread",
+      expect.objectContaining({
+        senderIds: ["s0123456789ab", "s00000000000f"],
+        topics: ["AI & LLMs", "System Design"],
+      }),
+    );
+  });
+
+  it("serves unread counts and the summary", async () => {
+    const { call } = setup();
+    const counts = await call("GET", "/unread-counts");
+    expect(counts.status).toBe(200);
+    expect(counts.body.counts[0]).toMatchObject({ topic: "AI", n: 2 });
+    const summary = await call("GET", "/summary");
+    expect(summary.status).toBe(200);
+    expect(summary.body).toMatchObject({
+      candidates: 1,
+      items: [{ id: "abc123", scoreReason: "From a Must Read newsletter", mustRead: true }],
+    });
+    expect((await call("POST", "/summary")).status).toBe(405);
   });
 
   it.each([
@@ -110,9 +145,13 @@ describe("routing and validation", () => {
     [{ limit: "0" }, "limit must be"],
     [{ limit: "101" }, "limit must be"],
     [{ limit: "2.5" }, "limit must be"],
-    [{ sender: "bytebytego@substack.com" }, "sender is not"],
+    [{ sender: "bytebytego@substack.com" }, "sender must be"],
+    [{ sender: "s0123456789ab,nope" }, "sender must be"],
+    [{ sender: "" }, "sender must be"],
     [{ shelf: "opinion" }, "shelf must be"],
     [{ topic: "x".repeat(61) }, "topic must be"],
+    [{ topic: "AI,,Data" }, "topic must be"],
+    [{ topic: "" }, "topic must be"],
   ])("rejects bad list query %o", async (query, msg) => {
     const res = await setup().call("GET", "/issues", { query });
     expect(res.status).toBe(400);

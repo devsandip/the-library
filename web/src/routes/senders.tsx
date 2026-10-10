@@ -3,7 +3,8 @@ import { BASE } from "../config.js";
 import { useApp } from "../context.js";
 import { relativeTime } from "../format.js";
 import { useAsync } from "../hooks.js";
-import { StarIcon } from "../components/icons.js";
+import { backIfPossible } from "../nav.js";
+import { BackIcon, StarIcon } from "../components/icons.js";
 
 export function Senders() {
   const { api } = useApp();
@@ -28,6 +29,9 @@ export function Senders() {
 
   return (
     <section>
+      <a class="back" href={`${BASE}/`} onClick={backIfPossible}>
+        <BackIcon /> Library
+      </a>
       <h1>Senders</h1>
       {senders.status === "loading" && <p class="muted">Loading...</p>}
       {senders.status === "error" && <p class="error">{senders.error}</p>}
@@ -36,12 +40,12 @@ export function Senders() {
       )}
       {items.length > 0 && (
         <>
-          <p class="muted small">
+          <p class="page-intro">
             Star the newsletters you never want to miss: their unread issues come first on Home.
             {starred > 0 && ` ${starred} of ${items.length} starred.`}
           </p>
           {error && <p class="error">{error}</p>}
-          <ul class="sender-list">
+          <ul class="card-list sender-list">
             {items.map((s) => {
               const on = stars[s.senderId] ?? s.mustRead;
               return (

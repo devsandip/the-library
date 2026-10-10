@@ -6,14 +6,23 @@
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
-import { issueKey, senderIdentity, TOPICS_KEY } from "@library/core";
+import {
+  embeddingKey,
+  INTERESTS_KEY,
+  issueIndexAttributes,
+  issueKey,
+  senderIdentity,
+  TOPICS_KEY,
+} from "@library/core";
 import type {
   IssueDetailResponse,
   IssueListResponse,
   SenderDetailResponse,
   SenderListResponse,
   StatusResponse,
+  SummaryResponse,
   TopicListResponse,
+  UnreadCountsResponse,
 } from "@library/core/types";
 import {
   docClient,
@@ -322,5 +331,119 @@ describe("API on dev", () => {
   it("reports status and accepts a refresh request", async () => {
     expect((await call<StatusResponse>("GET", "/status")).body.stage).toBe("dev");
     expect((await call("POST", "/ingest")).status).toBe(202);
+  });
+
+  it("several senders or topics mean any of them; a picked sender shows even when muted", async () => {
+    const LENNY = senderIdentity("lenny@substack.com", "").senderId;
+    for (const id of FIXTURE_NEWSLETTER_IDS) {
+      await call("PATCH", `/issues/${id}`, { body: { state: "unread" } });
+    }
+    const list = (q: Record<string, string>) =>
+      call<IssueListResponse>("GET", "/issues", { query: q }).then(ids);
+    expect(
+      await eventually(
+        () => list({ sender: `${BBG},${LENNY}` }),
+        (r) => r.length === 2,
+      ),
+    ).toEqual(["fx-bytebytego", "fx-lenny"]);
+
+    await call("PATCH", `/senders/${LENNY}`, { body: { muted: true } });
+    expect(await list({ sender: `${BBG},${LENNY}`, view: "all" })).toEqual([
+      "fx-bytebytego",
+      "fx-lenny",
+    ]);
+    expect(await list({})).not.toContain("fx-lenny");
+    await call("PATCH", `/senders/${LENNY}`, { body: { muted: false } });
+
+    await setSorted("fx-platformer", "news", "Business");
+    await setSorted("fx-tldr", "news", "AI");
+    expect(await list({ shelf: "news", topic: "AI,Business" })).toEqual([
+      "fx-platformer",
+      "fx-tldr",
+    ]);
+  });
+
+  it("counts unread issues by sender, shelf and topic", async () => {
+    const r = await eventually(
+      () => call<UnreadCountsResponse>("GET", "/unread-counts"),
+      (x) => x.body.counts.reduce((n, c) => n + c.n, 0) === 6,
+    );
+    expect(r.status).toBe(200);
+    const tldr = (await getItem("fx-tldr"))!.senderId as string;
+    expect(r.body.counts).toContainEqual({ senderId: tldr, shelf: "news", topic: "AI", n: 1 });
+  });
+
+  it("summary: unread News from the last two weeks, a reason on each, Must Read marked", async () => {
+    const CASEY = senderIdentity("casey@platformer.news", "").senderId;
+    // Fixture dates are fixed (2026-10-01), so set the ages this test depends on.
+    const age = async (id: string, hours: number) => {
+      const item = (await getItem(id))!;
+      const receivedAt = new Date(Date.now() - hours * 3_600_000).toISOString();
+      const idx = issueIndexAttributes({
+        id,
+        senderId: item.senderId as string,
+        receivedAt,
+        state: "unread",
+      });
+      const set: Record<string, string> = { receivedAt, ...idx.set };
+      const keys = Object.keys(set);
+      await ddb.send(
+        new UpdateCommand({
+          TableName: stack.tableName,
+          Key: issueKey(id),
+          UpdateExpression: `SET ${keys.map((_, i) => `#a${i} = :a${i}`).join(", ")}`,
+          ExpressionAttributeNames: Object.fromEntries(keys.map((k, i) => [`#a${i}`, k])),
+          ExpressionAttributeValues: Object.fromEntries(keys.map((k, i) => [`:a${i}`, set[k]])),
+        }),
+      );
+    };
+    await age("fx-platformer", 2);
+    await age("fx-tldr", 5);
+    await age("fx-lenny", 30);
+    await age("fx-pragmatic", 50);
+    await age("fx-example", 20 * 24); // outside the window
+    // Interests and two embeddings, so the vector path runs end to end.
+    const axis = (i: number) => {
+      const v = new Float32Array(512);
+      v[i] = 1;
+      return new Uint8Array(v.buffer);
+    };
+    await ddb.send(
+      new PutCommand({
+        TableName: stack.tableName,
+        Item: {
+          ...INTERESTS_KEY,
+          interests: ["tech", "startups", "AI", "product", "systems"].map((name, i) => ({
+            name,
+            text: name,
+            vector: axis(i),
+          })),
+        },
+      }),
+    );
+    for (const [id, i] of [
+      ["fx-tldr", 2],
+      ["fx-lenny", 3],
+    ] as const) {
+      await ddb.send(
+        new PutCommand({
+          TableName: stack.tableName,
+          Item: { ...embeddingKey(id), vector: axis(i) },
+        }),
+      );
+    }
+    await call("PATCH", `/senders/${CASEY}`, { body: { mustRead: true } });
+
+    const r = await eventually(
+      () => call<SummaryResponse>("GET", "/summary"),
+      (x) => x.body.candidates === 4,
+    );
+    expect(r.status).toBe(200);
+    expect(r.body.items.map((i) => i.id).sort()).toEqual(
+      ["fx-lenny", "fx-platformer", "fx-pragmatic", "fx-tldr"].sort(),
+    );
+    for (const i of r.body.items) expect(i.scoreReason?.length).toBeGreaterThan(0);
+    expect(r.body.items.find((i) => i.id === "fx-platformer")?.mustRead).toBe(true);
+    await call("PATCH", `/senders/${CASEY}`, { body: { mustRead: false } });
   });
 });

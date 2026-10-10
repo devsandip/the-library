@@ -6,12 +6,12 @@ import { StarIcon, ThumbDown, ThumbUp } from "./icons.js";
 export function IssueRow({
   issue,
   showPublication = true,
-  topicHref,
+  onTopic,
 }: {
   issue: IssueListItem;
   showPublication?: boolean;
-  /** Where tapping the topic label goes (a filtered list); plain text when absent. */
-  topicHref?: (topic: string) => string;
+  /** Tapping the topic label switches that topic's chip on; plain text when absent. */
+  onTopic?: (topic: string) => void;
 }) {
   const unread = issue.state === "unread";
   const preview = issue.summary ?? issue.snippet;
@@ -33,16 +33,23 @@ export function IssueRow({
         {preview && <span class="snippet">{preview}</span>}
       </a>
       <span class="meta">
-        <time dateTime={issue.receivedAt}>{relativeTime(issue.receivedAt)}</time>
-        <span aria-hidden="true">·</span>
-        <span>{issue.readMinutes} min</span>
+        <span>
+          <time dateTime={issue.receivedAt}>{relativeTime(issue.receivedAt)}</time>
+          {" · "}
+          {issue.readMinutes} min
+        </span>
         {issue.topic &&
-          (topicHref ? (
-            <a class="topic" href={topicHref(issue.topic)} title={`Only ${issue.topic}`}>
+          (onTopic ? (
+            <button
+              type="button"
+              class="topic-pill"
+              title={`Only ${issue.topic}`}
+              onClick={() => onTopic(issue.topic!)}
+            >
               {issue.topic}
-            </a>
+            </button>
           ) : (
-            <span class="topic">{issue.topic}</span>
+            <span class="topic-pill">{issue.topic}</span>
           ))}
         {issue.rating === 1 && (
           <span class="rated up" title="Relevant">

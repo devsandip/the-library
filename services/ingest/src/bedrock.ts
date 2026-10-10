@@ -11,8 +11,9 @@ import {
 
 export const MODELS = {
   // Haiku 5.5 (us.anthropic.claude-haiku-5-5) answers "not available for this account" on this
-  // AWS account as of 2026-10-09; Haiku 4.5 works at the same price. Switching back is this line
-  // (the ingest role allows both), then `pnpm enrich --force` if older issues should be redone.
+  // AWS account as of 2026-10-09, so Haiku 4.5 runs instead (Anthropic says 5.5 is about 75%
+  // cheaper to run). Switching is this line (the ingest role allows both), then
+  // `pnpm enrich --force` if older issues should be redone.
   classify: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
   embed: "amazon.titan-embed-text-v2:0",
 } as const;

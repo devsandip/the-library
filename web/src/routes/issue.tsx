@@ -6,6 +6,7 @@ import { BASE } from "../config.js";
 import { useApp } from "../context.js";
 import { relativeTime } from "../format.js";
 import { useAsync } from "../hooks.js";
+import { backIfPossible } from "../nav.js";
 import { NewsletterFrame } from "../components/newsletter-frame.js";
 import {
   ArchiveIcon,
@@ -90,7 +91,8 @@ export function Issue() {
           <a href={`${BASE}/senders/${d.senderId}`}>{d.publication}</a>
         </p>
         <h1>{d.subject}</h1>
-        <p class="muted">
+        {d.summary && <p class="standfirst">{d.summary}</p>}
+        <p class="issue-meta">
           <time dateTime={d.receivedAt}>{relativeTime(d.receivedAt)}</time> · {d.readMinutes} min
           read
         </p>
@@ -172,11 +174,3 @@ export function Issue() {
 }
 
 const SHELF_LABEL: Record<Shelf, string> = { news: "News", learning: "Learning" };
-
-/** Prefer real Back (keeps list filters and scroll) when we came from inside the app. */
-function backIfPossible(e: MouseEvent) {
-  if (history.length > 1 && document.referrer.startsWith(location.origin)) {
-    e.preventDefault();
-    history.back();
-  }
-}

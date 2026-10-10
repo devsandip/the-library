@@ -4,13 +4,14 @@ import { HttpLibraryApi } from "./api.js";
 import { Auth } from "./auth.js";
 import { BASE, loadConfig } from "./config.js";
 import { Ctx, type AppContext } from "./context.js";
-import { Header } from "./components/header.js";
+import { Header, HeaderSlot } from "./components/header.js";
 import { Home } from "./routes/home.js";
 import { Issue } from "./routes/issue.js";
 import { NotFound } from "./routes/not-found.js";
 import { Sender } from "./routes/sender.js";
 import { Senders } from "./routes/senders.js";
 import { Status } from "./routes/status.js";
+import { Summary } from "./routes/summary.js";
 
 type Boot =
   { kind: "loading" } | { kind: "ready"; ctx: AppContext } | { kind: "error"; message: string };
@@ -35,6 +36,7 @@ async function boot(): Promise<AppContext> {
 
 export function App() {
   const [state, setState] = useState<Boot>({ kind: "loading" });
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     boot().then(
@@ -57,19 +59,22 @@ export function App() {
 
   return (
     <Ctx.Provider value={state.ctx}>
-      <LocationProvider scope={BASE}>
-        <Header />
-        <main class="page">
-          <Router>
-            <Route path={`${BASE}/`} component={Home} />
-            <Route path={`${BASE}/issue/:id`} component={Issue} />
-            <Route path={`${BASE}/senders`} component={Senders} />
-            <Route path={`${BASE}/senders/:senderId`} component={Sender} />
-            <Route path={`${BASE}/status`} component={Status} />
-            <Route default component={NotFound} />
-          </Router>
-        </main>
-      </LocationProvider>
+      <HeaderSlot.Provider value={{ slot, setSlot }}>
+        <LocationProvider scope={BASE}>
+          <Header />
+          <main class="page">
+            <Router>
+              <Route path={`${BASE}/`} component={Home} />
+              <Route path={`${BASE}/summary`} component={Summary} />
+              <Route path={`${BASE}/issue/:id`} component={Issue} />
+              <Route path={`${BASE}/senders`} component={Senders} />
+              <Route path={`${BASE}/senders/:senderId`} component={Sender} />
+              <Route path={`${BASE}/status`} component={Status} />
+              <Route default component={NotFound} />
+            </Router>
+          </main>
+        </LocationProvider>
+      </HeaderSlot.Provider>
     </Ctx.Provider>
   );
 }

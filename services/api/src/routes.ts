@@ -36,6 +36,11 @@ function json<T>(req: Request): T {
   }
 }
 
+/** A comma-separated query value (HTTP API also joins repeated parameters with commas). */
+function list(value: string | undefined): string[] | undefined {
+  return value === undefined ? undefined : value.split(",").map((v) => v.trim());
+}
+
 function param(params: string[], i: number): string {
   const v = params[i];
   if (v === undefined) throw notFound();
@@ -53,25 +58,26 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
         throw badRequest("limit must be an integer from 1 to 100");
       }
-      const senderId = req.query.sender;
-      if (senderId !== undefined && !new RegExp(`^${SENDER_ID}$`).test(senderId)) {
-        throw badRequest("sender is not a sender id");
+      const senderIds = list(req.query.sender);
+      const senderRe = new RegExp(`^${SENDER_ID}$`);
+      if (senderIds && (senderIds.length > 50 || !senderIds.every((id) => senderRe.test(id)))) {
+        throw badRequest("sender must be up to 50 sender ids, comma-separated");
       }
       const shelf = req.query.shelf as Shelf | undefined;
       if (shelf !== undefined && !SHELVES.includes(shelf)) {
         throw badRequest("shelf must be news or learning");
       }
-      const topic = req.query.topic;
-      if (topic !== undefined && (topic.length === 0 || topic.length > 60)) {
-        throw badRequest("topic must be 1 to 60 characters");
+      const topics = list(req.query.topic);
+      if (topics && (topics.length > 20 || topics.some((t) => t.length === 0 || t.length > 60))) {
+        throw badRequest("topic must be up to 20 topics of 1 to 60 characters, comma-separated");
       }
       return ok(
         await svc.repo.listIssues(view, {
           limit,
           cursor: req.query.cursor,
-          senderId,
+          senderIds,
           shelf,
-          topic,
+          topics,
         }),
       );
     },
@@ -154,6 +160,16 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     method: "GET",
     pattern: /^\/topics$/,
     handler: async (svc) => ok({ topics: await svc.repo.listTopics() }),
+  },
+  {
+    method: "GET",
+    pattern: /^\/unread-counts$/,
+    handler: async (svc) => ok(await svc.repo.unreadCounts()),
+  },
+  {
+    method: "GET",
+    pattern: /^\/summary$/,
+    handler: async (svc) => ok(await svc.repo.summary()),
   },
   {
     method: "POST",

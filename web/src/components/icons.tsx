@@ -74,3 +74,54 @@ export function BackIcon() {
     </svg>
   );
 }
+
+export function SearchIcon() {
+  return (
+    <svg {...base}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}
+
+/** Three narrowing lines: the sender filter. */
+export function FilterIcon() {
+  return (
+    <svg {...base}>
+      <path d="M4 6h16M7 12h10M10 18h4" />
+    </svg>
+  );
+}
+
+/** Three left-aligned lines: the Summary page. */
+export function SummaryIcon() {
+  return (
+    <svg {...base}>
+      <path d="M4 6h16M4 12h10M4 18h13" />
+    </svg>
+  );
+}
+
+export function CheckIcon() {
+  return (
+    <svg {...base} stroke-width={2.4}>
+      <path d="m5 12 5 5 9-10" />
+    </svg>
+  );
+}
+
+export function CloseIcon() {
+  return (
+    <svg {...base} stroke-width={2.2}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  );
+}
+
+export function RefreshIcon() {
+  return (
+    <svg {...base}>
+      <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
+    </svg>
+  );
+}
