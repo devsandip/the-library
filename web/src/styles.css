@@ -664,7 +664,7 @@ a.pill:hover {
   list-style: none;
 }
 
-.issue-card a {
+.issue-card .card-main > a {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -676,7 +676,7 @@ a.pill:hover {
   color: var(--fg);
 }
 
-.issue-card a:hover {
+.issue-card .card-main > a:hover {
   color: var(--fg);
   border-color: var(--control);
 }
@@ -687,7 +687,7 @@ a.pill:hover {
   scroll-snap-align: start;
 }
 
-.issue-card.lead > a {
+.issue-card.lead .card-main > a {
   padding: 16px;
   border-radius: 16px;
   background: var(--raised);
@@ -732,6 +732,108 @@ a.pill:hover {
 
 .issue-card:not(.unread) .card-line {
   color: var(--muted);
+}
+
+/* ---------- tap for a summary (#41) ---------- */
+
+.peek {
+  display: grid;
+  gap: 10px;
+  padding: 2px 16px 14px;
+}
+
+.peek-label {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.peek-stories {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding-left: 1.25em;
+}
+
+.peek-stories li {
+  display: grid;
+  gap: 2px;
+}
+
+.peek-stories li::marker {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.peek-headline {
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.peek-text,
+.peek-note {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.peek-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  justify-self: start;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.peek-source svg {
+  width: 14px;
+  height: 14px;
+}
+
+.peek-open {
+  justify-self: start;
+}
+
+/* Phone cards: the peek carries on inside the card's border. */
+.issue-card .card-main {
+  position: relative;
+  height: 100%;
+}
+
+.issue-card.peeking .card-main {
+  height: auto;
+}
+
+.issue-card.peeking .card-main > a {
+  border-bottom-color: transparent;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.issue-card .peek {
+  border: 1px solid var(--border);
+  border-top: 0;
+  border-radius: 0 0 14px 14px;
+  background: var(--surface);
+}
+
+/* Mac rows and Summary lines: under the row, inside its divider. */
+.issue-row.peeking .row-link {
+  border-bottom-color: transparent;
+}
+
+.issue-row .peek {
+  padding: 0 20px 14px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.summary-row .peek {
+  padding: 0 0 14px;
 }
 
 /* ---------- save for later (#43) ---------- */
@@ -1617,7 +1719,7 @@ a.pill:hover {
   border-bottom: 0;
 }
 
-.summary-row a {
+.summary-row .swipe-face > a {
   display: grid;
   flex: 1;
   gap: 3px;
@@ -1626,7 +1728,7 @@ a.pill:hover {
   color: var(--fg);
 }
 
-.summary-row a:hover .summary-line {
+.summary-row .swipe-face > a:hover .summary-line {
   color: var(--accent-hover);
 }
 

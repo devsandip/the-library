@@ -44,6 +44,11 @@ function setup(overrides: Partial<RepoPort> = {}) {
     })),
     savePosition: vi.fn(async () => undefined),
     related: vi.fn(async () => ({ earlier: [{ ...issue, similarity: 0.41 }], since: [] })),
+    stories: vi.fn(async () => ({
+      stories: [
+        { n: 1, headline: "A model ships", summary: "It is small.", link: "https://x.test" },
+      ],
+    })),
     listSenders: vi.fn(async () => [sender]),
     getSender: vi.fn(async () => ({ ...sender, addresses: [], issues: [issue] })),
     updateSender: vi.fn(async (_id, patch) => ({ ...sender, ...patch })),
@@ -193,6 +198,15 @@ describe("routing and validation", () => {
     const res = await setup().call("GET", "/issues", { query });
     expect(res.status).toBe(400);
     expect(res.body.error).toContain(msg);
+  });
+
+  it("serves an issue's stories", async () => {
+    const { call, repo } = setup();
+    const r = await call("GET", "/issues/abc123/stories");
+    expect(r.status).toBe(200);
+    expect(r.body.stories[0]).toMatchObject({ n: 1, headline: "A model ships" });
+    expect(repo.stories).toHaveBeenCalledWith("abc123");
+    expect((await call("POST", "/issues/abc123/stories")).status).toBe(405);
   });
 
   it("PATCH state validates the body", async () => {

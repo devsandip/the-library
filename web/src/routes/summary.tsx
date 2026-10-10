@@ -11,6 +11,7 @@ import { PANES, useMedia, WIDE } from "../media.js";
 import { backIfPossible, clickInPlace } from "../nav.js";
 import { IssueReader } from "../components/issue-reader.js";
 import { DayInBrief } from "../components/narrative.js";
+import { StoryPeek, useTapToPeek } from "../components/peek.js";
 import { SaveButton, useSaveToggle } from "../components/save.js";
 import { ArchiveIcon, BackIcon, StarIcon, ThumbDown, ThumbUp } from "../components/icons.js";
 import { SwipeUnder, useSwipe, useSwipeRating, type SwipeActions } from "../components/swipe.js";
@@ -21,7 +22,11 @@ function skimMinutes(lines: string[]): number {
   return Math.max(1, Math.round(words / 200));
 }
 
-/** One line of the Summary: the newsletter, Claude's line and why it ranks there. */
+/**
+ * One line of the Summary: the newsletter, Claude's line and why it ranks there. With the reading
+ * pane a click opens the issue there; otherwise a tap peeks inside it and a double tap opens it
+ * (#41).
+ */
 function SummaryRow({
   issue: i,
   selected,
@@ -43,16 +48,24 @@ function SummaryRow({
   swipe?: SwipeActions;
 }) {
   const s = useSwipe(swipe);
+  const { route } = useLocation();
+  const [peeking, setPeeking] = useState(false);
+  const open = () => route(issueHref(i.id));
+  const tap = useTapToPeek({ toggle: () => setPeeking((on) => !on), open });
+  const peekId = `peek-${i.id}`;
   return (
-    <li class={`summary-row${selected ? " selected" : ""}${swipe ? " swipe" : ""}`} {...s.rowProps}>
+    <li
+      class={`summary-row${selected ? " selected" : ""}${swipe ? " swipe" : ""}${peeking ? " peeking" : ""}`}
+      {...s.rowProps}
+    >
       {swipe && <SwipeUnder />}
       <div class="swipe-face" ref={s.face}>
         <a
           href={issueHref(i.id)}
           aria-current={selected ? "true" : undefined}
-          onClick={(e) => {
-            if (onOpen) clickInPlace(e, () => onOpen(i.id));
-          }}
+          {...(onOpen
+            ? { onClick: (e: MouseEvent) => clickInPlace(e, () => onOpen(i.id)) }
+            : { ...tap, "aria-expanded": peeking, "aria-controls": peeking ? peekId : undefined })}
         >
           <span class="row-pub">
             {phone && <span class="dot" aria-hidden="true" />}
@@ -90,6 +103,7 @@ function SummaryRow({
           <ArchiveIcon />
         </button>
       </div>
+      {peeking && !onOpen && <StoryPeek issue={i} id={peekId} onOpen={open} />}
     </li>
   );
 }

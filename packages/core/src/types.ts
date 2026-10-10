@@ -107,6 +107,20 @@ export interface UnreadCountsResponse {
   saved: number;
 }
 
+/** One story of an issue, from the story index (#15), as a tap on its row shows it (#41). */
+export interface IssueStory {
+  n: number;
+  headline: string;
+  summary: string;
+  /** The story's own source: one of the issue's links. */
+  link?: string;
+}
+
+/** GET /issues/{id}/stories: in the order they appear; empty until the issue is split. */
+export interface IssueStoriesResponse {
+  stories: IssueStory[];
+}
+
 /** An issue shown as related to the open one (#20). */
 export interface RelatedItem extends IssueListItem {
   /** Cosine between the two embeddings once newsletter style is taken out, to 3 decimals. */

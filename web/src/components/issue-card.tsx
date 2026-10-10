@@ -1,13 +1,18 @@
+import { useState } from "preact/hooks";
+import { useLocation } from "preact-iso";
 import type { IssueListItem } from "@library/core/types";
 import { issueHref } from "../filters.js";
 import { clockTime, relativeTime } from "../format.js";
 import { StarIcon, ThumbDown, ThumbUp } from "./icons.js";
+import { StoryPeek, useTapToPeek } from "./peek.js";
 import { SaveButton } from "./save.js";
 import { SwipeUnder, useSwipe, type SwipeActions } from "./swipe.js";
 
 /**
  * A briefing card on the phone (#12): Claude's one line first, then where it came from. A lead
- * card (the Must Read row) also names the newsletter up top and keeps the headline.
+ * card (the Must Read row) also names the newsletter up top and keeps the headline. A tap peeks
+ * inside the issue and a double tap opens it (#41); lead cards open on a tap, since a card that
+ * grew would stretch the whole sideways row.
  */
 export function IssueCard({
   issue,
@@ -29,10 +34,22 @@ export function IssueCard({
 }) {
   const unread = issue.state === "unread";
   const s = useSwipe(swipe);
+  const { route } = useLocation();
+  const [peeking, setPeeking] = useState(false);
+  const tap = useTapToPeek({
+    toggle: () => setPeeking((on) => !on),
+    open: () => route(issueHref(issue.id)),
+  });
+  const peekId = `peek-${issue.id}`;
   const saves = onSave !== undefined && issue.state !== "archived";
   const bookmark = onSave && <SaveButton issue={issue} onSave={onSave} />;
   const link = (
-    <a href={issueHref(issue.id)}>
+    <a
+      href={issueHref(issue.id)}
+      {...(lead
+        ? {}
+        : { ...tap, "aria-expanded": peeking, "aria-controls": peeking ? peekId : undefined })}
+    >
       {lead && <span class="card-pub">{issue.publication}</span>}
       <span class="card-line">{issue.summary ?? issue.subject}</span>
       {lead && issue.summary && <span class="card-title">{issue.subject}</span>}
@@ -72,24 +89,29 @@ export function IssueCard({
       </span>
     </a>
   );
+  const body = (
+    <>
+      <div class="card-main">
+        {link}
+        {bookmark}
+      </div>
+      {peeking && <StoryPeek issue={issue} id={peekId} onOpen={() => route(issueHref(issue.id))} />}
+    </>
+  );
   return (
     <li
-      class={`issue-card${lead ? " lead" : ""}${unread ? " unread" : ""}${swipe ? " swipe" : ""}${saves ? " can-save" : ""}`}
+      class={`issue-card${lead ? " lead" : ""}${unread ? " unread" : ""}${swipe ? " swipe" : ""}${saves ? " can-save" : ""}${peeking ? " peeking" : ""}`}
       {...s.rowProps}
     >
       {swipe ? (
         <>
           <SwipeUnder />
           <div class="swipe-face" ref={s.face}>
-            {link}
-            {bookmark}
+            {body}
           </div>
         </>
       ) : (
-        <>
-          {link}
-          {bookmark}
-        </>
+        body
       )}
     </li>
   );

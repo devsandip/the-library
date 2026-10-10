@@ -1,11 +1,18 @@
+import { useState } from "preact/hooks";
+import { useLocation } from "preact-iso";
 import type { IssueListItem } from "@library/core/types";
 import { issueHref } from "../filters.js";
 import { clockTime, relativeTime } from "../format.js";
 import { clickInPlace } from "../nav.js";
 import { StarIcon, ThumbDown, ThumbUp } from "./icons.js";
+import { StoryPeek, useTapToPeek } from "./peek.js";
 import { SaveButton } from "./save.js";
 
-/** A row in the Mac's list column (#12): newsletter and time, the headline, Claude's line. */
+/**
+ * A row in the Mac's list column (#12): newsletter and time, the headline, Claude's line. With the
+ * reading pane, a click opens the issue there; without it, a click peeks inside the issue and a
+ * double click opens it (#41).
+ */
 export function IssueRow({
   issue,
   showPublication = true,
@@ -28,17 +35,22 @@ export function IssueRow({
   const unread = issue.state === "unread";
   const preview = issue.summary ?? issue.snippet;
   const saves = onSave !== undefined && issue.state !== "archived";
+  const { route } = useLocation();
+  const [peeking, setPeeking] = useState(false);
+  const open = () => route(issueHref(issue.id));
+  const tap = useTapToPeek({ toggle: () => setPeeking((on) => !on), open });
+  const peekId = `peek-${issue.id}`;
   return (
     <li
-      class={`issue-row${unread ? " unread" : ""}${selected ? " selected" : ""}${saves ? " can-save" : ""}`}
+      class={`issue-row${unread ? " unread" : ""}${selected ? " selected" : ""}${saves ? " can-save" : ""}${peeking ? " peeking" : ""}`}
     >
       <a
         class="row-link"
         href={issueHref(issue.id)}
         aria-current={selected ? "true" : undefined}
-        onClick={(e) => {
-          if (onOpen) clickInPlace(e, () => onOpen(issue.id));
-        }}
+        {...(onOpen
+          ? { onClick: (e: MouseEvent) => clickInPlace(e, () => onOpen(issue.id)) }
+          : { ...tap, "aria-expanded": peeking, "aria-controls": peeking ? peekId : undefined })}
       >
         <span class="row-top">
           <span class="row-pub">
@@ -82,6 +94,7 @@ export function IssueRow({
         {preview && <span class="snippet">{preview}</span>}
       </a>
       {onSave && <SaveButton issue={issue} onSave={onSave} />}
+      {peeking && !onOpen && <StoryPeek issue={issue} id={peekId} onOpen={open} />}
     </li>
   );
 }

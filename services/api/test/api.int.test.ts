@@ -16,6 +16,7 @@ import {
   openIndexAttributes,
   readerDay,
   senderIdentity,
+  storyKey,
   TOPICS_KEY,
 } from "@library/core";
 import type {
@@ -23,6 +24,7 @@ import type {
   IssueDetailResponse,
   IssueListItem,
   IssueListResponse,
+  IssueStoriesResponse,
   NowReadingResponse,
   RelatedResponse,
   SenderDetailResponse,
@@ -674,5 +676,36 @@ describe("API on dev", () => {
 
     await patch(a, { state: "unread" });
     await patch(b, { state: "unread" });
+  });
+
+  it("stories: an issue's stories in order, without their embeddings; none before a split", async () => {
+    const put = (n: number, headline: string, link?: string) =>
+      ddb.send(
+        new PutCommand({
+          TableName: stack.tableName,
+          Item: {
+            ...storyKey("fx-tldr", n),
+            n,
+            headline,
+            summary: `What story ${n} says.`,
+            names: [],
+            ...(link ? { link } : {}),
+            vector: new Uint8Array(8),
+            eventId: `int${n}`,
+          },
+        }),
+      );
+    await put(2, "Second", "https://example.test/two");
+    await put(1, "First");
+    const r = await call<IssueStoriesResponse>("GET", "/issues/fx-tldr/stories");
+    expect(r.status).toBe(200);
+    expect(r.body.stories).toEqual([
+      { n: 1, headline: "First", summary: "What story 1 says." },
+      { n: 2, headline: "Second", summary: "What story 2 says.", link: "https://example.test/two" },
+    ]);
+    expect((await call<IssueStoriesResponse>("GET", "/issues/fx-lenny/stories")).body).toEqual({
+      stories: [],
+    });
+    expect((await call("GET", "/issues/does-not-exist/stories")).status).toBe(404);
   });
 });
