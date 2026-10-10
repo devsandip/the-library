@@ -3,7 +3,9 @@ import { useLocation } from "preact-iso";
 import type { IssueListItem } from "@library/core/types";
 import { issueHref } from "../filters.js";
 import { clockTime, relativeTime } from "../format.js";
+import { Highlight } from "./highlight.js";
 import { StarIcon, ThumbDown, ThumbUp } from "./icons.js";
+import type { Found } from "./issue-row.js";
 import { StoryPeek, useTapToPeek } from "./peek.js";
 import { SaveButton } from "./save.js";
 import { SwipeUnder, useSwipe, type SwipeActions } from "./swipe.js";
@@ -21,6 +23,7 @@ export function IssueCard({
   openedAt,
   swipe,
   onSave,
+  found,
 }: {
   issue: IssueListItem;
   lead?: boolean;
@@ -31,6 +34,8 @@ export function IssueCard({
   swipe?: SwipeActions;
   /** Save for later (#43): the card gets a bookmark. */
   onSave?: (issue: IssueListItem) => void;
+  /** A search result (#53): the words to mark, and the story inside a digest that matched. */
+  found?: Found;
 }) {
   const unread = issue.state === "unread";
   const s = useSwipe(swipe);
@@ -51,8 +56,20 @@ export function IssueCard({
         : { ...tap, "aria-expanded": peeking, "aria-controls": peeking ? peekId : undefined })}
     >
       {lead && <span class="card-pub">{issue.publication}</span>}
-      <span class="card-line">{issue.summary ?? issue.subject}</span>
-      {lead && issue.summary && <span class="card-title">{issue.subject}</span>}
+      <span class="card-line">
+        <Highlight text={issue.summary ?? issue.subject} terms={found?.terms} />
+      </span>
+      {/* A search result shows the subject too: the words may be there and not in Claude's line. */}
+      {(lead || found) && issue.summary && (
+        <span class="card-title">
+          <Highlight text={issue.subject} terms={found?.terms} />
+        </span>
+      )}
+      {found?.story && (
+        <span class="found-story">
+          <Highlight text={found.story} terms={found.terms} />
+        </span>
+      )}
       <span class="card-meta">
         {!unread && <span class="sr-only">Read. </span>}
         {!lead && showPublication && (

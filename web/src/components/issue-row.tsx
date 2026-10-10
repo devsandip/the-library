@@ -4,9 +4,17 @@ import type { IssueListItem } from "@library/core/types";
 import { issueHref } from "../filters.js";
 import { clockTime, relativeTime } from "../format.js";
 import { clickInPlace } from "../nav.js";
+import { Highlight } from "./highlight.js";
 import { StarIcon, ThumbDown, ThumbUp } from "./icons.js";
 import { StoryPeek, useTapToPeek } from "./peek.js";
 import { SaveButton } from "./save.js";
+
+/** What a search found in a row or card (#53). */
+export interface Found {
+  terms: string[];
+  /** The headline of the story inside a digest that matched. */
+  story?: string;
+}
 
 /**
  * A row in the Mac's list column (#12): newsletter and time, the headline, Claude's line. With the
@@ -20,6 +28,7 @@ export function IssueRow({
   openedAt,
   onOpen,
   onSave,
+  found,
 }: {
   issue: IssueListItem;
   showPublication?: boolean;
@@ -31,6 +40,8 @@ export function IssueRow({
   onOpen?: (id: string) => void;
   /** Save for later (#43): the row gets a bookmark. */
   onSave?: (issue: IssueListItem) => void;
+  /** A search result (#53): the words to mark, and the story inside a digest that matched. */
+  found?: Found;
 }) {
   const unread = issue.state === "unread";
   const preview = issue.summary ?? issue.snippet;
@@ -90,8 +101,19 @@ export function IssueRow({
             )}
           </span>
         </span>
-        <span class="subject">{issue.subject}</span>
-        {preview && <span class="snippet">{preview}</span>}
+        <span class="subject">
+          <Highlight text={issue.subject} terms={found?.terms} />
+        </span>
+        {found?.story && (
+          <span class="found-story">
+            <Highlight text={found.story} terms={found.terms} />
+          </span>
+        )}
+        {preview && (
+          <span class="snippet">
+            <Highlight text={preview} terms={found?.terms} />
+          </span>
+        )}
       </a>
       {onSave && <SaveButton issue={issue} onSave={onSave} />}
       {peeking && !onOpen && <StoryPeek issue={issue} id={peekId} onOpen={open} />}

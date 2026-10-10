@@ -7,6 +7,7 @@ import { homeHref, readFilters, SHELVES, type HomeFilters } from "../filters.js"
 import { useLibrary } from "../library.js";
 import { ChevronIcon, SearchIcon, StarIcon } from "./icons.js";
 import { NowReadingLink } from "./now-reading.js";
+import { SearchBox } from "./search-box.js";
 
 const toggle = <T,>(list: T[], v: T): T[] =>
   list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
@@ -58,8 +59,8 @@ function SectionHead(props: {
 }
 
 /**
- * The Mac's left column (#12, two-pane): News and Learning, the Summary, topic chips (#10) and
- * the sender filter (#9). It sets Home's filters through the URL, from any page.
+ * The Mac's left column (#12, two-pane): search (#53), News and Learning, the Summary, topic
+ * chips (#10) and the sender filter (#9). It sets Home's filters through the URL, from any page.
  */
 export function Sidebar() {
   const { path, query, route } = useLocation();
@@ -134,6 +135,8 @@ export function Sidebar() {
       <a class="wordmark" href={`${BASE}/`}>
         The Library
       </a>
+
+      <SearchBox sidebar />
 
       <nav class="side-nav" aria-label="Main">
         {shelvesOn ? (

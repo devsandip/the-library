@@ -17,7 +17,9 @@ import {
   readerDay,
   senderIdentity,
   storyKey,
+  storyRef,
   TOPICS_KEY,
+  vectorBytes,
 } from "@library/core";
 import type {
   HistoryResponse,
@@ -27,6 +29,7 @@ import type {
   IssueStoriesResponse,
   NowReadingResponse,
   RelatedResponse,
+  SearchResponse,
   SenderDetailResponse,
   SenderListResponse,
   StatusResponse,
@@ -42,6 +45,7 @@ import {
   FIXTURE_NEWSLETTER_IDS,
   type DevStack,
 } from "../../../scripts/dev-stack.js";
+import { TitanEmbedder } from "../src/embed.js";
 
 let stack: DevStack;
 const lambda = new LambdaClient({ region: "us-east-1" });
@@ -573,6 +577,73 @@ describe("API on dev", () => {
     expect(earlier.body.items.map((i) => i.id)).toEqual(["fx-pragmatic"]);
     expect(earlier.body.nextDay).toBe(today);
     expect((await call("GET", "/history", { query: { day: "2026-02-30" } })).status).toBe(400);
+  });
+
+  it("search: by words, by meaning, and the story inside a digest (#53)", async () => {
+    // Two stories in the TLDR fixture, embedded by Titan the way ingest embeds them.
+    const titan = new TitanEmbedder();
+    const tldr = (await getItem("fx-tldr"))!;
+    const putStory = async (n: number, headline: string, summary: string, names: string[]) => {
+      const vector = await titan.embed([headline, summary, names.join(", ")].join("\n\n"));
+      await ddb.send(
+        new PutCommand({
+          TableName: stack.tableName,
+          Item: {
+            ...storyKey("fx-tldr", n),
+            id: "fx-tldr",
+            n,
+            senderId: tldr.senderId,
+            receivedAt: tldr.receivedAt,
+            headline,
+            summary,
+            names,
+            vector: vectorBytes(vector),
+            dims: vector.length,
+            gsi1pk: "STORIES",
+            gsi1sk: `${tldr.receivedAt as string}#${storyRef("fx-tldr", n)}`,
+          },
+        }),
+      );
+    };
+    await putStory(
+      1,
+      "OpenAI ships agents that book travel",
+      "The new agents plan a trip, compare fares and book flights and hotels on their own.",
+      ["OpenAI"],
+    );
+    await putStory(
+      2,
+      "Anthropic publishes interpretability research",
+      "A paper traces how a model represents concepts inside its layers.",
+      ["Anthropic"],
+    );
+
+    const words = await call<SearchResponse>("GET", "/search", {
+      query: { q: "Discord messages" },
+    });
+    expect(words.status).toBe(200);
+    expect(words.body.terms).toEqual(["discord", "messag"]);
+    expect(words.body.items[0]).toMatchObject({ id: "fx-bytebytego" });
+    expect(words.body.items[0]!.match).not.toBe("meaning");
+
+    // No word in common with the story: found by meaning alone, and named on the row.
+    const meaning = await call<SearchResponse>("GET", "/search", {
+      query: { q: "AI assistants that arrange vacations" },
+    });
+    expect(meaning.body.byMeaning).toBe(true);
+    expect(meaning.body.items).toContainEqual(
+      expect.objectContaining({
+        id: "fx-tldr",
+        match: "meaning",
+        story: { n: 1, headline: "OpenAI ships agents that book travel" },
+      }),
+    );
+
+    const digest = await call<SearchResponse>("GET", "/search", {
+      query: { q: "interpretability", sort: "newest" },
+    });
+    expect(digest.body.items[0]).toMatchObject({ id: "fx-tldr", story: { n: 2 } });
+    expect((await call("GET", "/search")).status).toBe(400);
   });
 
   it("now reading: the last issue opened, its place, and when it hides", async () => {

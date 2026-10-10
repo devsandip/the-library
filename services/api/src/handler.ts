@@ -2,8 +2,10 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 }
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { HttpError } from "./errors.js";
 import type { Services } from "./port.js";
+import { TitanEmbedder } from "./embed.js";
 import { DynamoRepo } from "./repo.js";
 import { API_PREFIX, route, type Request } from "./routes.js";
+import { Search } from "./search.js";
 
 type Event = APIGatewayProxyEventV2WithJWTAuthorizer;
 
@@ -78,8 +80,17 @@ export function createHandler(svc: Services) {
 const { TABLE_NAME, BUCKET_NAME, INGEST_FUNCTION, STAGE } = process.env;
 const lambda = new LambdaClient({});
 
+const repo = new DynamoRepo({
+  table: TABLE_NAME!,
+  bucket: BUCKET_NAME!,
+  stage: STAGE ?? "unknown",
+});
+
 export const handler = createHandler({
-  repo: new DynamoRepo({ table: TABLE_NAME!, bucket: BUCKET_NAME!, stage: STAGE ?? "unknown" }),
+  repo,
+  // Kept between requests while the Lambda is warm: the corpus, and recent query embeddings.
+  // Dev reads the corpus every time: integration tests rewrite it between searches.
+  search: new Search(repo, new TitanEmbedder(), STAGE === "prod" ? {} : { ttlMs: 0 }),
   startIngest: async () => {
     await lambda.send(
       new InvokeCommand({

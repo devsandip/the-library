@@ -8,6 +8,8 @@ import type {
   Rating,
   ReaderState,
   RelatedResponse,
+  SearchResponse,
+  SearchSort,
   SenderDetailResponse,
   SenderListItem,
   SenderListResponse,
@@ -60,6 +62,8 @@ export interface LibraryApi {
   related(id: string): Promise<RelatedResponse>;
   /** The issue's stories from the story index, for a tap on its row (#41). */
   stories(id: string): Promise<IssueStoriesResponse>;
+  /** What the newsletters said (#53): by words, then by meaning. */
+  search(q: string, sort: SearchSort): Promise<SearchResponse>;
   listSenders(): Promise<SenderListResponse>;
   getSender(senderId: string): Promise<SenderDetailResponse>;
   updateSender(senderId: string, patch: SenderPatch): Promise<SenderListItem>;
@@ -164,6 +168,11 @@ export class HttpLibraryApi implements LibraryApi {
   }
   stories(id: string) {
     return this.request<IssueStoriesResponse>("GET", `/issues/${encodeURIComponent(id)}/stories`);
+  }
+  search(q: string, sort: SearchSort) {
+    const query = new URLSearchParams({ q });
+    if (sort !== "best") query.set("sort", sort);
+    return this.request<SearchResponse>("GET", `/search?${query}`);
   }
   listSenders() {
     return this.request<SenderListResponse>("GET", "/senders");

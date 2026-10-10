@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./days": "./src/days.ts",
+    "./search": "./src/search.ts",
     "./types": "./src/types.ts"
   },
   "scripts": {

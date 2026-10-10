@@ -1,5 +1,9 @@
 /** Embeddings are stored in DynamoDB as float32 bytes. */
 
+/** Every embedding in the table: Titan Text Embeddings V2, 512 dimensions, normalized. */
+export const EMBED_MODEL = "amazon.titan-embed-text-v2:0";
+export const EMBED_DIMENSIONS = 512;
+
 /** A stored embedding (float32 bytes) as numbers. The copy avoids misaligned buffers. */
 export function toVector(bytes: Uint8Array): Float32Array {
   const out = new Float32Array(Math.floor(bytes.byteLength / 4));

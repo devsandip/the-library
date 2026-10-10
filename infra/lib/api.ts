@@ -1,4 +1,4 @@
-import { Duration, RemovalPolicy } from "aws-cdk-lib";
+import { Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
 import {
   HttpApi,
   HttpMethod,
@@ -7,6 +7,7 @@ import {
 } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import type { TableV2 } from "aws-cdk-lib/aws-dynamodb";
+import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import type { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import type { Bucket } from "aws-cdk-lib/aws-s3";
 import { Construct } from "constructs";
@@ -47,6 +48,18 @@ export class Api extends Construct {
     props.table.grantReadWriteData(this.fn);
     props.content.grantRead(this.fn);
     props.ingestFn.grantInvoke(this.fn);
+    // Search by meaning (#53): Titan embeds the query, in this region. Keep in step with
+    // EMBED_MODEL in packages/core/src/vectors.ts.
+    const stack = Stack.of(this);
+    this.fn.addToRolePolicy(
+      new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: ["bedrock:InvokeModel"],
+        resources: [
+          `arn:${stack.partition}:bedrock:${stack.region}::foundation-model/amazon.titan-embed-text-v2:0`,
+        ],
+      }),
+    );
 
     if (props.stage !== "prod") return;
 

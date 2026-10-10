@@ -1,4 +1,4 @@
-import type { Shelf, View } from "@library/core/types";
+import type { SearchSort, Shelf, View } from "@library/core/types";
 import { BASE } from "./config.js";
 
 export const SHELVES: { id: Shelf; label: string }[] = [
@@ -48,3 +48,28 @@ export function homeHref(f: HomeFilters): string {
 }
 
 export const issueHref = (id: string) => `${BASE}/issue/${encodeURIComponent(id)}`;
+
+/** Search's place (#53): the query and the order, in the URL so Back returns to the results. */
+export interface SearchState {
+  q: string;
+  sort: SearchSort;
+  /** The issue in the reading pane (wide Mac windows). */
+  issue?: string;
+}
+
+export function readSearch(query: Record<string, string | undefined>): SearchState {
+  return {
+    q: query.q ?? "",
+    sort: query.sort === "newest" ? "newest" : "best",
+    issue: query.issue || undefined,
+  };
+}
+
+export function searchHref(s: { q: string; sort?: SearchSort; issue?: string }): string {
+  const q = new URLSearchParams();
+  if (s.q) q.set("q", s.q);
+  if (s.sort === "newest") q.set("sort", "newest");
+  if (s.issue) q.set("issue", s.issue);
+  const qs = q.toString();
+  return `${BASE}/search${qs ? `?${qs}` : ""}`;
+}

@@ -106,6 +106,9 @@ importers:
 
   services/api:
     dependencies:
+      '@aws-sdk/client-bedrock-runtime':
+        specifier: ^3.1148.0
+        version: 3.1148.0
       '@aws-sdk/client-dynamodb':
         specifier: ^3.1148.0
         version: 3.1148.0

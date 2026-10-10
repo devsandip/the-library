@@ -17,6 +17,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import {
+  EMBED_DIMENSIONS,
   embeddingKey,
   eventKey,
   INDEX,
@@ -47,7 +48,7 @@ import type {
   StoryStats,
   Topic,
 } from "@library/core/types";
-import { EMBED_DIMENSIONS, MODELS } from "./bedrock.js";
+import { MODELS } from "./bedrock.js";
 import type { Classification, EnrichCandidate } from "./enrich.js";
 import { mapLimit } from "./ingest.js";
 import type { SenderFields, SenderPlan, StoredIssue, StoredSender } from "./senders.js";
