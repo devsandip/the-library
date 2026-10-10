@@ -45,6 +45,16 @@ describe("swipeChange", () => {
     expect(swipeChange({ state: "archived", rating: -1 }, "left")).toBeUndefined();
   });
 
+  it("left on a saved issue also takes it off the Saved list", () => {
+    const savedAt = "2026-10-10T10:00:00.000Z";
+    expect(swipeChange({ state: "read", savedAt }, "left")).toEqual({
+      rating: -1,
+      state: "archived",
+      savedAt: undefined,
+    });
+    expect(swipeChange({ state: "read", savedAt }, "right")).toEqual({ rating: 1 });
+  });
+
   it("only sends what changes", () => {
     expect(swipeChange({ state: "unread", rating: -1 }, "left")).toEqual({ state: "archived" });
     expect(swipeChange({ state: "archived" }, "left")).toEqual({ rating: -1 });

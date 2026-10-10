@@ -11,6 +11,7 @@ import { History } from "./routes/history.js";
 import { Home } from "./routes/home.js";
 import { Issue } from "./routes/issue.js";
 import { NotFound } from "./routes/not-found.js";
+import { Saved } from "./routes/saved.js";
 import { Sender } from "./routes/sender.js";
 import { Senders } from "./routes/senders.js";
 import { Status } from "./routes/status.js";
@@ -47,6 +48,7 @@ function Shell() {
         <Router>
           <Route path={`${BASE}/`} component={Home} />
           <Route path={`${BASE}/summary`} component={Summary} />
+          <Route path={`${BASE}/saved`} component={Saved} />
           <Route path={`${BASE}/history`} component={History} />
           <Route path={`${BASE}/issue/:id`} component={Issue} />
           <Route path={`${BASE}/senders`} component={Senders} />

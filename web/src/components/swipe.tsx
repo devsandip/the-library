@@ -222,6 +222,8 @@ export function useSwipeRating(opts: {
       "rating" in change ? api.rate(id, change.rating ?? 0) : undefined,
       change.state ? api.setState(id, change.state) : undefined,
     ]);
+    // Archiving unsaves on the server (#43); Undo saves again, once the issue is out of the archive.
+    if (change.savedAt !== undefined) await api.setSaved(id, true);
     if (change.state) counts.reload();
   };
 
@@ -231,6 +233,7 @@ export function useSwipeRating(opts: {
     const undo: SwipeChange = {
       ...("rating" in change ? { rating: issue.rating } : {}),
       ...(change.state ? { state: issue.state } : {}),
+      ...("savedAt" in change ? { savedAt: issue.savedAt } : {}),
     };
     const leaves = change.state === "archived" ? opts.hide : undefined;
     const apply = (c: SwipeChange, gone: boolean) => {

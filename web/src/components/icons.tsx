@@ -94,6 +94,14 @@ export function HistoryIcon() {
   );
 }
 
+export function BookmarkIcon({ filled }: IconProps) {
+  return (
+    <svg {...base} fill={filled ? "currentColor" : "none"}>
+      <path d="M6.5 3.5h11a1 1 0 0 1 1 1v16l-6.5-4.2-6.5 4.2v-16a1 1 0 0 1 1-1Z" />
+    </svg>
+  );
+}
+
 export function BookIcon() {
   return (
     <svg {...base}>

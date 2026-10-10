@@ -11,7 +11,15 @@ import { backIfPossible } from "../nav.js";
 import { NewsletterFrame } from "./newsletter-frame.js";
 import { useReadingPlace } from "./now-reading.js";
 import { Related } from "./related.js";
-import { ArchiveIcon, BackIcon, ExternalIcon, ThumbDown, ThumbUp, UnreadIcon } from "./icons.js";
+import {
+  ArchiveIcon,
+  BackIcon,
+  BookmarkIcon,
+  ExternalIcon,
+  ThumbDown,
+  ThumbUp,
+  UnreadIcon,
+} from "./icons.js";
 
 /**
  * One issue: its header, the actions and the newsletter. Its own page on the phone (actions in
@@ -88,7 +96,7 @@ export function IssueReader({
     setNotice(undefined);
     try {
       await send();
-      if ("state" in patch || "shelf" in patch) counts.reload();
+      if ("state" in patch || "shelf" in patch || "savedAt" in patch) counts.reload();
       // Archiving or rating an issue ends Now reading on it.
       if ("state" in patch || "rating" in patch) nowReading.reload();
     } catch (err) {
@@ -113,7 +121,17 @@ export function IssueReader({
     const next = issue.data?.rating === value ? 0 : value; // tap again to clear
     void change({ rating: next === 0 ? undefined : next }, () => api.rate(id, next));
   };
-  const setState = (state: ReaderState) => void change({ state }, () => api.setState(id, state));
+  // Archiving takes a saved issue off the Saved list too (#43).
+  const setState = (state: ReaderState) =>
+    void change({ state, ...(state === "archived" ? { savedAt: undefined } : {}) }, () =>
+      api.setState(id, state),
+    );
+  const toggleSaved = () => {
+    const saved = issue.data?.savedAt === undefined;
+    void change({ savedAt: saved ? new Date().toISOString() : undefined }, () =>
+      api.setSaved(id, saved),
+    );
+  };
   const moveTo = (shelf: Shelf) => void change({ shelf }, () => api.setShelf(id, shelf));
 
   if (issue.status === "loading") return <p class="muted">Loading...</p>;
@@ -133,6 +151,7 @@ export function IssueReader({
   const d = issue.data;
   const other: Shelf = d.shelf === "learning" ? "news" : "learning";
   const archived = d.state === "archived";
+  const saved = d.savedAt !== undefined;
   // The topic switches Home's chip on (#10); from a pane, the issue stays open beside the list.
   const topic = d.topic && (
     <a
@@ -175,9 +194,24 @@ export function IssueReader({
     <article class={`issue${wide ? " wide" : ""}`}>
       <header class="issue-header">
         {standalone && (
-          <a class="back" href={`${BASE}/`} onClick={backIfPossible}>
-            <BackIcon /> Library
-          </a>
+          <div class="issue-top">
+            <a class="back" href={`${BASE}/`} onClick={backIfPossible}>
+              <BackIcon /> Library
+            </a>
+            {/* On the phone the bar at the bottom is full, so Save sits up here (#43). */}
+            {!wide && !archived && (
+              <button
+                type="button"
+                class={`save-toggle${saved ? " on" : ""}`}
+                title={saved ? "Saved for later" : "Save for later"}
+                aria-label="Save for later"
+                aria-pressed={saved}
+                onClick={toggleSaved}
+              >
+                <BookmarkIcon filled={saved} />
+              </button>
+            )}
+          </div>
         )}
         <p class="issue-publication">
           <a href={`${BASE}/senders/${d.senderId}`}>{d.publication}</a>
@@ -219,6 +253,17 @@ export function IssueReader({
       {wide ? (
         <div class="reader-actions" role="toolbar" aria-label="Issue actions">
           {thumbs}
+          {!archived && (
+            <button
+              type="button"
+              class={`thumb${saved ? " on" : ""}`}
+              aria-pressed={saved}
+              title={saved ? "Take it off the Saved list" : "Save it to read later"}
+              onClick={toggleSaved}
+            >
+              <BookmarkIcon filled={saved} /> <span>{saved ? "Saved" : "Save"}</span>
+            </button>
+          )}
           <button
             type="button"
             class={`thumb${archived ? " on" : ""}`}

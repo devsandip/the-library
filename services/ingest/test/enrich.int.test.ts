@@ -135,4 +135,24 @@ describe("archive rules on dev", () => {
     expect((await get(issueKey("fx-platformer")))?.state).toBe("unread"); // Must Read
     expect((await get(issueKey("fx-lenny")))?.state).toBe("unread"); // Learning
   });
+
+  it("leaves a saved issue alone (#43)", async () => {
+    const savedAt = "2026-10-02T00:00:00.000Z";
+    await ddb.send(
+      new UpdateCommand({
+        TableName: stack.tableName,
+        Key: issueKey("fx-lenny"),
+        UpdateExpression: "SET savedAt = :at, gsi2pk = :saved, gsi2sk = :sk, shelf = :news",
+        ExpressionAttributeValues: {
+          ":at": savedAt,
+          ":saved": "SAVED",
+          ":sk": `${savedAt}#fx-lenny`,
+          ":news": "news",
+        },
+      }),
+    );
+    expect(await store.autoArchive("fx-lenny", "promo")).toBe(false);
+    expect(await archiveOldNews(store, { now: Date.parse("2026-10-09T00:00:00.000Z") })).toBe(0);
+    expect((await get(issueKey("fx-lenny")))?.state).toBe("unread");
+  });
 });

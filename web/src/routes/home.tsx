@@ -1,6 +1,7 @@
 import { useState } from "preact/hooks";
 import { useLocation } from "preact-iso";
 import type { IssueListItem, View } from "@library/core/types";
+import { BASE } from "../config.js";
 import { useApp } from "../context.js";
 import { facets } from "../counts.js";
 import {
@@ -20,6 +21,7 @@ import { CloseIcon, FilterIcon, RefreshIcon, StarIcon } from "../components/icon
 import { IssueCard } from "../components/issue-card.js";
 import { IssueReader } from "../components/issue-reader.js";
 import { IssueRow } from "../components/issue-row.js";
+import { useSaveToggle } from "../components/save.js";
 import { SenderPicker } from "../components/sender-picker.js";
 import { useSwipeRating } from "../components/swipe.js";
 
@@ -140,6 +142,9 @@ export function Home() {
     });
   // The Archived view keeps archived issues, so a left swipe there only rates.
   const rating = useSwipeRating({ patch, hide: view === "archived" ? undefined : hide });
+  // Save for later (#43): a saved row stays put until the list reloads, then leaves Unread.
+  const save = useSaveToggle(patch);
+  const savedCount = lib.counts.data?.saved ?? 0;
 
   const countLine =
     view === "unread"
@@ -155,13 +160,19 @@ export function Home() {
       <select
         aria-label="Which issues"
         value={view}
-        onChange={(e) => setFilter({ view: (e.target as HTMLSelectElement).value as View })}
+        onChange={(e) => {
+          const next = (e.target as HTMLSelectElement).value;
+          // Saved (#43) is its own page: every saved issue, newest saved first, across shelves.
+          if (next === "saved") route(`${BASE}/saved`);
+          else setFilter({ view: next as View });
+        }}
       >
         {VIEWS.map((v) => (
           <option key={v.id} value={v.id}>
             {v.label}
           </option>
         ))}
+        <option value="saved">{savedCount ? `Saved (${savedCount})` : "Saved"}</option>
       </select>
       <button
         type="button"
@@ -233,6 +244,7 @@ export function Home() {
             issue={i}
             selected={panes && i.id === filters.issue}
             onOpen={panes ? openInPane : undefined}
+            onSave={save}
           />
         ))}
       </ul>
@@ -377,7 +389,7 @@ export function Home() {
           </h2>
           <ul class="must-row" aria-label="Must Read">
             {must.map((i) => (
-              <IssueCard key={i.id} issue={i} lead />
+              <IssueCard key={i.id} issue={i} lead onSave={save} />
             ))}
           </ul>
         </>
@@ -402,7 +414,7 @@ export function Home() {
           </h2>
           <ul class="cards">
             {s.items.map((i) => (
-              <IssueCard key={i.id} issue={i} swipe={rating.actions(i)} />
+              <IssueCard key={i.id} issue={i} swipe={rating.actions(i)} onSave={save} />
             ))}
           </ul>
         </section>

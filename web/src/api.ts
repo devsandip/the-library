@@ -39,6 +39,8 @@ export interface LibraryApi {
   setState(id: string, state: ReaderState): Promise<IssueListItem>;
   /** Move an issue to the other shelf; Claude never moves it back. */
   setShelf(id: string, shelf: Shelf): Promise<IssueListItem>;
+  /** Save an issue for later, or take it off the Saved list (#43). */
+  setSaved(id: string, saved: boolean): Promise<IssueListItem>;
   listTopics(): Promise<TopicListResponse>;
   unreadCounts(): Promise<UnreadCountsResponse>;
   /** The most relevant unread News, best first. */
@@ -124,6 +126,9 @@ export class HttpLibraryApi implements LibraryApi {
   }
   setShelf(id: string, shelf: Shelf) {
     return this.request<IssueListItem>("PATCH", `/issues/${encodeURIComponent(id)}`, { shelf });
+  }
+  setSaved(id: string, saved: boolean) {
+    return this.request<IssueListItem>("PATCH", `/issues/${encodeURIComponent(id)}`, { saved });
   }
   listTopics() {
     return this.request<TopicListResponse>("GET", "/topics");

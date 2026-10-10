@@ -350,6 +350,7 @@ const statesFor: Record<View, ReaderState[]> = {
   unread: ["unread"],
   all: ["unread", "read"],
   archived: ["archived"],
+  saved: ["unread", "read"],
 };
 const strip = ({
   html: _html,
@@ -364,6 +365,15 @@ function find(id: string) {
   const issue = issues.find((i) => i.id === id);
   if (!issue) throw new Error("issue not found");
   return issue;
+}
+
+// Two issues start saved (#43): one read, one not.
+for (const [id, hours] of [
+  ["mock-6", 5],
+  ["mock-9", 26],
+] as const) {
+  const i = issues.find((x) => x.id === id);
+  if (i && i.state !== "archived") i.savedAt = new Date(now - hours * HOUR).toISOString();
 }
 
 /** Today's top 5 as first shown, like the API's digest log. */
@@ -468,15 +478,22 @@ export class MockLibraryApi implements LibraryApi {
     const muted = new Set(senders.filter((s) => s.muted).map((s) => s.senderId));
     const must = mustSet();
     const picked = opts.senders?.length ? new Set(opts.senders) : undefined;
+    // Saved (#43) is its own queue, newest saved first: saved issues leave Unread, and hide no one.
+    const saved = opts.view === "saved";
     const matching = issues
       .filter(
         (i) =>
           statesFor[opts.view].includes(i.state) &&
-          (picked ? picked.has(i.senderId) : opts.view === "archived" || !muted.has(i.senderId)) &&
+          (saved ? i.savedAt !== undefined : opts.view !== "unread" || i.savedAt === undefined) &&
+          (picked
+            ? picked.has(i.senderId)
+            : opts.view === "archived" || saved || !muted.has(i.senderId)) &&
           (!opts.shelf || (i.shelf ?? "news") === opts.shelf) &&
           (!opts.topics?.length || (i.topic !== undefined && opts.topics.includes(i.topic))),
       )
-      .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
+      .sort((a, b) =>
+        saved ? b.savedAt!.localeCompare(a.savedAt!) : b.receivedAt.localeCompare(a.receivedAt),
+      );
     // Unread lists Must Read newsletters first, like the API.
     const all =
       opts.view === "unread" && !picked
@@ -506,6 +523,16 @@ export class MockLibraryApi implements LibraryApi {
     await delay(80);
     const i = find(id);
     i.state = state;
+    // Archiving takes an issue off the Saved list (#43).
+    if (state === "archived") delete i.savedAt;
+    return strip(i);
+  }
+  async setSaved(id: string, saved: boolean) {
+    await delay(80);
+    const i = find(id);
+    if (saved && i.state === "archived") throw new Error("archived issues cannot be saved");
+    if (!saved) delete i.savedAt;
+    else i.savedAt ??= new Date().toISOString();
     return strip(i);
   }
   async setShelf(id: string, shelf: Shelf) {
@@ -521,13 +548,13 @@ export class MockLibraryApi implements LibraryApi {
   async unreadCounts(): Promise<UnreadCountsResponse> {
     await delay();
     const tally = new Map<string, UnreadCount>();
-    for (const i of issues.filter((x) => x.state === "unread")) {
+    for (const i of issues.filter((x) => x.state === "unread" && x.savedAt === undefined)) {
       const key = `${i.senderId}|${i.shelf ?? ""}|${i.topic ?? ""}`;
       const t = tally.get(key);
       if (t) t.n++;
       else tally.set(key, { senderId: i.senderId, shelf: i.shelf, topic: i.topic, n: 1 });
     }
-    return { counts: [...tally.values()] };
+    return { counts: [...tally.values()], saved: issues.filter((i) => i.savedAt).length };
   }
   async related(id: string): Promise<RelatedResponse> {
     await delay();
@@ -551,7 +578,11 @@ export class MockLibraryApi implements LibraryApi {
     const must = mustSet();
     const muted = new Set(senders.filter((s) => s.muted).map((s) => s.senderId));
     const news = issues.filter(
-      (i) => i.state === "unread" && (i.shelf ?? "news") === "news" && !muted.has(i.senderId),
+      (i) =>
+        i.state === "unread" &&
+        i.savedAt === undefined &&
+        (i.shelf ?? "news") === "news" &&
+        !muted.has(i.senderId),
     );
     const scored = news.map((i) => {
       const fresh = 0.5 ** ((now - Date.parse(i.receivedAt)) / HOUR / 48);

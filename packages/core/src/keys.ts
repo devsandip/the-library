@@ -29,7 +29,7 @@ export const storyKey = (id: string, n: number) => ({
 export const INDEX = {
   /** INBOX (unread + read) | ARCHIVE | SENDERS | STORIES | OPENS */
   list: "gsi1",
-  /** Sparse: unread issues only. */
+  /** Sparse: unread issues (UNREAD), and saved ones (SAVED, #43), which leave UNREAD. */
   unread: "gsi2",
   /** SENDER#<senderId> */
   bySender: "gsi3",
@@ -44,6 +44,7 @@ export const PARTITION = {
   stories: "STORIES",
   opens: "OPENS",
   unread: "UNREAD",
+  saved: "SAVED",
   rated: "RATED",
 } as const;
 
@@ -60,9 +61,9 @@ const ISSUE_INDEX_ATTRS = [
 export type IssueIndexAttr = (typeof ISSUE_INDEX_ATTRS)[number];
 
 /**
- * Every index attribute an issue should carry, computed from its target state and rating.
- * Attributes listed in `remove` must be removed in the same write, so an issue can never sit in
- * an index that no longer matches its state.
+ * Every index attribute an issue should carry, computed from its target state, rating and whether
+ * it is saved. Attributes listed in `remove` must be removed in the same write, so an issue can
+ * never sit in an index that no longer matches its state.
  */
 export function issueIndexAttributes(issue: {
   id: string;
@@ -71,6 +72,8 @@ export function issueIndexAttributes(issue: {
   state: IssueState;
   rating?: Rating;
   ratedAt?: string;
+  /** Saved for later (#43). */
+  savedAt?: string;
 }): { set: Partial<Record<IssueIndexAttr, string>>; remove: IssueIndexAttr[] } {
   const sk = `${issue.receivedAt}#${issue.id}`;
   const set: Partial<Record<IssueIndexAttr, string>> = {};
@@ -79,7 +82,11 @@ export function issueIndexAttributes(issue: {
     set.gsi1sk = sk;
     set.gsi3pk = `SENDER#${issue.senderId}`;
     set.gsi3sk = sk;
-    if (issue.state === "unread") {
+    if (issue.savedAt) {
+      // Saved is its own queue, newest saved first, and out of Unread whatever the state.
+      set.gsi2pk = PARTITION.saved;
+      set.gsi2sk = `${issue.savedAt}#${issue.id}`;
+    } else if (issue.state === "unread") {
       set.gsi2pk = PARTITION.unread;
       set.gsi2sk = sk;
     }

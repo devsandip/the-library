@@ -734,6 +734,74 @@ a.pill:hover {
   color: var(--muted);
 }
 
+/* ---------- save for later (#43) ---------- */
+
+.save-toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+}
+
+.save-toggle:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+.save-toggle.on {
+  color: var(--accent-text);
+}
+
+.save-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Phone cards: bottom right, on the line under Claude's summary. */
+.issue-card {
+  position: relative;
+}
+
+.issue-card.can-save .card-meta {
+  padding-right: 34px;
+}
+
+.issue-card .save-toggle {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: var(--tap);
+  height: var(--tap);
+}
+
+/* The phone's issue page: right of the way back to the Library. */
+.issue-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.issue-top .save-toggle {
+  width: var(--tap);
+  height: var(--tap);
+  margin-right: -10px;
+}
+
+/* Summary lines: beside Archive. */
+.summary-row .save-toggle {
+  width: var(--tap);
+  height: var(--tap);
+  margin-top: 0;
+}
+
 /* ---------- swipe to rate (#13) ---------- */
 
 /* Vertical scrolling stays the browser's; sideways drags are the row's. */
@@ -1230,11 +1298,39 @@ a.pill:hover {
   overflow: hidden;
 }
 
+.issue-row {
+  position: relative;
+}
+
 .issue-row .row-link {
   display: block;
   padding: 12px 20px;
   border-bottom: 1px solid var(--divider);
   color: var(--fg);
+}
+
+/* Mac rows: the bookmark sits right of the time; until saved, it shows on hover. */
+.issue-row.can-save .row-top {
+  padding-right: 28px;
+}
+
+.issue-row .save-toggle {
+  position: absolute;
+  top: 6px;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+}
+
+@media (hover: hover) {
+  .issue-row .save-toggle:not(.on) {
+    opacity: 0;
+  }
+
+  .issue-row:hover .save-toggle,
+  .issue-row .save-toggle:focus-visible {
+    opacity: 1;
+  }
 }
 
 .rows.panel .issue-row:last-child .row-link {

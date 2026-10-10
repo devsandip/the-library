@@ -10,6 +10,8 @@ import { BackIcon } from "../components/icons.js";
 import { IssueCard } from "../components/issue-card.js";
 import { IssueReader } from "../components/issue-reader.js";
 import { IssueRow } from "../components/issue-row.js";
+import { useSaveToggle } from "../components/save.js";
+import { patchIssue } from "../groups.js";
 
 const historyHref = (day: string, issue?: string) =>
   `${BASE}/history?day=${day}${issue ? `&issue=${encodeURIComponent(issue)}` : ""}`;
@@ -28,6 +30,10 @@ export function History() {
   const day = query.day && isReaderDay(query.day) && query.day <= today ? query.day : today;
   const history = useAsync(() => api.history(day), [day]);
   const open = panes ? query.issue : undefined;
+
+  const save = useSaveToggle((id, change) =>
+    history.set((d) => ({ ...d, items: patchIssue(d.items, id, change) })),
+  );
 
   const go = (d: string) => route(historyHref(d));
   const openHere = (id: string) => route(historyHref(day, id), true);
@@ -112,13 +118,14 @@ export function History() {
                 openedAt={i.openedAt}
                 selected={i.id === open}
                 onOpen={panes ? openHere : undefined}
+                onSave={save}
               />
             ))}
           </ul>
         ) : (
           <ul class="cards">
             {items.map((i) => (
-              <IssueCard key={i.id} issue={i} openedAt={i.openedAt} />
+              <IssueCard key={i.id} issue={i} openedAt={i.openedAt} onSave={save} />
             ))}
           </ul>
         ))}

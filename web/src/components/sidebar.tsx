@@ -166,6 +166,14 @@ export function Sidebar() {
           <span>Summary</span>
         </a>
         <a
+          class={path === `${BASE}/saved` ? "on" : ""}
+          aria-current={path === `${BASE}/saved` ? "page" : undefined}
+          href={`${BASE}/saved`}
+        >
+          <span>Saved</span>
+          {(counts.data?.saved ?? 0) > 0 && <span class="n">{counts.data?.saved}</span>}
+        </a>
+        <a
           class={path === `${BASE}/history` ? "on" : ""}
           aria-current={path === `${BASE}/history` ? "page" : undefined}
           href={`${BASE}/history`}

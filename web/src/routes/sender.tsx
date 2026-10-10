@@ -1,11 +1,12 @@
 import { useState } from "preact/hooks";
 import { useRoute } from "preact-iso";
-import type { SenderPatch, Shelf } from "@library/core/types";
+import type { IssueListItem, SenderPatch, Shelf } from "@library/core/types";
 import { BASE } from "../config.js";
 import { useApp } from "../context.js";
 import { BackIcon, StarIcon } from "../components/icons.js";
 import { IssueCard } from "../components/issue-card.js";
 import { IssueRow } from "../components/issue-row.js";
+import { useSaveToggle } from "../components/save.js";
 import { useSwipeRating } from "../components/swipe.js";
 import { patchIssue } from "../groups.js";
 import { useAsync } from "../hooks.js";
@@ -19,10 +20,11 @@ export function Sender() {
   const wide = useMedia(WIDE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
+  const patch = (id: string, change: Partial<IssueListItem>) =>
+    sender.set((d) => ({ ...d, issues: patchIssue(d.issues, id, change) }));
   // Swipe to rate (#13). This page lists archived issues too, so swiped rows stay.
-  const rating = useSwipeRating({
-    patch: (id, change) => sender.set((d) => ({ ...d, issues: patchIssue(d.issues, id, change) })),
-  });
+  const rating = useSwipeRating({ patch });
+  const save = useSaveToggle(patch);
 
   const update = async (patch: SenderPatch) => {
     const before = sender.data;
@@ -117,13 +119,19 @@ export function Sender() {
       ) : wide ? (
         <ul class="rows panel">
           {s.issues.map((i) => (
-            <IssueRow key={i.id} issue={i} showPublication={false} />
+            <IssueRow key={i.id} issue={i} showPublication={false} onSave={save} />
           ))}
         </ul>
       ) : (
         <ul class="cards">
           {s.issues.map((i) => (
-            <IssueCard key={i.id} issue={i} showPublication={false} swipe={rating.actions(i)} />
+            <IssueCard
+              key={i.id}
+              issue={i}
+              showPublication={false}
+              swipe={rating.actions(i)}
+              onSave={save}
+            />
           ))}
         </ul>
       )}

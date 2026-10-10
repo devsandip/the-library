@@ -11,6 +11,7 @@ import { PANES, useMedia, WIDE } from "../media.js";
 import { backIfPossible, clickInPlace } from "../nav.js";
 import { IssueReader } from "../components/issue-reader.js";
 import { DayInBrief } from "../components/narrative.js";
+import { SaveButton, useSaveToggle } from "../components/save.js";
 import { ArchiveIcon, BackIcon, StarIcon, ThumbDown, ThumbUp } from "../components/icons.js";
 import { SwipeUnder, useSwipe, useSwipeRating, type SwipeActions } from "../components/swipe.js";
 
@@ -27,6 +28,7 @@ function SummaryRow({
   phone,
   onOpen,
   onArchive,
+  onSave,
   swipe,
 }: {
   issue: IssueListItem;
@@ -35,6 +37,8 @@ function SummaryRow({
   /** Open in the reading pane instead of on its own page. */
   onOpen?: (id: string) => void;
   onArchive: (id: string) => void;
+  /** Save for later (#43). */
+  onSave: (issue: IssueListItem) => void;
   /** Swipe to rate (#13), on the phone. */
   swipe?: SwipeActions;
 }) {
@@ -75,6 +79,7 @@ function SummaryRow({
           <span class="summary-line">{i.summary ?? i.subject}</span>
           {i.scoreReason && <span class="reason">{i.scoreReason}</span>}
         </a>
+        <SaveButton issue={i} onSave={onSave} />
         <button
           type="button"
           class="icon-button"
@@ -115,10 +120,10 @@ export function Summary() {
       return next;
     });
 
-  const rating = useSwipeRating({
-    patch: (id, change) => summary.set((d) => ({ ...d, items: patchIssue(d.items, id, change) })),
-    hide: (id, on) => hide([id], on),
-  });
+  const patch = (id: string, change: Partial<IssueListItem>) =>
+    summary.set((d) => ({ ...d, items: patchIssue(d.items, id, change) }));
+  const rating = useSwipeRating({ patch, hide: (id, on) => hide([id], on) });
+  const save = useSaveToggle(patch);
 
   const archive = async (id: string) => {
     setError(undefined);
@@ -168,6 +173,7 @@ export function Summary() {
       phone={!wide}
       onOpen={panes ? openHere : undefined}
       onArchive={(id) => void archive(id)}
+      onSave={save}
       swipe={wide ? undefined : rating.actions(i)}
     />
   );

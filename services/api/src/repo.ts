@@ -92,6 +92,7 @@ const LIST_ATTRIBUTES = [
   "topic",
   "promo",
   "autoArchived",
+  "savedAt",
 ];
 
 export function toListItem(i: Item): IssueListItem {
@@ -111,6 +112,7 @@ export function toListItem(i: Item): IssueListItem {
     topic: i.topic as string | undefined,
     promo: i.promo as boolean | undefined,
     autoArchived: i.autoArchived as IssueListItem["autoArchived"],
+    savedAt: i.savedAt as string | undefined,
     scoreReason: i.scoreReason as string | undefined,
   };
 }
@@ -194,7 +196,8 @@ function shelfFilter(shelf: Shelf): Filter {
     : { expr: "#sh = :sh", names: { "#sh": "shelf" }, values: { ":sh": "learning" } };
 }
 
-const VIEW_STATES: Record<View, IssueState[]> = {
+/** The states each view shows when it reads a sender's index. Saved has its own partition. */
+const VIEW_STATES: Record<Exclude<View, "saved">, IssueState[]> = {
   unread: ["unread"],
   all: ["unread", "read"],
   archived: ["archived"],
@@ -273,10 +276,24 @@ export class DynamoRepo implements RepoPort {
   }
 
   /**
-   * One view as one index stream. Muted senders are hidden everywhere but Archived, unless they
-   * are picked: one sender reads its own index, several filter the view's index.
+   * One view as one index stream. Muted senders are hidden everywhere but Archived and Saved,
+   * unless they are picked: one sender reads its own index, several filter the view's index.
    */
   private viewQuery(view: View, muted: string[], senderIds?: string[], extra?: Filter): IndexQuery {
+    if (view === "saved") {
+      // Saved for later (#43): its own partition, newest saved first. Saving was a choice, so it
+      // hides no one, like Archived.
+      return {
+        index: INDEX.unread,
+        pkAttr: "gsi2pk",
+        skAttr: "gsi2sk",
+        pkValue: PARTITION.saved,
+        filter: andFilters(
+          senderIds?.length ? inFilter("senderId", "sid", senderIds) : undefined,
+          extra,
+        ),
+      };
+    }
     if (senderIds?.length === 1) {
       return {
         index: INDEX.bySender,
@@ -511,6 +528,9 @@ export class DynamoRepo implements RepoPort {
     const item = await this.mustGetIssue(id);
     if (item.state === state) return toListItem(item);
     const now = new Date().toISOString();
+    // Archiving a saved issue takes it off the Saved list too (#43): done with it.
+    const unsave = state === "archived" && item.savedAt !== undefined;
+    const savedAt = unsave ? undefined : (item.savedAt as string | undefined);
     const idx = issueIndexAttributes({
       id,
       senderId: item.senderId as string,
@@ -518,8 +538,12 @@ export class DynamoRepo implements RepoPort {
       state,
       rating: item.rating as Rating | undefined,
       ratedAt: item.ratedAt as string | undefined,
+      savedAt,
     });
-    const u = updateExpression({ state, stateChangedAt: now, ...idx.set }, idx.remove);
+    const u = updateExpression({ state, stateChangedAt: now, ...idx.set }, [
+      ...idx.remove,
+      ...(unsave ? ["savedAt"] : []),
+    ]);
     await this.transact([
       {
         Update: {
@@ -532,8 +556,50 @@ export class DynamoRepo implements RepoPort {
         },
       },
       this.event(id, now, { type: "state", value: state, prev: item.state }),
+      ...(unsave ? [this.event(id, now, { type: "saved", value: false, prev: true })] : []),
     ]);
-    return toListItem({ ...item, state });
+    return toListItem({ ...item, state, savedAt });
+  }
+
+  /**
+   * Save an issue for later, or take it off the Saved list (#43). Saved issues leave Unread
+   * whatever their state, and the archive rules skip them. An archived issue cannot be saved:
+   * archiving is the end of the Saved list.
+   */
+  async setSaved(id: string, saved: boolean): Promise<IssueListItem> {
+    const item = await this.mustGetIssue(id);
+    if ((item.savedAt !== undefined) === saved) return toListItem(item);
+    if (saved && item.state === "archived") throw badRequest("archived issues cannot be saved");
+    const now = new Date().toISOString();
+    const savedAt = saved ? now : undefined;
+    const idx = issueIndexAttributes({
+      id,
+      senderId: item.senderId as string,
+      receivedAt: item.receivedAt as string,
+      state: item.state as IssueState,
+      rating: item.rating as Rating | undefined,
+      ratedAt: item.ratedAt as string | undefined,
+      savedAt,
+    });
+    const u = updateExpression({ ...idx.set, ...(saved ? { savedAt: now } : {}) }, [
+      ...idx.remove,
+      ...(saved ? [] : ["savedAt"]),
+    ]);
+    await this.transact([
+      {
+        Update: {
+          TableName: this.table,
+          Key: issueKey(id),
+          UpdateExpression: u.expr,
+          // The indexes follow the state read above; another device may have changed either.
+          ConditionExpression: `${saved ? "attribute_not_exists" : "attribute_exists"}(#sv) AND #st = :st`,
+          ExpressionAttributeNames: { ...u.names, "#sv": "savedAt", "#st": "state" },
+          ExpressionAttributeValues: { ...u.values, ":st": item.state },
+        },
+      },
+      this.event(id, now, { type: "saved", value: saved, prev: !saved }),
+    ]);
+    return toListItem({ ...item, savedAt });
   }
 
   async setShelf(id: string, shelf: Shelf): Promise<IssueListItem> {
@@ -570,6 +636,7 @@ export class DynamoRepo implements RepoPort {
       state: item.state as IssueState,
       rating,
       ratedAt: rating ? now : undefined,
+      savedAt: item.savedAt as string | undefined,
     });
     const u = updateExpression({ ...idx.set, ...(rating ? { rating, ratedAt: now } : {}) }, [
       ...idx.remove,
@@ -891,8 +958,12 @@ export class DynamoRepo implements RepoPort {
 
   // ---------- counts and summary ----------
 
-  /** Unread issues counted by sender, shelf and topic. Muted senders are included. */
+  /**
+   * Unread issues counted by sender, shelf and topic (muted senders are included), and how many
+   * are saved for later (#43).
+   */
   async unreadCounts(): Promise<UnreadCountsResponse> {
+    const saved = this.countSaved();
     const tally = new Map<string, UnreadCount>();
     let start: Item | undefined;
     do {
@@ -919,7 +990,24 @@ export class DynamoRepo implements RepoPort {
       }
       start = res.LastEvaluatedKey;
     } while (start);
-    return { counts: [...tally.values()] };
+    return { counts: [...tally.values()], saved: await saved };
+  }
+
+  private async countSaved(): Promise<number> {
+    let n = 0;
+    let start: Item | undefined;
+    do {
+      const res: QueryCommandOutput = await this.query({
+        IndexName: INDEX.unread,
+        KeyConditionExpression: "gsi2pk = :p",
+        ExpressionAttributeValues: { ":p": PARTITION.saved },
+        Select: "COUNT",
+        ExclusiveStartKey: start,
+      });
+      n += res.Count ?? 0;
+      start = res.LastEvaluatedKey;
+    } while (start);
+    return n;
   }
 
   /**

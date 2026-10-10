@@ -3,6 +3,7 @@ import { issueHref } from "../filters.js";
 import { clockTime, relativeTime } from "../format.js";
 import { clickInPlace } from "../nav.js";
 import { StarIcon, ThumbDown, ThumbUp } from "./icons.js";
+import { SaveButton } from "./save.js";
 
 /** A row in the Mac's list column (#12): newsletter and time, the headline, Claude's line. */
 export function IssueRow({
@@ -11,6 +12,7 @@ export function IssueRow({
   selected = false,
   openedAt,
   onOpen,
+  onSave,
 }: {
   issue: IssueListItem;
   showPublication?: boolean;
@@ -20,11 +22,16 @@ export function IssueRow({
   openedAt?: string;
   /** Open in the reading pane instead of on its own page. */
   onOpen?: (id: string) => void;
+  /** Save for later (#43): the row gets a bookmark. */
+  onSave?: (issue: IssueListItem) => void;
 }) {
   const unread = issue.state === "unread";
   const preview = issue.summary ?? issue.snippet;
+  const saves = onSave !== undefined && issue.state !== "archived";
   return (
-    <li class={`issue-row${unread ? " unread" : ""}${selected ? " selected" : ""}`}>
+    <li
+      class={`issue-row${unread ? " unread" : ""}${selected ? " selected" : ""}${saves ? " can-save" : ""}`}
+    >
       <a
         class="row-link"
         href={issueHref(issue.id)}
@@ -74,6 +81,7 @@ export function IssueRow({
         <span class="subject">{issue.subject}</span>
         {preview && <span class="snippet">{preview}</span>}
       </a>
+      {onSave && <SaveButton issue={issue} onSave={onSave} />}
     </li>
   );
 }

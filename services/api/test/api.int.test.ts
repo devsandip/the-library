@@ -21,6 +21,7 @@ import {
 import type {
   HistoryResponse,
   IssueDetailResponse,
+  IssueListItem,
   IssueListResponse,
   NowReadingResponse,
   RelatedResponse,
@@ -629,5 +630,49 @@ describe("API on dev", () => {
     expect((await save("fx-tldr", 2)).status).toBe(400);
     await call("PATCH", "/issues/fx-tldr", { body: { state: "read" } });
     await call("POST", "/issues/fx-pragmatic/rating", { body: { value: 0 } });
+  });
+
+  it("saved: out of Unread and its counts, newest saved first; archiving takes it off", async () => {
+    const patch = (id: string, body: unknown) =>
+      call<IssueListItem>("PATCH", `/issues/${id}`, { body });
+    const unread = async () =>
+      ids(await call<IssueListResponse>("GET", "/issues", { query: { limit: "100" } }));
+    const saved = () => call<IssueListResponse>("GET", "/issues", { query: { view: "saved" } });
+    const counts = async () => (await call<UnreadCountsResponse>("GET", "/unread-counts")).body;
+    const unreadTotal = (c: UnreadCountsResponse) => c.counts.reduce((n, x) => n + x.n, 0);
+
+    const [a, b] = (await unread()).slice(0, 2);
+    if (!a || !b) throw new Error("needs two unread issues");
+    const before = await counts();
+    expect(before.saved).toBe(0);
+
+    expect((await patch(a, { saved: true })).body.savedAt).toMatch(/^\d{4}-/);
+    await patch(b, { saved: true });
+    // Newest saved first, out of Unread and its counts, and still in All.
+    const list = await eventually(saved, (r) => r.body.items.length === 2);
+    expect(ids(list)).toEqual([b, a]);
+    expect(list.body.items[0]?.savedAt).toMatch(/^\d{4}-/);
+    const left = await eventually(unread, (x) => !x.includes(a) && !x.includes(b));
+    expect(left).not.toContain(a);
+    const after = await eventually(counts, (c) => c.saved === 2);
+    expect(unreadTotal(after)).toBe(unreadTotal(before) - 2);
+    const all = await call<IssueListResponse>("GET", "/issues", {
+      query: { view: "all", limit: "100" },
+    });
+    expect(ids(all)).toContain(a);
+
+    // Reading keeps it saved; archiving takes it off the list, and an archived issue cannot be saved.
+    expect((await patch(a, { state: "read" })).body.savedAt).toBeDefined();
+    expect((await patch(b, { state: "archived" })).body.savedAt).toBeUndefined();
+    expect(ids(await eventually(saved, (r) => r.body.items.length === 1))).toEqual([a]);
+    expect((await patch(b, { saved: true })).status).toBe(400);
+
+    // Unsaving a read issue takes it off the list without putting it back in Unread.
+    await patch(a, { saved: false });
+    expect((await eventually(saved, (r) => r.body.items.length === 0)).body.items).toEqual([]);
+    expect(await unread()).not.toContain(a);
+
+    await patch(a, { state: "unread" });
+    await patch(b, { state: "unread" });
   });
 });
