@@ -4,14 +4,17 @@ import type { SenderPatch, Shelf } from "@library/core/types";
 import { BASE } from "../config.js";
 import { useApp } from "../context.js";
 import { BackIcon, StarIcon } from "../components/icons.js";
+import { IssueCard } from "../components/issue-card.js";
 import { IssueRow } from "../components/issue-row.js";
 import { useAsync } from "../hooks.js";
+import { useMedia, WIDE } from "../media.js";
 
 export function Sender() {
   const { api } = useApp();
   const { params } = useRoute();
   const senderId = params.senderId ?? "";
   const sender = useAsync(() => api.getSender(senderId), [senderId]);
+  const wide = useMedia(WIDE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -105,10 +108,16 @@ export function Sender() {
       <h2>Issues</h2>
       {s.issues.length === 0 ? (
         <p class="muted">No issues stored.</p>
-      ) : (
-        <ul class="card-list issue-list">
+      ) : wide ? (
+        <ul class="rows panel">
           {s.issues.map((i) => (
             <IssueRow key={i.id} issue={i} showPublication={false} />
+          ))}
+        </ul>
+      ) : (
+        <ul class="cards">
+          {s.issues.map((i) => (
+            <IssueCard key={i.id} issue={i} showPublication={false} />
           ))}
         </ul>
       )}
