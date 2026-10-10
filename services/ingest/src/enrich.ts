@@ -11,7 +11,7 @@ import type { ModelPort, ToolRequest } from "./bedrock.js";
 import { mapLimit } from "./ingest.js";
 import type { Store } from "./store.js";
 
-const READER =
+export const READER =
   "The reader is a senior product manager interested in the tech industry, startups, AI, " +
   "product management and system design, plus some general business news.";
 
@@ -215,6 +215,12 @@ export interface EnrichCandidate {
   shelfSetBy?: ShelfSetBy;
   enriched: boolean;
   embedded: boolean;
+  /** Claude marked it as a promo. */
+  promo?: boolean;
+  /** Split into stories (#15). */
+  storied?: boolean;
+  /** Failed story splits so far; after a few the issue is left alone. */
+  storyAttempts?: number;
 }
 
 export interface EnrichOptions {

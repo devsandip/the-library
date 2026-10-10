@@ -169,12 +169,32 @@ export interface EnrichStats {
   durationMs: number;
 }
 
+/** One run of the story index (#15). */
+export interface StoryStats {
+  /** Issues without stories yet (promos and muted newsletters are left out). */
+  checked: number;
+  /** Issues split into stories. */
+  storied: number;
+  stories: number;
+  /** Stories that joined an event started by another issue. */
+  linked: number;
+  /** Not started before the run's time budget ran out; picked up by the next run. */
+  deferred: number;
+  errors: number;
+  errorSamples: string[];
+  inputTokens: number;
+  outputTokens: number;
+  embedTokens: number;
+  durationMs: number;
+}
+
 export interface StatusResponse {
   stage: string;
   lastRunAt?: string;
   lastRunStats?: IngestStats;
   lastError?: string | null;
   lastEnrich?: EnrichStats;
+  lastStories?: StoryStats;
   digestStats?: DigestStats;
 }
 

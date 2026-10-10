@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toVector } from "../src/repo.js";
+import { toVector, vectorBytes } from "../src/vectors.js";
 
 describe("toVector", () => {
   it("reads float32 bytes back as numbers, even from an odd offset", () => {
@@ -10,5 +10,13 @@ describe("toVector", () => {
     const shifted = new Uint8Array(bytes.length + 1);
     shifted.set(bytes, 1);
     expect([...toVector(shifted.subarray(1))]).toEqual([0.25, -1.5, 3]);
+  });
+});
+
+describe("vectorBytes", () => {
+  it("stores numbers as float32 bytes that toVector reads back", () => {
+    const bytes = vectorBytes([0.25, -1.5, 3]);
+    expect(bytes.byteLength).toBe(12);
+    expect([...toVector(bytes)]).toEqual([0.25, -1.5, 3]);
   });
 });

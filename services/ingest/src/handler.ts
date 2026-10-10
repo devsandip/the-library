@@ -1,5 +1,5 @@
 import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
-import type { EnrichStats } from "@library/core/types";
+import type { EnrichStats, StoryStats } from "@library/core/types";
 import { Bedrock } from "./bedrock.js";
 import { archiveOldNews, enrich, proposeTopics } from "./enrich.js";
 import { Gmail, type GmailCredentials } from "./gmail.js";
@@ -7,6 +7,7 @@ import { ingest } from "./ingest.js";
 import { reprocess } from "./reprocess.js";
 import { rebuildSenders } from "./senders.js";
 import { Store } from "./store.js";
+import { indexStories, relinkStories } from "./stories.js";
 
 const { TABLE_NAME, BUCKET_NAME, GMAIL_PARAM, STAGE } = process.env;
 
@@ -56,6 +57,8 @@ export interface IngestEvent {
   enrich?: { days?: number; force?: boolean };
   /** Claude proposes the topic list from stored issues (`pnpm topics`); stored with `apply`. */
   proposeTopics?: { days?: number; apply?: boolean; replace?: boolean };
+  /** Split stored issues into stories (`pnpm stories`); `relink` only recomputes event links. */
+  stories?: { days?: number; force?: boolean; relink?: boolean };
 }
 
 export async function handler(event: IngestEvent = {}) {
@@ -68,6 +71,20 @@ export async function handler(event: IngestEvent = {}) {
     });
     stats.oldNewsArchived = await archiveOldNews(store);
     console.log(JSON.stringify({ level: "info", msg: "enrich done", ...stats }));
+    return stats;
+  }
+  if (event.stories) {
+    if (event.stories.relink) {
+      const report = await relinkStories(store);
+      console.log(JSON.stringify({ level: "info", msg: "relink done", ...report }));
+      return report;
+    }
+    const stats = await indexStories(store, bedrock, {
+      sinceIso: daysAgo(event.stories.days ?? 30),
+      force: event.stories.force === true,
+      deadline: started + 8.5 * 60_000,
+    });
+    console.log(JSON.stringify({ level: "info", msg: "stories done", ...stats }));
     return stats;
   }
   if (event.proposeTopics) {
@@ -125,7 +142,25 @@ export async function handler(event: IngestEvent = {}) {
       durationMs: 0,
     }));
   console.log(JSON.stringify({ level: "info", msg: "enrich done", ...enriched }));
-  await store.putIngestState(stats, enriched);
+  // Then the story index (#15), which needs the promo flag. Like enrichment, it never fails the run.
+  const storied = await indexStories(store, bedrock, {
+    sinceIso: daysAgo(14),
+    deadline: started + 8.5 * 60_000,
+  }).catch((err: Error): StoryStats => ({
+    checked: 0,
+    storied: 0,
+    stories: 0,
+    linked: 0,
+    deferred: 0,
+    errors: 1,
+    errorSamples: [err.message],
+    inputTokens: 0,
+    outputTokens: 0,
+    embedTokens: 0,
+    durationMs: 0,
+  }));
+  console.log(JSON.stringify({ level: "info", msg: "stories done", ...storied }));
+  await store.putIngestState(stats, enriched, storied);
   // A run with errors fails the invocation so the alarm fires. What was stored stays stored,
   // and async retries are off, so this is one failed run, not three.
   if (stats.errors > 0) throw new Error(`ingest finished with ${stats.errors} errors`);

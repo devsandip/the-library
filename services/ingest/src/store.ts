@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   BatchGetCommand,
+  BatchWriteCommand,
   DeleteCommand,
   DynamoDBDocumentClient,
   GetCommand,
@@ -29,14 +30,26 @@ import {
   s3Keys,
   senderIndexAttributes,
   senderItemKey,
+  storyKey,
+  storyRef,
+  toVector,
+  vectorBytes,
   type IngestStats,
   type ProcessedMessage,
 } from "@library/core";
-import type { EnrichStats, Rating, Shelf, ShelfSetBy, Topic } from "@library/core/types";
+import type {
+  EnrichStats,
+  Rating,
+  Shelf,
+  ShelfSetBy,
+  StoryStats,
+  Topic,
+} from "@library/core/types";
 import { EMBED_DIMENSIONS, MODELS } from "./bedrock.js";
 import type { Classification, EnrichCandidate } from "./enrich.js";
 import { mapLimit } from "./ingest.js";
 import type { SenderFields, SenderPlan, StoredIssue, StoredSender } from "./senders.js";
+import type { NewStory, StoredStory } from "./stories.js";
 
 type Newsletter = Extract<ProcessedMessage, { kind: "newsletter" }>;
 type Filtered = Extract<ProcessedMessage, { kind: "filtered" }>;
@@ -397,8 +410,8 @@ export class Store {
       );
     }
 
-    await mapLimit(plan.rekeys, 10, (r) =>
-      attempt(`re-key issue ${r.id}`, () =>
+    await mapLimit(plan.rekeys, 10, async (r) => {
+      await attempt(`re-key issue ${r.id}`, () =>
         this.ddb.send(
           new UpdateCommand({
             TableName: this.table,
@@ -413,8 +426,21 @@ export class Store {
             },
           }),
         ),
-      ),
-    );
+      );
+      // Its stories (#15) carry the sender too.
+      await attempt(`re-key stories of ${r.id}`, async () => {
+        for (const Key of await this.storyKeys(r.id)) {
+          await this.ddb.send(
+            new UpdateCommand({
+              TableName: this.table,
+              Key,
+              UpdateExpression: "SET senderId = :to",
+              ExpressionAttributeValues: { ":to": r.toSenderId },
+            }),
+          );
+        }
+      });
+    });
 
     for (const { next, current } of plan.updates) {
       const { unsubscribeUrl, ...fields } = {
@@ -462,7 +488,11 @@ export class Store {
     return errors;
   }
 
-  async putIngestState(stats: IngestStats, enrichStats?: EnrichStats): Promise<void> {
+  async putIngestState(
+    stats: IngestStats,
+    enrichStats?: EnrichStats,
+    storyStats?: StoryStats,
+  ): Promise<void> {
     await this.ddb.send(
       new PutCommand({
         TableName: this.table,
@@ -472,6 +502,7 @@ export class Store {
           lastRunStats: stats,
           lastError: stats.errors ? stats.errorSamples.join("; ") : null,
           lastEnrich: enrichStats,
+          lastStories: storyStats,
         },
       }),
     );
@@ -492,7 +523,7 @@ export class Store {
             KeyConditionExpression: "gsi1pk = :p AND gsi1sk >= :since",
             ExpressionAttributeValues: { ":p": partition, ":since": sinceIso },
             ProjectionExpression:
-              "id, senderId, publication, subject, receivedAt, summary, shelfSetBy, enrichedAt, embeddedAt",
+              "id, senderId, publication, subject, receivedAt, summary, shelfSetBy, enrichedAt, embeddedAt, promo, storiedAt, storyAttempts",
             ExclusiveStartKey: start,
           }),
         );
@@ -507,6 +538,9 @@ export class Store {
             shelfSetBy: i.shelfSetBy as ShelfSetBy | undefined,
             enriched: Boolean(i.enrichedAt),
             embedded: Boolean(i.embeddedAt),
+            promo: i.promo === true,
+            storied: Boolean(i.storiedAt),
+            storyAttempts: (i.storyAttempts as number | undefined) ?? 0,
           });
         }
         start = res.LastEvaluatedKey;
@@ -559,8 +593,10 @@ export class Store {
   }
 
   /** Sandip's per-sender settings: an "always" shelf, and the Must Read star. */
-  async senderSettings(): Promise<Map<string, { shelf?: Shelf; mustRead: boolean }>> {
-    const settings = new Map<string, { shelf?: Shelf; mustRead: boolean }>();
+  async senderSettings(): Promise<
+    Map<string, { shelf?: Shelf; mustRead: boolean; muted: boolean }>
+  > {
+    const settings = new Map<string, { shelf?: Shelf; mustRead: boolean; muted: boolean }>();
     let start: Record<string, unknown> | undefined;
     do {
       const res: QueryCommandOutput = await this.ddb.send(
@@ -569,13 +605,17 @@ export class Store {
           IndexName: INDEX.list,
           KeyConditionExpression: "gsi1pk = :p",
           ExpressionAttributeValues: { ":p": PARTITION.senders },
-          ProjectionExpression: "senderId, shelf, mustRead",
+          ProjectionExpression: "senderId, shelf, mustRead, muted",
           ExclusiveStartKey: start,
         }),
       );
       for (const s of res.Items ?? []) {
         const shelf = s.shelf === "news" || s.shelf === "learning" ? (s.shelf as Shelf) : undefined;
-        settings.set(s.senderId as string, { shelf, mustRead: s.mustRead === true });
+        settings.set(s.senderId as string, {
+          shelf,
+          mustRead: s.mustRead === true,
+          muted: s.muted === true,
+        });
       }
       start = res.LastEvaluatedKey;
     } while (start);
@@ -701,11 +741,18 @@ export class Store {
   }
 
   /** The issue's clean text (kept forever), or undefined if it was never written. */
-  async getText(id: string): Promise<string | undefined> {
+  getText(id: string): Promise<string | undefined> {
+    return this.readObject(s3Keys(id).text);
+  }
+
+  /** The issue's HTML (kept a year), or undefined once it has expired or was never written. */
+  getHtml(id: string): Promise<string | undefined> {
+    return this.readObject(s3Keys(id).html);
+  }
+
+  private async readObject(key: string): Promise<string | undefined> {
     try {
-      const res = await this.s3.send(
-        new GetObjectCommand({ Bucket: this.bucket, Key: s3Keys(id).text }),
-      );
+      const res = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
       return await res.Body?.transformToString("utf-8");
     } catch (err) {
       if ((err as { name?: string }).name === "NoSuchKey") return undefined;
@@ -795,6 +842,143 @@ export class Store {
         ExpressionAttributeValues: { ":at": now },
       }),
     );
+  }
+
+  // ---------- story index (#15) ----------
+
+  /** Stories received between two times (inclusive), oldest first. */
+  async storiesBetween(fromIso: string, toIso: string): Promise<StoredStory[]> {
+    const out: StoredStory[] = [];
+    let start: Record<string, unknown> | undefined;
+    do {
+      const res: QueryCommandOutput = await this.ddb.send(
+        new QueryCommand({
+          TableName: this.table,
+          IndexName: INDEX.list,
+          KeyConditionExpression: "gsi1pk = :p AND gsi1sk BETWEEN :from AND :to",
+          ExpressionAttributeValues: {
+            ":p": PARTITION.stories,
+            ":from": fromIso,
+            ":to": `${toIso}\uffff`,
+          },
+          ProjectionExpression: "id, n, senderId, receivedAt, #names, vector, eventId",
+          ExpressionAttributeNames: { "#names": "names" },
+          ExclusiveStartKey: start,
+        }),
+      );
+      for (const i of res.Items ?? []) {
+        out.push({
+          key: storyRef(i.id as string, i.n as number),
+          issueId: i.id as string,
+          n: i.n as number,
+          senderId: i.senderId as string,
+          receivedAt: i.receivedAt as string,
+          names: (i.names as string[] | undefined) ?? [],
+          vector: toVector(i.vector as Uint8Array),
+          eventId: i.eventId as string | undefined,
+        });
+      }
+      start = res.LastEvaluatedKey;
+    } while (start);
+    return out;
+  }
+
+  /** Replace an issue's stories, then mark the issue as split. */
+  async putStories(
+    issue: { id: string; senderId: string; receivedAt: string },
+    stories: NewStory[],
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    const puts = stories.map((s) => ({
+      ...storyKey(issue.id, s.n),
+      id: issue.id,
+      n: s.n,
+      senderId: issue.senderId,
+      receivedAt: issue.receivedAt,
+      headline: s.headline,
+      summary: s.summary,
+      names: s.names,
+      link: s.link,
+      eventId: s.eventId,
+      vector: vectorBytes(s.vector),
+      dims: s.vector.length,
+      model: MODELS.classify,
+      embedModel: MODELS.embed,
+      at: now,
+      gsi1pk: PARTITION.stories,
+      gsi1sk: `${issue.receivedAt}#${storyRef(issue.id, s.n)}`,
+    }));
+    // A redo can come back with fewer stories than before.
+    const keep = new Set(puts.map((p) => p.sk));
+    const stale = (await this.storyKeys(issue.id)).filter((k) => !keep.has(k.sk));
+    await this.batchWrite([
+      ...stale.map((Key) => ({ DeleteRequest: { Key } })),
+      ...puts.map((Item) => ({ PutRequest: { Item } })),
+    ]);
+    await this.ddb.send(
+      new UpdateCommand({
+        TableName: this.table,
+        Key: issueKey(issue.id),
+        UpdateExpression: "SET storiedAt = :at, storyCount = :n REMOVE storyError, storyAttempts",
+        ConditionExpression: "attribute_exists(pk)",
+        ExpressionAttributeValues: { ":at": now, ":n": stories.length },
+      }),
+    );
+  }
+
+  /** A failed split is counted, so an issue that keeps failing stops costing a call every run. */
+  async putStoryError(id: string, message: string): Promise<void> {
+    await this.ddb.send(
+      new UpdateCommand({
+        TableName: this.table,
+        Key: issueKey(id),
+        UpdateExpression: "SET storyError = :e ADD storyAttempts :one",
+        ConditionExpression: "attribute_exists(pk)",
+        ExpressionAttributeValues: { ":e": message.slice(0, 300), ":one": 1 },
+      }),
+    );
+  }
+
+  /** New event ids after relinking. */
+  async setEventIds(changes: { issueId: string; n: number; eventId: string }[]): Promise<void> {
+    await mapLimit(changes, 8, async (c) => {
+      await this.ddb.send(
+        new UpdateCommand({
+          TableName: this.table,
+          Key: storyKey(c.issueId, c.n),
+          UpdateExpression: "SET eventId = :e",
+          ConditionExpression: "attribute_exists(pk)",
+          ExpressionAttributeValues: { ":e": c.eventId },
+        }),
+      );
+    });
+  }
+
+  private async storyKeys(id: string): Promise<{ pk: string; sk: string }[]> {
+    const res = await this.ddb.send(
+      new QueryCommand({
+        TableName: this.table,
+        KeyConditionExpression: "pk = :pk AND begins_with(sk, :story)",
+        ExpressionAttributeValues: { ":pk": issueKey(id).pk, ":story": "STORY#" },
+        ProjectionExpression: "pk, sk",
+      }),
+    );
+    return (res.Items ?? []).map((i) => ({ pk: i.pk as string, sk: i.sk as string }));
+  }
+
+  /** BatchWriteItem in chunks of 25, retrying what DynamoDB leaves unprocessed. */
+  private async batchWrite(requests: Record<string, unknown>[]): Promise<void> {
+    for (let i = 0; i < requests.length; i += 25) {
+      let pending = requests.slice(i, i + 25);
+      for (let attempt = 0; pending.length; attempt++) {
+        if (attempt >= 8) throw new Error(`${pending.length} writes left unprocessed`);
+        if (attempt) await new Promise((r) => setTimeout(r, 50 * 2 ** attempt));
+        const res = await this.ddb.send(
+          new BatchWriteCommand({ RequestItems: { [this.table]: pending } }),
+        );
+        pending = (res.UnprocessedItems?.[this.table] ?? []) as Record<string, unknown>[];
+      }
+    }
   }
 
   private putObject(key: string, body: string | Buffer, contentType: string) {

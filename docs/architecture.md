@@ -153,12 +153,13 @@ Through the proxy the app runs on the `https://sandip.dev` origin, so anything o
 
 ### DynamoDB: one table, on-demand, PITR on (prod)
 
-All four GSIs are defined before the first deploy because CloudFormation adds only one GSI per update. Projections are `ALL`; anything large (Phase 2 embeddings) lives in its own item so it never lands in an index.
+All four GSIs are defined before the first deploy because CloudFormation adds only one GSI per update. Projections are `ALL`; an issue's embedding lives in its own item so it never lands in an index. Story items (#15) are the exception on purpose: linking reads a window of stories with their vectors in one `gsi1` query.
 
 | Entity | pk | sk | Notes |
 |---|---|---|---|
 | Issue | `ISSUE#<gmailMsgId>` | `META` | `senderId`, `publication`, `fromAddr`, `fromName` (kept so sender rules can be re-applied after the raw message expires), `subject`, `receivedAt`, `snippet`, `viewOnlineUrl`, `unsubscribeUrl`, `wordCount`, `readMinutes`, `state` (`unread`\|`read`\|`archived`\|`filtered`), `rating` (`1`\|`-1`), `ratedAt`, `s3Keys`, `labelIds`. Enrichment (section 11) adds `summary`, `shelf` (`news`\|`learning`, what Home's tabs filter on), `shelfAuto` (Claude's call), `shelfSetBy` (`claude`\|`sender`\|`sandip`), `topic`, `promo`, `enrichedAt`, `embeddedAt`, and `autoArchived` (`promo`\|`old-news`) when a rule archived it. Phase 2 ranking adds `score`, `scoreReason`. |
 | Embedding | `ISSUE#<id>` | `EMB` | Titan V2, 512 float32 as binary, for Phase 2 ranking. |
+| Story (#15) | `ISSUE#<id>` | `STORY#<nn>` | `n` (from 1), `headline`, `summary`, `names` (companies, people, products), `link` (the story's own source, one of the issue's links), `eventId`, `senderId`, `receivedAt`, `vector` (Titan V2 float32 binary), `model`, `embedModel`, `at`. In `gsi1` under `STORIES`. The issue's META gets `storiedAt` and `storyCount`, or `storyError` and `storyAttempts` after a failed split. |
 | Topic list | `CONFIG` | `TOPICS` | `topics` (`name`, `description`), proposed once by Claude (`pnpm topics`). Names cannot contain commas: the API takes several as one comma-separated parameter. |
 | Interests | `CONFIG` | `INTERESTS` | The five PRD interests (`name`, `text`, `vector` as Titan float32 binary). Written by enrichment when missing or when the list in `packages/core/src/rank.ts` changes; read by the API to seed the taste profile. |
 | Event | `ISSUE#<id>` | `EVT#<iso>#<rand>` | `type` (`rating`\|`state`\|`open`), `value`, `prev`. Append-only. |
@@ -172,7 +173,7 @@ Sender rules live in `packages/core/src/sources.ts`. Aliases name a newsletter b
 
 | Index | pk | sk | Present on | Serves |
 |---|---|---|---|---|
-| `gsi1` | `INBOX` \| `ARCHIVE` \| `SENDERS` | `<receivedAt>#<id>` (senders: lowercase publication) | non-filtered issues, senders | "All" and "Archived" views, sender list |
+| `gsi1` | `INBOX` \| `ARCHIVE` \| `SENDERS` \| `STORIES` | `<receivedAt>#<id>` (senders: lowercase publication; stories: `<receivedAt>#<id>#<nn>`) | non-filtered issues, senders, stories | "All" and "Archived" views, sender list, stories in a time window |
 | `gsi2` | `UNREAD` | `<receivedAt>#<id>` | unread issues only (sparse) | "Unread" view, Phase 2 candidates (`gsi2sk > now-14d`) |
 | `gsi3` | `SENDER#<senderId>` | `<receivedAt>#<id>` | non-filtered issues | Sender page, sender filter |
 | `gsi4` | `RATED` | `<ratedAt>#<id>` | rated issues only (sparse) | Phase 2 taste profile |
@@ -292,6 +293,15 @@ Each issue gets one forced tool call to Claude Haiku (cross-region profile, `thi
 - **Access:** Anthropic models need a one-time use-case form on the AWS account (Bedrock console, model catalog). Titan needs nothing.
 - **Cost:** Haiku 4.5 and 5.5 both cost about $1 and $5 per million input and output tokens; an issue is ~1,500 tokens in and ~60 out, so the 4-week backlog costs under $1 and daily runs a few cents.
 
+### Story index (`services/ingest/src/stories.ts`, `packages/core/src/stories.ts`, issue #15)
+
+Claude splits every issue into its stories and stories about the same event are linked across newsletters; decisions and the probe are in `docs/features/story-index.md`.
+
+- **Split:** a second forced tool call to Haiku per issue (`record_stories`), reading the whole issue up to 60,000 characters from the stored HTML, with each outside link marked `[n]`. Each story gets a headline (at most 12 words), a summary (at most 45 words), up to 6 names and the number of its own source link, which the code turns back into the URL. Sponsor slots and housekeeping are left out; an essay is one story. Promos and muted newsletters are skipped.
+- **Embed and link:** Titan V2 embeds headline, summary and names (no newsletter name). In arrival order, a story joins the event of the most similar story from another issue within 3 days at a cosine of 0.80, or 0.60 with a shared name; otherwise it starts an event named after itself. `pnpm stories --relink` recomputes every link without model calls, for threshold changes.
+- **When:** after enrichment on every scheduled run, for the last 14 days, inside the run's time budget; `pnpm stories --days 30` for the backlog. A split that fails three times is left alone (`--force` retries). Like enrichment, it never fails the ingest run; `/status` shows the last run's line.
+- **Cost:** about 0.7 cents per issue (5 prod issues, 2026-10-10: ~3,300 tokens in and ~830 out each), so about $3 for the 4-week backlog and about $3 a month.
+
 ## 12. Cost (steady state, ~25 issues/day)
 
 | Item | Phase 1 | Phase 2 |
@@ -303,9 +313,10 @@ Each issue gets one forced tool call to Claude Haiku (cross-region profile, `thi
 | DynamoDB PITR (tiny table) | ~$0.02 | ~$0.02 |
 | Titan embeddings ($0.02 per M tokens) | n/a | ~$0.03 |
 | Haiku 5.5 enrichment (~25 issues/day) | n/a | ~$1.50 |
-| **Total** | **~$0.20/month** | **~$1.40 to $1.80/month** |
+| Story index: Haiku 4.5 reading whole issues (#15) | n/a | ~$3 |
+| **Total** | **~$0.20/month** | **~$4.40 to $4.80/month** |
 
-An AWS Budget filtered on `project=thelibrary` alerts at $2 (set up in R9, once the cost-allocation tag is active).
+An AWS Budget filtered on `project=thelibrary` alerts at $6 (set up in R9, once the cost-allocation tag is active; it was $2 before the story index).
 
 ## 13. Phase 3 readiness (audio briefing)
 

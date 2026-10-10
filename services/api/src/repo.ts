@@ -36,6 +36,7 @@ import {
   s3Keys,
   senderItemKey,
   TOPICS_KEY,
+  toVector,
   type InterestVector,
   type RelatedMatch,
 } from "@library/core";
@@ -178,13 +179,6 @@ function inFilter(attr: string, prefix: string, values: string[], negate = false
   const list = Object.keys(vals).join(", ");
   const expr = negate ? `NOT (#${prefix} IN (${list}))` : `#${prefix} IN (${list})`;
   return { expr, names, values: vals };
-}
-
-/** A stored embedding (float32 bytes) as numbers. The copy avoids misaligned buffers. */
-export function toVector(bytes: Uint8Array): Float32Array {
-  const out = new Float32Array(Math.floor(bytes.byteLength / 4));
-  new Uint8Array(out.buffer).set(bytes.subarray(0, out.length * 4));
-  return out;
 }
 
 /** Unread cursors: which stream (1 Must Read, 2 everything else), plus that stream's cursor. */
@@ -1043,6 +1037,7 @@ export class DynamoRepo implements RepoPort {
       lastRunStats: res.Item?.lastRunStats as StatusResponse["lastRunStats"],
       lastError: (res.Item?.lastError as string | null | undefined) ?? null,
       lastEnrich: res.Item?.lastEnrich as StatusResponse["lastEnrich"],
+      lastStories: res.Item?.lastStories as StatusResponse["lastStories"],
     };
   }
 

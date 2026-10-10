@@ -16,9 +16,14 @@ export const INTERESTS_KEY = { pk: "CONFIG", sk: "INTERESTS" } as const;
 export const digestKey = (day: string) => ({ pk: `DIGEST#${day}`, sk: "META" });
 /** Titan embedding of an issue, kept out of the META item so it never lands in an index. */
 export const embeddingKey = (id: string) => ({ pk: `ISSUE#${id}`, sk: "EMB" });
+/** One story of an issue (#15): headline, summary, names, link, embedding and event id. */
+export const storyKey = (id: string, n: number) => ({
+  pk: `ISSUE#${id}`,
+  sk: `STORY#${String(n).padStart(2, "0")}`,
+});
 
 export const INDEX = {
-  /** INBOX (unread + read) | ARCHIVE | SENDERS */
+  /** INBOX (unread + read) | ARCHIVE | SENDERS | STORIES */
   list: "gsi1",
   /** Sparse: unread issues only. */
   unread: "gsi2",
@@ -32,6 +37,7 @@ export const PARTITION = {
   inbox: "INBOX",
   archive: "ARCHIVE",
   senders: "SENDERS",
+  stories: "STORIES",
   unread: "UNREAD",
   rated: "RATED",
 } as const;
