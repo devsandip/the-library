@@ -1,35 +1,26 @@
-import { createContext } from "preact";
-import { useContext } from "preact/hooks";
 import { BASE } from "../config.js";
-import { SummaryIcon } from "./icons.js";
+import { todayLine } from "../format.js";
+import { SettingsIcon, SummaryIcon } from "./icons.js";
 
-/** Where Home puts its News | Learning control: in the header row on the Mac, under it on phones. */
-export const HeaderSlot = createContext<{
-  slot: HTMLElement | null;
-  setSlot: (el: HTMLElement | null) => void;
-}>({ slot: null, setSlot: () => undefined });
-
-export const useHeaderSlot = () => useContext(HeaderSlot).slot;
-
-export function Header() {
-  const { setSlot } = useContext(HeaderSlot);
+/** The phone's Home header: the wordmark and today's date, the Summary and Status. */
+export function BriefHeader() {
   return (
-    <header class="site-header">
-      <div class="header-inner">
+    <header class="brief-head">
+      <div>
         <a class="wordmark" href={`${BASE}/`}>
           The Library
         </a>
-        <div class="header-slot" ref={setSlot} />
-        <nav class="header-nav" aria-label="Main">
-          <a class="pill" href={`${BASE}/summary`}>
-            <SummaryIcon />
-            Summary
-          </a>
-          <a class="nav-link" href={`${BASE}/status`}>
-            Status
-          </a>
-        </nav>
+        <p class="dateline">{todayLine()}</p>
       </div>
+      <nav class="brief-nav" aria-label="Main">
+        <a class="pill" href={`${BASE}/summary`}>
+          <SummaryIcon />
+          Summary
+        </a>
+        <a class="icon-button" href={`${BASE}/status`} title="Status" aria-label="Status">
+          <SettingsIcon />
+        </a>
+      </nav>
     </header>
   );
 }

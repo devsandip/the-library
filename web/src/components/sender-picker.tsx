@@ -4,12 +4,12 @@ import { BASE } from "../config.js";
 import { SearchIcon, StarIcon } from "./icons.js";
 
 /**
- * Pick one or more newsletters (#9). A bottom sheet on phones, a popover under the Senders chip
- * on the Mac. Done or the main button applies; Escape or a tap outside leaves the filter as it was.
+ * Pick one or more newsletters (#9): a bottom sheet on the phone. The Mac lists senders in its
+ * sidebar instead. Done or the main button applies; Escape or a tap outside leaves the filter as
+ * it was.
  */
 export function SenderPicker({
   open,
-  anchor,
   senders,
   counts,
   picked,
@@ -18,7 +18,6 @@ export function SenderPicker({
   onClose,
 }: {
   open: boolean;
-  anchor: HTMLElement | null;
   senders: SenderListItem[];
   /** Unread per sender in the current tab and topics. */
   counts: Map<string, number>;
@@ -38,11 +37,6 @@ export function SenderPicker({
     if (open && !d.open) {
       setSelected(new Set(picked));
       setSearch("");
-      if (anchor && matchMedia("(min-width: 760px)").matches) {
-        const r = anchor.getBoundingClientRect();
-        d.style.setProperty("--top", `${Math.round(r.bottom + 8)}px`);
-        d.style.setProperty("--left", `${Math.round(Math.min(r.left, innerWidth - 416))}px`);
-      }
       d.showModal();
     } else if (!open && d.open) {
       d.close();

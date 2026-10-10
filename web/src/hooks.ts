@@ -5,11 +5,13 @@ export type Async<T> =
   | { status: "ok"; data: T; error?: undefined }
   | { status: "error"; data?: undefined; error: string };
 
+export type AsyncHandle<T> = Async<T> & { reload: () => void; set: (data: T) => void };
+
 /**
  * Load when `deps` change (showing a loading state), `reload()` refetches in place (keeping the
  * current data on screen), `set()` replaces data for optimistic updates.
  */
-export function useAsync<T>(load: () => Promise<T>, deps: unknown[]) {
+export function useAsync<T>(load: () => Promise<T>, deps: unknown[]): AsyncHandle<T> {
   const [state, setState] = useState<Async<T>>({ status: "loading" });
 
   const run = useCallback((keepData: boolean) => {
@@ -28,5 +30,5 @@ export function useAsync<T>(load: () => Promise<T>, deps: unknown[]) {
 
   const reload = useCallback(() => void run(true), [run]);
   const set = useCallback((data: T) => setState({ status: "ok", data }), []);
-  return { ...state, reload, set };
+  return { ...state, reload, set } as AsyncHandle<T>;
 }

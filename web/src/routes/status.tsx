@@ -3,6 +3,8 @@ import type { StatusResponse } from "@library/core/types";
 import { BASE } from "../config.js";
 import { useApp } from "../context.js";
 import { relativeTime } from "../format.js";
+import { backIfPossible } from "../nav.js";
+import { BackIcon } from "../components/icons.js";
 
 export function Status() {
   const { api, auth } = useApp();
@@ -26,6 +28,9 @@ export function Status() {
   const enrich = status?.lastEnrich;
   return (
     <section class="status">
+      <a class="back" href={`${BASE}/`} onClick={backIfPossible}>
+        <BackIcon /> Library
+      </a>
       <h1>Status</h1>
       {error && <p class="error">{error}</p>}
       {!status && !error && <p class="muted">Loading...</p>}

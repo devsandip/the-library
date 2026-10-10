@@ -15,3 +15,8 @@ export function relativeTime(iso: string, now = Date.now()): string {
     ...(sameYear ? {} : { year: "numeric" }),
   });
 }
+
+/** "Saturday 10 October", for the phone's header and the Summary. */
+export function todayLine(now = new Date()): string {
+  return now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+}

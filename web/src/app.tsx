@@ -4,7 +4,9 @@ import { HttpLibraryApi } from "./api.js";
 import { Auth } from "./auth.js";
 import { BASE, loadConfig } from "./config.js";
 import { Ctx, type AppContext } from "./context.js";
-import { Header, HeaderSlot } from "./components/header.js";
+import { LibraryProvider } from "./library.js";
+import { useMedia, WIDE } from "./media.js";
+import { Sidebar } from "./components/sidebar.js";
 import { Home } from "./routes/home.js";
 import { Issue } from "./routes/issue.js";
 import { NotFound } from "./routes/not-found.js";
@@ -34,9 +36,29 @@ async function boot(): Promise<AppContext> {
   return { cfg, auth, api: new HttpLibraryApi(cfg, auth) };
 }
 
+/** The phone gets one column; the Mac gets the sidebar beside every page (#12). */
+function Shell() {
+  const wide = useMedia(WIDE);
+  return (
+    <div class={wide ? "shell" : "phone"}>
+      {wide && <Sidebar />}
+      <main class={wide ? "main" : "page"}>
+        <Router>
+          <Route path={`${BASE}/`} component={Home} />
+          <Route path={`${BASE}/summary`} component={Summary} />
+          <Route path={`${BASE}/issue/:id`} component={Issue} />
+          <Route path={`${BASE}/senders`} component={Senders} />
+          <Route path={`${BASE}/senders/:senderId`} component={Sender} />
+          <Route path={`${BASE}/status`} component={Status} />
+          <Route default component={NotFound} />
+        </Router>
+      </main>
+    </div>
+  );
+}
+
 export function App() {
   const [state, setState] = useState<Boot>({ kind: "loading" });
-  const [slot, setSlot] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     boot().then(
@@ -59,22 +81,11 @@ export function App() {
 
   return (
     <Ctx.Provider value={state.ctx}>
-      <HeaderSlot.Provider value={{ slot, setSlot }}>
-        <LocationProvider scope={BASE}>
-          <Header />
-          <main class="page">
-            <Router>
-              <Route path={`${BASE}/`} component={Home} />
-              <Route path={`${BASE}/summary`} component={Summary} />
-              <Route path={`${BASE}/issue/:id`} component={Issue} />
-              <Route path={`${BASE}/senders`} component={Senders} />
-              <Route path={`${BASE}/senders/:senderId`} component={Sender} />
-              <Route path={`${BASE}/status`} component={Status} />
-              <Route default component={NotFound} />
-            </Router>
-          </main>
-        </LocationProvider>
-      </HeaderSlot.Provider>
+      <LocationProvider scope={BASE}>
+        <LibraryProvider>
+          <Shell />
+        </LibraryProvider>
+      </LocationProvider>
     </Ctx.Provider>
   );
 }

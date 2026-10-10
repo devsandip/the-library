@@ -1,67 +1,70 @@
 import type { IssueListItem } from "@library/core/types";
-import { BASE } from "../config.js";
+import { issueHref } from "../filters.js";
 import { relativeTime } from "../format.js";
+import { clickInPlace } from "../nav.js";
 import { StarIcon, ThumbDown, ThumbUp } from "./icons.js";
 
+/** A row in the Mac's list column (#12): newsletter and time, the headline, Claude's line. */
 export function IssueRow({
   issue,
   showPublication = true,
-  onTopic,
+  selected = false,
+  onOpen,
 }: {
   issue: IssueListItem;
   showPublication?: boolean;
-  /** Tapping the topic label switches that topic's chip on; plain text when absent. */
-  onTopic?: (topic: string) => void;
+  /** Showing in the reading pane. */
+  selected?: boolean;
+  /** Open in the reading pane instead of on its own page. */
+  onOpen?: (id: string) => void;
 }) {
   const unread = issue.state === "unread";
   const preview = issue.summary ?? issue.snippet;
   return (
-    <li class={`issue-row${unread ? " unread" : ""}`}>
-      <a class="row-link" href={`${BASE}/issue/${encodeURIComponent(issue.id)}`}>
-        {showPublication && (
-          <span class="publication">
-            {unread && <span class="dot" aria-label="Unread" />}
-            {issue.publication}
-            {issue.mustRead && (
-              <span class="star" title="Must Read" aria-label="Must Read">
+    <li class={`issue-row${unread ? " unread" : ""}${selected ? " selected" : ""}`}>
+      <a
+        class="row-link"
+        href={issueHref(issue.id)}
+        aria-current={selected ? "true" : undefined}
+        onClick={(e) => {
+          if (onOpen) clickInPlace(e, () => onOpen(issue.id));
+        }}
+      >
+        <span class="row-top">
+          <span class="row-pub">
+            {unread && (
+              <>
+                <span class="dot" aria-hidden="true" />
+                <span class="sr-only">Unread. </span>
+              </>
+            )}
+            <span class="row-name">{showPublication ? issue.publication : issue.topic}</span>
+            {showPublication && issue.mustRead && (
+              <span class="star" title="Must Read">
                 <StarIcon filled />
+                <span class="sr-only">Must Read</span>
               </span>
             )}
           </span>
-        )}
+          <span class="row-meta">
+            {issue.rating === 1 && (
+              <span class="rated up" title="Relevant">
+                <ThumbUp filled />
+                <span class="sr-only">Rated Relevant</span>
+              </span>
+            )}
+            {issue.rating === -1 && (
+              <span class="rated down" title="Irrelevant">
+                <ThumbDown filled />
+                <span class="sr-only">Rated Irrelevant</span>
+              </span>
+            )}
+            <time dateTime={issue.receivedAt}>{relativeTime(issue.receivedAt)}</time>
+          </span>
+        </span>
         <span class="subject">{issue.subject}</span>
         {preview && <span class="snippet">{preview}</span>}
       </a>
-      <span class="meta">
-        <span>
-          <time dateTime={issue.receivedAt}>{relativeTime(issue.receivedAt)}</time>
-          {" · "}
-          {issue.readMinutes} min
-        </span>
-        {issue.topic &&
-          (onTopic ? (
-            <button
-              type="button"
-              class="topic-pill"
-              title={`Only ${issue.topic}`}
-              onClick={() => onTopic(issue.topic!)}
-            >
-              {issue.topic}
-            </button>
-          ) : (
-            <span class="topic-pill">{issue.topic}</span>
-          ))}
-        {issue.rating === 1 && (
-          <span class="rated up" title="Relevant">
-            <ThumbUp filled />
-          </span>
-        )}
-        {issue.rating === -1 && (
-          <span class="rated down" title="Irrelevant">
-            <ThumbDown filled />
-          </span>
-        )}
-      </span>
     </li>
   );
 }

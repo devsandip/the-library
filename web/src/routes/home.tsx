@@ -1,82 +1,45 @@
-import { useRef, useState } from "preact/hooks";
-import { createPortal } from "preact/compat";
+import { useState } from "preact/hooks";
 import { useLocation } from "preact-iso";
-import type { IssueListItem, Shelf, View } from "@library/core/types";
-import { BASE } from "../config.js";
+import type { IssueListItem, View } from "@library/core/types";
 import { useApp } from "../context.js";
 import { facets } from "../counts.js";
-import { useHeaderSlot } from "../components/header.js";
-import { CheckIcon, CloseIcon, FilterIcon, RefreshIcon, StarIcon } from "../components/icons.js";
+import {
+  homeHref,
+  readFilters,
+  SHELF_LABEL,
+  SHELVES,
+  VIEWS,
+  type HomeFilters,
+} from "../filters.js";
+import { patchIssue, topicSections, UNSORTED } from "../groups.js";
+import { useAsync } from "../hooks.js";
+import { useLibrary } from "../library.js";
+import { PANES, useMedia, WIDE } from "../media.js";
+import { BriefHeader } from "../components/header.js";
+import { CloseIcon, FilterIcon, RefreshIcon, StarIcon } from "../components/icons.js";
+import { IssueCard } from "../components/issue-card.js";
+import { IssueReader } from "../components/issue-reader.js";
 import { IssueRow } from "../components/issue-row.js";
 import { SenderPicker } from "../components/sender-picker.js";
-import { useAsync } from "../hooks.js";
 
-const SHELVES: { id: Shelf; label: string }[] = [
-  { id: "news", label: "News" },
-  { id: "learning", label: "Learning" },
-];
-
-const VIEWS: { id: View; label: string }[] = [
-  { id: "unread", label: "Unread" },
-  { id: "all", label: "All" },
-  { id: "archived", label: "Archived" },
-];
-
-interface Filters {
-  shelf: Shelf;
-  view: View;
-  senders: string[];
-  topics: string[];
-}
-
-const split = (v: string | undefined) => (v ? v.split(",").filter(Boolean) : []);
-
-/** Filters live in the URL, so Back from an issue restores them. */
-function filtersHref(f: Filters): string {
-  const q = new URLSearchParams();
-  if (f.shelf !== "news") q.set("shelf", f.shelf);
-  if (f.view !== "unread") q.set("view", f.view);
-  if (f.senders.length) q.set("sender", f.senders.join(","));
-  if (f.topics.length) q.set("topic", f.topics.join(","));
-  const qs = q.toString();
-  return `${BASE}/${qs ? `?${qs}` : ""}`;
-}
-
-function IssueList({
-  items,
-  onTopic,
-}: {
-  items: IssueListItem[];
-  onTopic: (topic: string) => void;
-}) {
-  return (
-    <ul class="card-list issue-list">
-      {items.map((i) => (
-        <IssueRow key={i.id} issue={i} onTopic={onTopic} />
-      ))}
-    </ul>
-  );
-}
-
+/**
+ * Home (#12). On the phone, briefing cards: Must Read as a row of large cards, then the rest
+ * under their topics. On the Mac, the list column beside the sidebar, and a reading pane when the
+ * window is wide enough.
+ */
 export function Home() {
   const { api } = useApp();
   const { query, route } = useLocation();
-  const slot = useHeaderSlot();
+  const lib = useLibrary();
+  const wide = useMedia(WIDE);
+  const panes = useMedia(PANES);
   // The tabs appear once Claude has proposed topics and started sorting (`pnpm topics`).
-  const topicList = useAsync(() => api.listTopics(), []);
-  const shelvesOn = (topicList.data?.topics.length ?? 0) > 0;
-  const filters: Filters = {
-    shelf: query.shelf === "learning" ? "learning" : "news",
-    view: (VIEWS.some((v) => v.id === query.view) ? query.view : "unread") as View,
-    senders: split(query.sender),
-    topics: split(query.topic),
-  };
+  const shelvesOn = (lib.topics.data?.topics.length ?? 0) > 0;
+  const filters = readFilters(query);
   const { shelf, view, senders: picked, topics: pickedTopics } = filters;
 
-  const senders = useAsync(() => api.listSenders(), []);
-  const counts = useAsync(() => api.unreadCounts(), []);
   const listShelf = shelvesOn ? shelf : undefined;
-  const topicsKnown = topicList.status !== "loading";
+  const topicsKnown = lib.topics.status !== "loading";
   const senderKey = picked.join(",");
   const topicKey = pickedTopics.join(",");
   // Wait for the topic check, so the list loads once, with or without a tab.
@@ -90,39 +53,41 @@ export function Home() {
   const [more, setMore] = useState<{ items: IssueListItem[]; cursor?: string; loading: boolean }>();
   const [refreshing, setRefreshing] = useState(false);
   const [picking, setPicking] = useState(false);
-  const sendersButton = useRef<HTMLButtonElement>(null);
 
-  const setFilter = (next: Partial<Filters>) => {
+  const setFilter = (next: Partial<HomeFilters>) => {
     setMore(undefined);
-    route(filtersHref({ ...filters, ...next }));
+    route(homeHref({ ...filters, ...next }));
   };
   const toggleTopic = (t: string) =>
     setFilter({
       topics: pickedTopics.includes(t) ? pickedTopics.filter((x) => x !== t) : [...pickedTopics, t],
     });
-  const showTopic = (t: string) => {
-    if (!pickedTopics.includes(t)) setFilter({ topics: [...pickedTopics, t] });
-  };
+  // Opening in the pane replaces the history entry, so Back still leaves the list.
+  const openInPane = (id: string) => route(homeHref({ ...filters, issue: id }), true);
 
-  const muted = new Set((senders.data?.items ?? []).filter((s) => s.muted).map((s) => s.senderId));
-  const f = counts.data
-    ? facets(counts.data.counts, { shelf: listShelf, senders: picked, topics: pickedTopics }, muted)
+  const senderItems = lib.senders.data?.items ?? [];
+  const muted = new Set(senderItems.filter((s) => s.muted).map((s) => s.senderId));
+  const f = lib.counts.data
+    ? facets(
+        lib.counts.data.counts,
+        { shelf: listShelf, senders: picked, topics: pickedTopics },
+        muted,
+      )
     : undefined;
   const nameOf = (id: string) =>
-    senders.data?.items.find((s) => s.senderId === id)?.publication ?? "Newsletter";
+    senderItems.find((s) => s.senderId === id)?.publication ?? "Newsletter";
+  const topicOrder = (lib.topics.data?.topics ?? []).map((t) => t.name);
   // Claude's topic order; topics with nothing unread here drop out unless they are on.
-  const topicChips = (topicList.data?.topics ?? [])
-    .map((t) => ({
-      name: t.name,
-      n: f?.topics.get(t.name) ?? 0,
-      on: pickedTopics.includes(t.name),
-    }))
+  const topicChips = topicOrder
+    .map((name) => ({ name, n: f?.topics.get(name) ?? 0, on: pickedTopics.includes(name) }))
     .filter((t) => t.on || t.n > 0 || !f);
 
   const cursor = more ? more.cursor : list.data?.cursor;
   const items = [...(list.data?.items ?? []), ...(more?.items ?? [])];
-  // Unread lists Must Read newsletters first; label the two groups.
+  // Unread lists Must Read newsletters first; they lead as their own group.
   const grouped = view === "unread" && !picked.length && items.some((i) => i.mustRead);
+  const must = grouped ? items.filter((i) => i.mustRead) : [];
+  const rest = grouped ? items.filter((i) => !i.mustRead) : items;
   const filtered = picked.length > 0 || pickedTopics.length > 0;
 
   const loadMore = async () => {
@@ -150,111 +115,58 @@ export function Home() {
       await new Promise((r) => setTimeout(r, 8000));
       setMore(undefined);
       list.reload();
-      counts.reload();
+      lib.counts.reload();
     } finally {
       setRefreshing(false);
     }
   };
 
-  const shelvesControl = shelvesOn && (
-    <div class="shelves" role="tablist" aria-label="Shelf">
-      {SHELVES.map((s) => (
-        <button
-          key={s.id}
-          type="button"
-          role="tab"
-          aria-selected={shelf === s.id}
-          class={shelf === s.id ? "active" : ""}
-          // Topics belong to a tab, so switching clears them; picked senders stay.
-          onClick={() => setFilter({ shelf: s.id, topics: [] })}
-        >
-          {s.label}
-          {f && <span class="n">{f.shelves[s.id]}</span>}
-        </button>
-      ))}
-    </div>
+  /** Keeps rows in step with what the reading pane changes (read, rated, archived, moved). */
+  const patch = (id: string, change: Partial<IssueListItem>) => {
+    if (list.data) list.set({ ...list.data, items: patchIssue(list.data.items, id, change) });
+    setMore((m) => (m ? { ...m, items: patchIssue(m.items, id, change) } : m));
+  };
+
+  const countLine =
+    view === "unread"
+      ? f
+        ? `${f.total} unread`
+        : ""
+      : view === "all"
+        ? "Read and unread"
+        : "Archived";
+
+  const viewTools = (
+    <span class="list-tools">
+      <select
+        aria-label="Which issues"
+        value={view}
+        onChange={(e) => setFilter({ view: (e.target as HTMLSelectElement).value as View })}
+      >
+        {VIEWS.map((v) => (
+          <option key={v.id} value={v.id}>
+            {v.label}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        class={`icon-button${refreshing ? " spinning" : ""}`}
+        onClick={refresh}
+        disabled={refreshing}
+        title="Check Gmail now"
+        aria-label={refreshing ? "Checking Gmail" : "Check Gmail now"}
+      >
+        <RefreshIcon />
+      </button>
+    </span>
   );
 
-  return (
-    <section class="home">
-      {slot && shelvesControl && createPortal(shelvesControl, slot)}
-
-      <div class="filter-bar" role="group" aria-label="Filters">
-        <button
-          ref={sendersButton}
-          type="button"
-          class="chip senders"
-          aria-haspopup="dialog"
-          onClick={() => setPicking(true)}
-        >
-          <FilterIcon />
-          {picked.length ? `Senders: ${picked.length}` : "Senders: all"}
-        </button>
-        {picked.map((id) => (
-          <button
-            key={id}
-            type="button"
-            class="chip picked"
-            aria-label={`Stop filtering by ${nameOf(id)}`}
-            onClick={() => setFilter({ senders: picked.filter((x) => x !== id) })}
-          >
-            {nameOf(id)}
-            <CloseIcon />
-          </button>
-        ))}
-        {topicChips.map((t) => (
-          <button
-            key={t.name}
-            type="button"
-            class={`chip${t.on ? " on" : ""}`}
-            aria-pressed={t.on}
-            onClick={() => toggleTopic(t.name)}
-          >
-            {t.on && <CheckIcon />}
-            {t.name}
-            {!t.on && f && <span class="n">{t.n}</span>}
-          </button>
-        ))}
-      </div>
-
-      <div class="list-bar">
-        <span class="muted">
-          {view === "unread"
-            ? f
-              ? `${f.total} unread`
-              : ""
-            : view === "all"
-              ? "Read and unread"
-              : "Archived"}
-        </span>
-        <span class="list-bar-actions">
-          <select
-            aria-label="Which issues"
-            value={view}
-            onChange={(e) => setFilter({ view: (e.target as HTMLSelectElement).value as View })}
-          >
-            {VIEWS.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.label}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            class={`icon-button${refreshing ? " spinning" : ""}`}
-            onClick={refresh}
-            disabled={refreshing}
-            title="Check Gmail now"
-            aria-label={refreshing ? "Checking Gmail" : "Check Gmail now"}
-          >
-            <RefreshIcon />
-          </button>
-        </span>
-      </div>
-
-      {list.status === "loading" && <p class="muted">Loading...</p>}
+  const listStatus = (
+    <>
+      {list.status === "loading" && <p class="muted list-note">Loading...</p>}
       {list.status === "error" && (
-        <p class="error">
+        <p class="error list-note">
           {list.error}{" "}
           <button type="button" class="link" onClick={list.reload}>
             Retry
@@ -287,35 +199,199 @@ export function Home() {
           )}
         </div>
       )}
-      {items.length > 0 &&
-        (grouped ? (
-          <>
-            <h2 class="group-heading">
-              <StarIcon filled /> Must Read
-            </h2>
-            <IssueList items={items.filter((i) => i.mustRead)} onTopic={showTopic} />
-            {items.some((i) => !i.mustRead) && (
-              <>
-                <h2 class="group-heading">Everything else</h2>
-                <IssueList items={items.filter((i) => !i.mustRead)} onTopic={showTopic} />
-              </>
-            )}
-          </>
-        ) : (
-          <IssueList items={items} onTopic={showTopic} />
+    </>
+  );
+
+  const loadMoreButton = cursor && list.status === "ok" && (
+    <p class="load-more">
+      <button type="button" onClick={loadMore} disabled={more?.loading}>
+        {more?.loading ? "Loading..." : "Load more"}
+      </button>
+    </p>
+  );
+
+  if (wide) {
+    const rows = (xs: IssueListItem[]) => (
+      <ul class="rows">
+        {xs.map((i) => (
+          <IssueRow
+            key={i.id}
+            issue={i}
+            selected={panes && i.id === filters.issue}
+            onOpen={panes ? openInPane : undefined}
+          />
         ))}
-      {cursor && list.status === "ok" && (
-        <p class="load-more">
-          <button type="button" onClick={loadMore} disabled={more?.loading}>
-            {more?.loading ? "Loading..." : "Load more"}
-          </button>
-        </p>
+      </ul>
+    );
+    return (
+      <div class={`desk-home${panes ? " with-reader" : ""}`}>
+        <section class="pane-list" aria-label="Issues">
+          <header class="list-head">
+            <div class="list-title">
+              <h1>{shelvesOn ? SHELF_LABEL[shelf] : "Issues"}</h1>
+              {viewTools}
+            </div>
+            <p class="subline">
+              {countLine}
+              {grouped && " · Must Read first"}
+              {filtered && (
+                <>
+                  {countLine && " · "}
+                  <button
+                    type="button"
+                    class="link"
+                    onClick={() => setFilter({ senders: [], topics: [] })}
+                  >
+                    Clear filters
+                  </button>
+                </>
+              )}
+            </p>
+          </header>
+          {listStatus}
+          {items.length > 0 &&
+            (grouped ? (
+              <>
+                <h2 class="band">
+                  <StarIcon filled /> Must Read
+                </h2>
+                {rows(must)}
+                {rest.length > 0 && (
+                  <>
+                    <h2 class="band">Everything else</h2>
+                    {rows(rest)}
+                  </>
+                )}
+              </>
+            ) : (
+              rows(items)
+            ))}
+          {loadMoreButton}
+        </section>
+        {panes && (
+          <section class="pane-reader" aria-label="Reading pane">
+            {filters.issue ? (
+              <IssueReader key={filters.issue} id={filters.issue} wide onChange={patch} />
+            ) : (
+              <div class="reader-empty">
+                <p class="empty-title">Pick an issue to read it here.</p>
+                <p class="muted">Opening one marks it read.</p>
+              </div>
+            )}
+          </section>
+        )}
+      </div>
+    );
+  }
+
+  const sections = topicSections(rest, topicOrder);
+  return (
+    <section class="home">
+      <BriefHeader />
+
+      {shelvesOn && (
+        <div class="shelves" role="tablist" aria-label="Shelf">
+          {SHELVES.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              role="tab"
+              aria-selected={shelf === s.id}
+              class={shelf === s.id ? "active" : ""}
+              // Topics belong to a tab, so switching clears them; picked senders stay.
+              onClick={() => setFilter({ shelf: s.id, topics: [] })}
+            >
+              {s.label}
+              {f && ` · ${f.shelves[s.id]}`}
+            </button>
+          ))}
+        </div>
       )}
+
+      <div class="filter-bar" role="group" aria-label="Filters">
+        <button
+          type="button"
+          class="chip senders"
+          aria-haspopup="dialog"
+          onClick={() => setPicking(true)}
+        >
+          <FilterIcon />
+          {picked.length ? `Senders: ${picked.length}` : "Senders"}
+        </button>
+        {picked.map((id) => (
+          <button
+            key={id}
+            type="button"
+            class="chip picked"
+            aria-label={`Stop filtering by ${nameOf(id)}`}
+            onClick={() => setFilter({ senders: picked.filter((x) => x !== id) })}
+          >
+            {nameOf(id)}
+            <CloseIcon />
+          </button>
+        ))}
+        {topicChips.map((t) => (
+          <button
+            key={t.name}
+            type="button"
+            class={`chip${t.on ? " on" : ""}`}
+            aria-pressed={t.on}
+            onClick={() => toggleTopic(t.name)}
+          >
+            {t.name}
+            {!t.on && f && <span class="n">{t.n}</span>}
+          </button>
+        ))}
+      </div>
+
+      <div class="list-bar">
+        <span class="muted">{countLine}</span>
+        {viewTools}
+      </div>
+
+      {listStatus}
+      {must.length > 0 && (
+        <>
+          <h2 class="section-head must">
+            <StarIcon filled /> Must Read
+          </h2>
+          <ul class="must-row" aria-label="Must Read">
+            {must.map((i) => (
+              <IssueCard key={i.id} issue={i} lead />
+            ))}
+          </ul>
+        </>
+      )}
+      {sections.map((s) => (
+        <section key={s.name} class="topic-section">
+          <h2 class="section-head">
+            {/* Tapping a topic's heading switches its chip on (#10). */}
+            {s.name !== UNSORTED && !pickedTopics.includes(s.name) ? (
+              <button
+                type="button"
+                class="section-topic"
+                title={`Only ${s.name}`}
+                onClick={() => toggleTopic(s.name)}
+              >
+                {s.name}
+              </button>
+            ) : (
+              <span>{s.name}</span>
+            )}
+            <span class="n">{s.items.length}</span>
+          </h2>
+          <ul class="cards">
+            {s.items.map((i) => (
+              <IssueCard key={i.id} issue={i} />
+            ))}
+          </ul>
+        </section>
+      ))}
+      {loadMoreButton}
 
       <SenderPicker
         open={picking}
-        anchor={sendersButton.current}
-        senders={senders.data?.items ?? []}
+        senders={senderItems}
         counts={f?.senders ?? new Map()}
         picked={picked}
         unreadView={view === "unread"}
