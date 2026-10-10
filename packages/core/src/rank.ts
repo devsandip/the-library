@@ -17,6 +17,11 @@ export const CANDIDATE_DAYS = 14;
 /** The Summary shows at most this many issues from one newsletter, unless that leaves it short. */
 export const SUMMARY_PER_SENDER = 3;
 
+/** The digest: the Summary's top 5, logged when first shown each day (the PRD's "top 5"). */
+export const DIGEST_SIZE = 5;
+/** The success measure looks back this many days. */
+export const DIGEST_DAYS = 14;
+
 /**
  * The five interests from the PRD. They seed the taste profile, so ranking works before the
  * first rating. Enrichment embeds `text` once and stores the vectors (CONFIG/INTERESTS).
@@ -104,6 +109,11 @@ export function readerDay(now: number, timeZone = READER_TIME_ZONE): string {
     month: "2-digit",
     day: "2-digit",
   }).format(now);
+}
+
+/** The reader's last `n` calendar days, today first. IST has no daylight saving. */
+export function recentDays(now: number, n: number, timeZone = READER_TIME_ZONE): string[] {
+  return Array.from({ length: n }, (_, k) => readerDay(now - k * 86_400_000, timeZone));
 }
 
 /** mulberry32 seeded with an FNV-1a hash of the string: the same seed gives the same numbers. */

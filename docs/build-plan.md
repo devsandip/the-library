@@ -55,8 +55,8 @@ Reshaped by issues #2 to #5 (2026-10-09): Must Read shipped (#2); enrichment and
 |---|---|---|
 | P2.1 | Enrichment per issue: Haiku summary, News/Learning shelf, one topic, promo flag (thinking off); Titan embedding into the `EMB` item; retry for un-enriched issues; topic list proposed once; enrich the backfill. | Every non-filtered issue enriched; backfill cost logged. |
 | P2.2 | Ranking math in `packages/core` + rank step after ingest and after each rating. | Cold start orders keep-list senders above neutral; 5 Irrelevant ratings drop a sender; order stable within a day. **Math done** (`rank.ts`, all three checks are unit tests); it scores the Summary page at read time. The stored rank step is left. |
-| P2.3 | Rank sort, reason line, yellow box on top 5, topic filter, digest logging. | Ranked list with reasons; one digest row per day. |
-| P2.4 | Success metric: rolling 14-day share of digest items rated Relevant. | Visible in the app; target >= 60%. |
+| P2.3 | Rank sort, reason line, yellow box on top 5, topic filter, digest logging. | Ranked list with reasons; one digest row per day. **Summary page done** (reasons, yellow box on the day's top 5, digest logged on the first Summary of each day); the "Best first" sort inside the tabs waits for ratings. |
+| P2.4 | Success metric: rolling 14-day share of digest items rated Relevant. | Visible in the app; target >= 60%. **Done** (under the Summary and on Status), counting from 2026-10-10. |
 
 ## Phase 3 (optional, later)
 
