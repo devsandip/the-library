@@ -24,6 +24,7 @@ import {
   issueIndexAttributes,
   issueKey,
   PARTITION,
+  pickTop,
   rank,
   readerDay,
   retryOnConflict,
@@ -741,8 +742,8 @@ export class DynamoRepo implements RepoPort {
   }
 
   /**
-   * The most relevant unread News from the last two weeks, best first, scored at read time
-   * (docs/architecture.md section 11). Nothing is stored.
+   * The most relevant unread News from the last two weeks, best first and at most three from one
+   * newsletter, scored at read time (docs/architecture.md section 11). Nothing is stored.
    */
   async summary(limit = 20): Promise<SummaryResponse> {
     const now = Date.now();
@@ -795,7 +796,7 @@ export class DynamoRepo implements RepoPort {
     });
     const byId = new Map(items.map((i) => [i.id as string, i]));
     return {
-      items: ranked.slice(0, limit).map((r) => {
+      items: pickTop(ranked, limit).map((r) => {
         const item = toListItem(byId.get(r.id)!);
         return {
           ...item,

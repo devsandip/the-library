@@ -4,6 +4,7 @@ import {
   cosine,
   freshness,
   normalCdf,
+  pickTop,
   rank,
   readerDay,
   seededRandom,
@@ -198,6 +199,34 @@ describe("rank", () => {
     expect(reason("twin")).toBe('Like "Rate limiting", which you rated Relevant');
   });
 
+  it("names the interest an issue stands out on, not a rated issue every newsletter resembles", () => {
+    // Axis 3 is what all newsletters share. The rated issue has more of it than the interest
+    // has, so raw cosines would credit it for every issue.
+    const c = (id: string, v: number[]): RankCandidate => ({
+      id,
+      senderId: "s",
+      receivedAt: hoursAgo(5),
+      vector: v,
+    });
+    const ranked = rank(
+      input({
+        candidates: [c("ai", [1, 0, 0, 2]), c("other", [0, 1, 0, 2]), c("twin", [0, 0, 1, 2])],
+        senders: new Map([["s", neutral]]),
+        interests: [{ name: "AI", vector: axis(0) }],
+        rated: [
+          {
+            id: "r",
+            subject: "Campus politics",
+            rating: 1,
+            ratedAt: hoursAgo(20),
+            vector: [0, 0, 0.3, 1],
+          },
+        ],
+      }),
+    );
+    expect(ranked.find((r) => r.id === "ai")!.reason).toBe("Close to your interest in AI");
+  });
+
   it("issues without embeddings sit in the middle of the topic scale", () => {
     const ranked = rank(
       input({
@@ -223,5 +252,23 @@ describe("rank", () => {
     );
     expect(ranked[0]!.id).toBe("new");
     expect(ranked[0]!.reason).toBe("Just in");
+  });
+});
+
+describe("pickTop", () => {
+  const list = (...pairs: [string, string][]) => pairs.map(([id, senderId]) => ({ id, senderId }));
+
+  it("keeps at most a few per newsletter, best first", () => {
+    const ranked = list(["k1", "ken"], ["k2", "ken"], ["k3", "ken"], ["p1", "pf"], ["w1", "wsj"]);
+    expect(pickTop(ranked, 4, 2).map((r) => r.id)).toEqual(["k1", "k2", "p1", "w1"]);
+  });
+
+  it("fills up from the rest when the limit would leave the page short", () => {
+    const ranked = list(["k1", "ken"], ["k2", "ken"], ["p1", "pf"], ["k3", "ken"], ["k4", "ken"]);
+    expect(pickTop(ranked, 4, 2).map((r) => r.id)).toEqual(["k1", "k2", "p1", "k3"]);
+  });
+
+  it("returns everything when there are fewer than the limit", () => {
+    expect(pickTop(list(["a", "x"], ["b", "x"]), 20).map((r) => r.id)).toEqual(["a", "b"]);
   });
 });
