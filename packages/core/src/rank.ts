@@ -14,6 +14,9 @@ export const READER_TIME_ZONE = "Asia/Kolkata";
 /** Candidates are unread issues from the last two weeks. */
 export const CANDIDATE_DAYS = 14;
 
+/** The Summary shows at most this many issues from one newsletter, unless that leaves it short. */
+export const SUMMARY_PER_SENDER = 3;
+
 /**
  * The five interests from the PRD. They seed the taste profile, so ranking works before the
  * first rating. Enrichment embeds `text` once and stores the vectors (CONFIG/INTERESTS).
@@ -87,6 +90,7 @@ export interface RankInput {
 
 export interface Ranked {
   id: string;
+  senderId: string;
   score: number;
   parts: { sender: number; topic: number; fresh: number };
   reason: string;
@@ -228,15 +232,81 @@ export function rank(input: RankInput): Ranked[] {
   const avg = (k: keyof Ranked["parts"]) =>
     scored.reduce((n, s) => n + s.parts[k], 0) / Math.max(1, scored.length);
   const means = { sender: avg("sender"), topic: avg("topic"), fresh: avg("fresh") };
+  const closest = closestAnchor(candidates, [
+    ...interests.map((i) => ({ text: `Close to your interest in ${i.name}`, vector: i.vector })),
+    ...relevant.map((r) => ({
+      text: `Like "${clip(r.subject, 60)}", which you rated Relevant`,
+      vector: r.vector,
+    })),
+  ]);
 
   return scored
-    .map(({ c, parts, score }) => ({
+    .map(({ c, parts, score }, i) => ({
       id: c.id,
+      senderId: c.senderId,
       score,
       parts,
-      reason: reasonFor(c, parts, means, senders.get(c.senderId), interests, relevant, now),
+      reason: reasonFor(c, parts, means, senders.get(c.senderId), closest(i), now),
     }))
     .sort((x, y) => y.score - x.score || y.id.localeCompare(x.id));
+}
+
+/**
+ * For each candidate, the interest or Relevant-rated issue it is unusually close to, judged
+ * against the other candidates (a z-score per anchor). Raw cosines would always name a rated
+ * issue: newsletters sit closer to one another than to a one-line interest.
+ */
+function closestAnchor(
+  candidates: RankCandidate[],
+  anchors: { text: string; vector: Vector }[],
+): (candidate: number) => string | undefined {
+  const sims = candidates.map((c) =>
+    c.vector ? anchors.map((a) => cosine(c.vector!, a.vector)) : undefined,
+  );
+  const known = sims.filter((s): s is number[] => s !== undefined);
+  const stats = anchors.map((_, k) => {
+    const xs = known.map((s) => s[k]!);
+    const mean = xs.reduce((n, x) => n + x, 0) / Math.max(1, xs.length);
+    const sd = Math.sqrt(xs.reduce((n, x) => n + (x - mean) ** 2, 0) / Math.max(1, xs.length));
+    return { mean, sd };
+  });
+  return (i) => {
+    const s = sims[i];
+    if (!s) return undefined;
+    let best: { text: string; z: number } | undefined;
+    s.forEach((x, k) => {
+      const { mean, sd } = stats[k]!;
+      const z = sd > 0 ? (x - mean) / sd : 0;
+      if (!best || z > best.z) best = { text: anchors[k]!.text, z };
+    });
+    return best?.text;
+  };
+}
+
+/**
+ * The Summary's picks, still best first: at most `perSender` from one newsletter, so one
+ * prolific Must Read cannot fill the page. If that leaves fewer than `limit`, the best of the
+ * rest fill in.
+ */
+export function pickTop<T extends { id: string; senderId: string }>(
+  ranked: T[],
+  limit: number,
+  perSender = SUMMARY_PER_SENDER,
+): T[] {
+  const picked = new Set<string>();
+  const taken = new Map<string, number>();
+  for (const r of ranked) {
+    if (picked.size >= limit) break;
+    const n = taken.get(r.senderId) ?? 0;
+    if (n >= perSender) continue;
+    picked.add(r.id);
+    taken.set(r.senderId, n + 1);
+  }
+  for (const r of ranked) {
+    if (picked.size >= limit) break;
+    picked.add(r.id);
+  }
+  return ranked.filter((r) => picked.has(r.id));
 }
 
 /** One line on why an issue ranks where it does: the part that lifts it most above average. */
@@ -245,8 +315,7 @@ function reasonFor(
   parts: Ranked["parts"],
   means: Ranked["parts"],
   sender: RankSender | undefined,
-  interests: InterestVector[],
-  relevant: RatedIssue[],
+  closest: string | undefined,
   now: number,
 ): string {
   const lift = (["sender", "topic", "fresh"] as const)
@@ -262,19 +331,8 @@ function reasonFor(
       continue;
     }
     if (k === "topic") {
-      if (!c.vector) continue;
-      const anchors = [
-        ...interests.map((i) => ({ text: `Close to your interest in ${i.name}`, v: i.vector })),
-        ...relevant.map((r) => ({
-          text: `Like "${clip(r.subject, 60)}", which you rated Relevant`,
-          v: r.vector,
-        })),
-      ];
-      if (!anchors.length) continue;
-      const best = anchors
-        .map((a) => ({ text: a.text, s: cosine(c.vector!, a.v) }))
-        .sort((x, y) => y.s - x.s)[0]!;
-      return best.text;
+      if (closest) return closest;
+      continue;
     }
     const hours = (now - Date.parse(c.receivedAt)) / 3_600_000;
     return hours < 3 ? "Just in" : "Among the newest";
