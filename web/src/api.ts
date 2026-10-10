@@ -4,6 +4,7 @@ import type {
   IssueListResponse,
   Rating,
   ReaderState,
+  RelatedResponse,
   SenderDetailResponse,
   SenderListItem,
   SenderListResponse,
@@ -42,6 +43,8 @@ export interface LibraryApi {
   summary(): Promise<SummaryResponse>;
   rate(id: string, value: Rating | 0): Promise<IssueListItem>;
   logOpen(id: string): Promise<void>;
+  /** Issues close to this one, from before and since (#20). */
+  related(id: string): Promise<RelatedResponse>;
   listSenders(): Promise<SenderListResponse>;
   getSender(senderId: string): Promise<SenderDetailResponse>;
   updateSender(senderId: string, patch: SenderPatch): Promise<SenderListItem>;
@@ -126,6 +129,9 @@ export class HttpLibraryApi implements LibraryApi {
   }
   logOpen(id: string) {
     return this.request<void>("POST", `/issues/${encodeURIComponent(id)}/events`, { type: "open" });
+  }
+  related(id: string) {
+    return this.request<RelatedResponse>("GET", `/issues/${encodeURIComponent(id)}/related`);
   }
   listSenders() {
     return this.request<SenderListResponse>("GET", "/senders");

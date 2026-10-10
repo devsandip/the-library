@@ -17,6 +17,7 @@ import {
 import type {
   IssueDetailResponse,
   IssueListResponse,
+  RelatedResponse,
   SenderDetailResponse,
   SenderListResponse,
   StatusResponse,
@@ -445,5 +446,35 @@ describe("API on dev", () => {
     for (const i of r.body.items) expect(i.scoreReason?.length).toBeGreaterThan(0);
     expect(r.body.items.find((i) => i.id === "fx-platformer")?.mustRead).toBe(true);
     await call("PATCH", `/senders/${CASEY}`, { body: { mustRead: false } });
+  });
+
+  it("related: the closest issue by topic, muted newsletters left out", async () => {
+    const vector = (...pairs: [number, number][]) => {
+      const v = new Float32Array(512);
+      for (const [i, x] of pairs) v[i] = x;
+      return new Uint8Array(v.buffer);
+    };
+    // fx-tldr and fx-lenny share axis 7; fx-pragmatic is elsewhere.
+    for (const [id, v] of [
+      ["fx-tldr", vector([7, 1], [1, 0.2])],
+      ["fx-lenny", vector([7, 1], [2, 0.2])],
+      ["fx-pragmatic", vector([9, 1])],
+    ] as const) {
+      await ddb.send(
+        new PutCommand({ TableName: stack.tableName, Item: { ...embeddingKey(id), vector: v } }),
+      );
+    }
+    const r = await call<RelatedResponse>("GET", "/issues/fx-tldr/related");
+    expect(r.status).toBe(200);
+    const found = [...r.body.earlier, ...r.body.since];
+    expect(found.map((i) => i.id)).toEqual(["fx-lenny"]);
+    expect(found[0]!.similarity).toBeGreaterThan(0.27);
+    expect(found[0]!.publication.length).toBeGreaterThan(0);
+
+    const LENNY = (await getItem("fx-lenny"))!.senderId as string;
+    await call("PATCH", `/senders/${LENNY}`, { body: { muted: true } });
+    const muted = await call<RelatedResponse>("GET", "/issues/fx-tldr/related");
+    expect([...muted.body.earlier, ...muted.body.since]).toEqual([]);
+    await call("PATCH", `/senders/${LENNY}`, { body: { muted: false } });
   });
 });

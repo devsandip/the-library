@@ -35,6 +35,7 @@ function setup(overrides: Partial<RepoPort> = {}) {
     listTopics: vi.fn(async () => [{ name: "AI", description: "Models and tools" }]),
     setRating: vi.fn(async (_id, value) => ({ ...issue, rating: value === 0 ? undefined : value })),
     logOpen: vi.fn(async () => undefined),
+    related: vi.fn(async () => ({ earlier: [{ ...issue, similarity: 0.41 }], since: [] })),
     listSenders: vi.fn(async () => [sender]),
     getSender: vi.fn(async () => ({ ...sender, addresses: [], issues: [issue] })),
     updateSender: vi.fn(async (_id, patch) => ({ ...sender, ...patch })),
@@ -138,6 +139,15 @@ describe("routing and validation", () => {
       items: [{ id: "abc123", scoreReason: "From a Must Read newsletter", mustRead: true }],
     });
     expect((await call("POST", "/summary")).status).toBe(405);
+  });
+
+  it("serves related issues", async () => {
+    const { call, repo } = setup();
+    const r = await call("GET", "/issues/abc123/related");
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ earlier: [{ ...issue, similarity: 0.41 }], since: [] });
+    expect(repo.related).toHaveBeenCalledWith("abc123");
+    expect((await call("GET", "/issues/a.b/related")).status).toBe(404);
   });
 
   it.each([

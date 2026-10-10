@@ -4,6 +4,7 @@ import type {
   IssueListResponse,
   Rating,
   ReaderState,
+  RelatedResponse,
   SenderDetailResponse,
   SenderListItem,
   SenderPatch,
@@ -34,6 +35,8 @@ export interface RepoPort {
   setShelf(id: string, shelf: Shelf): Promise<IssueListItem>;
   setRating(id: string, value: Rating | 0): Promise<IssueListItem>;
   logOpen(id: string): Promise<void>;
+  /** Issues close to this one, from before and since (#20). */
+  related(id: string): Promise<RelatedResponse>;
   listSenders(): Promise<SenderListItem[]>;
   getSender(senderId: string): Promise<SenderDetailResponse>;
   updateSender(senderId: string, patch: SenderPatch): Promise<SenderListItem>;
