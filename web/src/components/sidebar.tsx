@@ -6,6 +6,7 @@ import { facets } from "../counts.js";
 import { homeHref, readFilters, SHELVES, type HomeFilters } from "../filters.js";
 import { useLibrary } from "../library.js";
 import { ChevronIcon, SearchIcon, StarIcon } from "./icons.js";
+import { NowReadingLink } from "./now-reading.js";
 
 const toggle = <T,>(list: T[], v: T): T[] =>
   list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
@@ -172,6 +173,8 @@ export function Sidebar() {
           <span>History</span>
         </a>
       </nav>
+
+      <NowReadingLink wide />
 
       {chips.length > 0 && (
         <>

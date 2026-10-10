@@ -94,6 +94,15 @@ export function HistoryIcon() {
   );
 }
 
+export function BookIcon() {
+  return (
+    <svg {...base}>
+      <path d="M12 6.5C10.3 5.2 7.9 4.5 4 4.5v13c3.9 0 6.3.7 8 2 1.7-1.3 4.1-2 8-2v-13c-3.9 0-6.3.7-8 2Z" />
+      <path d="M12 6.5v13" />
+    </svg>
+  );
+}
+
 export function SearchIcon() {
   return (
     <svg {...base}>

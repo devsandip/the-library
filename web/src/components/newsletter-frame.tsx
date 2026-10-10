@@ -18,7 +18,16 @@ export function wrapNewsletter(html: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><style>${FRAME_STYLE}</style></head><body>${html}</body></html>`;
 }
 
-export function NewsletterFrame({ html, title }: { html: string; title: string }) {
+export function NewsletterFrame({
+  html,
+  title,
+  onFit,
+}: {
+  html: string;
+  title: string;
+  /** Called after each resize to the content, so the reader can find its place (#44). */
+  onFit?: (frame: HTMLIFrameElement) => void;
+}) {
   const ref = useRef<HTMLIFrameElement>(null);
   const observer = useRef<ResizeObserver | undefined>(undefined);
 
@@ -29,6 +38,7 @@ export function NewsletterFrame({ html, title }: { html: string; title: string }
     // border-box sizing: add the frame's own borders or the content overflows by 2px.
     const borders = frame.offsetHeight - frame.clientHeight;
     frame.style.height = `${doc.documentElement.scrollHeight + borders}px`;
+    onFit?.(frame);
   };
 
   /** Size to content now, and again whenever the content grows (late images, fonts). */

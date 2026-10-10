@@ -3,6 +3,7 @@ import type {
   IssueDetailResponse,
   IssueListItem,
   IssueListResponse,
+  NowReadingResponse,
   Rating,
   ReaderState,
   RelatedResponse,
@@ -45,6 +46,13 @@ export interface LibraryApi {
   history(day?: string): Promise<HistoryResponse>;
   rate(id: string, value: Rating | 0): Promise<IssueListItem>;
   logOpen(id: string): Promise<void>;
+  /** The issue to come back to (#44), if there is one. */
+  nowReading(): Promise<NowReadingResponse>;
+  /**
+   * Save how far down an issue the reader is (#44), 0 to 1, where 1 means finished. With
+   * `keepalive`, the request outlives the page (sent as the page goes away).
+   */
+  savePosition(id: string, position: number, keepalive?: boolean): Promise<void>;
   /** Issues close to this one, from before and since (#20). */
   related(id: string): Promise<RelatedResponse>;
   listSenders(): Promise<SenderListResponse>;
@@ -74,6 +82,7 @@ export class HttpLibraryApi implements LibraryApi {
     path: string,
     body?: unknown,
     retried = false,
+    keepalive = false,
   ): Promise<T> {
     const token = await this.auth.accessToken(retried);
     if (!token) return this.auth.signIn();
@@ -85,10 +94,11 @@ export class HttpLibraryApi implements LibraryApi {
       },
       body: body === undefined ? undefined : JSON.stringify(body),
       cache: "no-store",
+      keepalive,
     });
     // An expired or revoked token: refresh once, then fall back to signing in.
     if (res.status === 401) {
-      if (!retried) return this.request<T>(method, path, body, true);
+      if (!retried) return this.request<T>(method, path, body, true, keepalive);
       return this.auth.signIn();
     }
     if (res.status === 204) return undefined as T;
@@ -134,6 +144,12 @@ export class HttpLibraryApi implements LibraryApi {
   }
   logOpen(id: string) {
     return this.request<void>("POST", `/issues/${encodeURIComponent(id)}/events`, { type: "open" });
+  }
+  nowReading() {
+    return this.request<NowReadingResponse>("GET", "/now-reading");
+  }
+  savePosition(id: string, position: number, keepalive = false) {
+    return this.request<void>("PUT", "/now-reading", { id, position }, false, keepalive);
   }
   related(id: string) {
     return this.request<RelatedResponse>("GET", `/issues/${encodeURIComponent(id)}/related`);

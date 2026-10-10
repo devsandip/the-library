@@ -52,6 +52,8 @@ export interface IssueDetailResponse extends IssueListItem {
   unsubscribeUrl?: string;
   /** Sanitized newsletter HTML, rendered in a script-less sandboxed iframe. */
   html: string;
+  /** Where reading stopped (#44), when this is the issue Now reading points at, unfinished. */
+  position?: number;
 }
 
 export interface SenderListItem {
@@ -166,6 +168,20 @@ export interface HistoryResponse {
   /** The nearest days before and after it with anything read. */
   previousDay?: string;
   nextDay?: string;
+}
+
+/** The issue to come back to (#44): the last one opened, and how far down it was read. */
+export interface NowReading {
+  issue: IssueListItem;
+  /** The share of the newsletter above the top of the screen, from 0 up to (not including) 1. */
+  position: number;
+  /** When the place was last saved. */
+  at: string;
+}
+
+/** GET /now-reading. Empty once the issue is finished, archived, or rated after it was opened. */
+export interface NowReadingResponse {
+  nowReading?: NowReading;
 }
 
 export interface SenderDetailResponse extends SenderListItem {

@@ -133,6 +133,26 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
   },
   {
     method: "GET",
+    pattern: /^\/now-reading$/,
+    handler: async (svc) => ok(await svc.repo.nowReading()),
+  },
+  {
+    method: "PUT",
+    pattern: /^\/now-reading$/,
+    handler: async (svc, req) => {
+      const { id, position } = json<{ id?: unknown; position?: unknown }>(req);
+      if (typeof id !== "string" || !new RegExp(`^${ISSUE_ID}$`).test(id)) {
+        throw badRequest("id must be an issue id");
+      }
+      if (typeof position !== "number" || !(position >= 0 && position <= 1)) {
+        throw badRequest("position must be a number from 0 to 1");
+      }
+      await svc.repo.savePosition(id, position);
+      return { status: 204 };
+    },
+  },
+  {
+    method: "GET",
     pattern: /^\/senders$/,
     handler: async (svc) => ok({ items: await svc.repo.listSenders() }),
   },
