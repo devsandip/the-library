@@ -1,28 +1,36 @@
 import { randomUUID } from "node:crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
+  BatchGetCommand,
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
   QueryCommand,
   TransactWriteCommand,
   UpdateCommand,
+  type BatchGetCommandOutput,
   type QueryCommandInput,
   type QueryCommandOutput,
   type TransactWriteCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import {
+  CANDIDATE_DAYS,
+  embeddingKey,
   eventKey,
   INDEX,
   INGEST_STATE_KEY,
+  INTERESTS_KEY,
   issueIndexAttributes,
   issueKey,
   PARTITION,
+  rank,
+  readerDay,
   retryOnConflict,
   s3Keys,
   senderItemKey,
   TOPICS_KEY,
+  type InterestVector,
 } from "@library/core";
 import type {
   IssueDetailResponse,
@@ -37,7 +45,10 @@ import type {
   Shelf,
   ShelfSetBy,
   StatusResponse,
+  SummaryResponse,
   Topic,
+  UnreadCount,
+  UnreadCountsResponse,
   View,
 } from "@library/core/types";
 import { badRequest, conflict, notFound } from "./errors.js";
@@ -145,12 +156,6 @@ function shelfFilter(shelf: Shelf): Filter {
     : { expr: "#sh = :sh", names: { "#sh": "shelf" }, values: { ":sh": "learning" } };
 }
 
-const topicFilter = (topic: string): Filter => ({
-  expr: "#tp = :tp",
-  names: { "#tp": "topic" },
-  values: { ":tp": topic },
-});
-
 const VIEW_STATES: Record<View, IssueState[]> = {
   unread: ["unread"],
   all: ["unread", "read"],
@@ -163,6 +168,13 @@ function inFilter(attr: string, prefix: string, values: string[], negate = false
   const list = Object.keys(vals).join(", ");
   const expr = negate ? `NOT (#${prefix} IN (${list}))` : `#${prefix} IN (${list})`;
   return { expr, names, values: vals };
+}
+
+/** A stored embedding (float32 bytes) as numbers. The copy avoids misaligned buffers. */
+export function toVector(bytes: Uint8Array): Float32Array {
+  const out = new Float32Array(Math.floor(bytes.byteLength / 4));
+  new Uint8Array(out.buffer).set(bytes.subarray(0, out.length * 4));
+  return out;
 }
 
 /** Unread cursors: which stream (1 Must Read, 2 everything else), plus that stream's cursor. */
@@ -227,14 +239,17 @@ export class DynamoRepo implements RepoPort {
     };
   }
 
-  /** One view as one index stream. Muted senders are hidden everywhere but Archived. */
-  private viewQuery(view: View, muted: string[], senderId?: string, extra?: Filter): IndexQuery {
-    if (senderId) {
+  /**
+   * One view as one index stream. Muted senders are hidden everywhere but Archived, unless they
+   * are picked: one sender reads its own index, several filter the view's index.
+   */
+  private viewQuery(view: View, muted: string[], senderIds?: string[], extra?: Filter): IndexQuery {
+    if (senderIds?.length === 1) {
       return {
         index: INDEX.bySender,
         pkAttr: "gsi3pk",
         skAttr: "gsi3sk",
-        pkValue: `SENDER#${senderId}`,
+        pkValue: `SENDER#${senderIds[0]}`,
         filter: andFilters(inFilter("state", "st", VIEW_STATES[view]), extra),
       };
     }
@@ -249,11 +264,12 @@ export class DynamoRepo implements RepoPort {
           };
     // Archived is an explicit view: show everything archived. DynamoDB allows 100 values in IN;
     // muting more than 100 senders is not a real scenario.
-    const hideMuted =
-      view !== "archived" && muted.length
+    const who = senderIds?.length
+      ? inFilter("senderId", "sid", senderIds)
+      : view !== "archived" && muted.length
         ? inFilter("senderId", "m", muted.slice(0, 100), true)
         : undefined;
-    return { ...q, filter: andFilters(hideMuted, extra) };
+    return { ...q, filter: andFilters(who, extra) };
   }
 
   private decodeCursor(cursor: string | undefined, q: IndexQuery): Item | undefined {
@@ -286,17 +302,21 @@ export class DynamoRepo implements RepoPort {
     return Buffer.from(JSON.stringify(key)).toString("base64url");
   }
 
-  /** Issues for a view, newest first. In Unread, Must Read newsletters come first. */
+  /**
+   * Issues for a view, newest first. In Unread without a sender filter, Must Read newsletters
+   * come first. Several senders or topics mean any of them.
+   */
   async listIssues(view: View, opts: ListOptions): Promise<IssueListResponse> {
     const senders = await this.listSenders();
     const muted = senders.filter((s) => s.muted).map((s) => s.senderId);
     const starred = new Set(senders.filter((s) => s.mustRead).map((s) => s.senderId));
     const extra = andFilters(
       opts.shelf ? shelfFilter(opts.shelf) : undefined,
-      opts.topic ? topicFilter(opts.topic) : undefined,
+      opts.topics?.length ? inFilter("topic", "tp", opts.topics) : undefined,
     );
+    const picked = opts.senderIds?.length ? opts.senderIds : undefined;
     const page =
-      view === "unread" && !opts.senderId
+      view === "unread" && !picked
         ? await this.listUnread(
             [...starred].filter((id) => !muted.includes(id)),
             muted,
@@ -304,7 +324,7 @@ export class DynamoRepo implements RepoPort {
             extra,
           )
         : await this.readStream(
-            this.viewQuery(view, muted, opts.senderId, extra),
+            this.viewQuery(view, muted, picked, extra),
             opts.limit,
             opts.cursor,
           );
@@ -685,6 +705,169 @@ export class DynamoRepo implements RepoPort {
   async listTopics(): Promise<Topic[]> {
     const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: TOPICS_KEY }));
     return (res.Item?.topics as Topic[] | undefined) ?? [];
+  }
+
+  // ---------- counts and summary ----------
+
+  /** Unread issues counted by sender, shelf and topic. Muted senders are included. */
+  async unreadCounts(): Promise<UnreadCountsResponse> {
+    const tally = new Map<string, UnreadCount>();
+    let start: Item | undefined;
+    do {
+      const res: QueryCommandOutput = await this.query({
+        IndexName: INDEX.unread,
+        KeyConditionExpression: "gsi2pk = :p",
+        ProjectionExpression: "#sid, #sh, #tp",
+        ExpressionAttributeNames: { "#sid": "senderId", "#sh": "shelf", "#tp": "topic" },
+        ExpressionAttributeValues: { ":p": PARTITION.unread },
+        ExclusiveStartKey: start,
+      });
+      for (const i of res.Items ?? []) {
+        const key = `${i.senderId}|${i.shelf ?? ""}|${i.topic ?? ""}`;
+        const t = tally.get(key);
+        if (t) t.n++;
+        else {
+          tally.set(key, {
+            senderId: i.senderId as string,
+            shelf: i.shelf as Shelf | undefined,
+            topic: i.topic as string | undefined,
+            n: 1,
+          });
+        }
+      }
+      start = res.LastEvaluatedKey;
+    } while (start);
+    return { counts: [...tally.values()] };
+  }
+
+  /**
+   * The most relevant unread News from the last two weeks, best first, scored at read time
+   * (docs/architecture.md section 11). Nothing is stored.
+   */
+  async summary(limit = 20): Promise<SummaryResponse> {
+    const now = Date.now();
+    const since = new Date(now - CANDIDATE_DAYS * 86_400_000).toISOString();
+    const [senders, interests, rated] = await Promise.all([
+      this.listSenders(),
+      this.interestVectors(),
+      this.ratedIssues(),
+    ]);
+    const muted = new Set(senders.filter((s) => s.muted).map((s) => s.senderId));
+    const starred = new Set(senders.filter((s) => s.mustRead).map((s) => s.senderId));
+
+    const news = shelfFilter("news");
+    const items: Item[] = [];
+    let start: Item | undefined;
+    do {
+      const res: QueryCommandOutput = await this.query({
+        IndexName: INDEX.unread,
+        KeyConditionExpression: "gsi2pk = :p AND gsi2sk > :since",
+        FilterExpression: news.expr,
+        ExpressionAttributeNames: news.names,
+        ExpressionAttributeValues: { ":p": PARTITION.unread, ":since": since, ...news.values },
+        ExclusiveStartKey: start,
+      });
+      items.push(...(res.Items ?? []).filter((i) => !muted.has(i.senderId as string)));
+      start = res.LastEvaluatedKey;
+    } while (start);
+
+    const vectors = await this.embeddings([
+      ...items.map((i) => i.id as string),
+      ...rated.map((r) => r.id),
+    ]);
+    const ranked = rank({
+      candidates: items.map((i) => ({
+        id: i.id as string,
+        senderId: i.senderId as string,
+        receivedAt: i.receivedAt as string,
+        vector: vectors.get(i.id as string),
+      })),
+      senders: new Map(
+        senders.map((s) => [s.senderId, { mustRead: s.mustRead, up: s.up, down: s.down }]),
+      ),
+      interests,
+      rated: rated.flatMap((r) => {
+        const vector = vectors.get(r.id);
+        return vector ? [{ ...r, vector }] : [];
+      }),
+      now,
+      day: readerDay(now),
+    });
+    const byId = new Map(items.map((i) => [i.id as string, i]));
+    return {
+      items: ranked.slice(0, limit).map((r) => {
+        const item = toListItem(byId.get(r.id)!);
+        return {
+          ...item,
+          scoreReason: r.reason,
+          ...(starred.has(item.senderId) ? { mustRead: true } : {}),
+        };
+      }),
+      candidates: items.length,
+    };
+  }
+
+  /** The five interests' embeddings, written by enrichment; empty until the first run. */
+  private async interestVectors(): Promise<InterestVector[]> {
+    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: INTERESTS_KEY }));
+    const list = (res.Item?.interests as { name: string; vector: Uint8Array }[] | undefined) ?? [];
+    return list.map((i) => ({ name: i.name, vector: toVector(i.vector) }));
+  }
+
+  /** The most recent ratings (the taste profile fades them over 60 days anyway). */
+  private async ratedIssues() {
+    const res = await this.query({
+      IndexName: INDEX.rated,
+      KeyConditionExpression: "gsi4pk = :p",
+      ProjectionExpression: "#id, #r, #at, #sub",
+      ExpressionAttributeNames: {
+        "#id": "id",
+        "#r": "rating",
+        "#at": "ratedAt",
+        "#sub": "subject",
+      },
+      ExpressionAttributeValues: { ":p": PARTITION.rated },
+      ScanIndexForward: false,
+      Limit: 300,
+    });
+    return (res.Items ?? [])
+      .filter((i) => i.rating === 1 || i.rating === -1)
+      .map((i) => ({
+        id: i.id as string,
+        subject: (i.subject as string | undefined) ?? "",
+        rating: i.rating as Rating,
+        ratedAt: i.ratedAt as string,
+      }));
+  }
+
+  /** Embeddings by issue id, 100 keys per batch; issues not embedded yet are simply missing. */
+  private async embeddings(ids: string[]): Promise<Map<string, Float32Array>> {
+    const out = new Map<string, Float32Array>();
+    const unique = [...new Set(ids)];
+    for (let n = 0; n < unique.length; n += 100) {
+      let keys: Record<string, unknown>[] | undefined = unique
+        .slice(n, n + 100)
+        .map((id) => embeddingKey(id));
+      for (let attempt = 0; keys?.length && attempt < 5; attempt++) {
+        if (attempt) await new Promise((r) => setTimeout(r, 100 * 2 ** attempt));
+        const res: BatchGetCommandOutput = await this.ddb.send(
+          new BatchGetCommand({
+            RequestItems: {
+              [this.table]: {
+                Keys: keys,
+                ProjectionExpression: "#pk, #v",
+                ExpressionAttributeNames: { "#pk": "pk", "#v": "vector" },
+              },
+            },
+          }),
+        );
+        for (const item of res.Responses?.[this.table] ?? []) {
+          out.set((item.pk as string).slice("ISSUE#".length), toVector(item.vector as Uint8Array));
+        }
+        keys = res.UnprocessedKeys?.[this.table]?.Keys;
+      }
+    }
+    return out;
   }
 
   // ---------- status ----------

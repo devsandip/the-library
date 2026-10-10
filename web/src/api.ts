@@ -10,7 +10,9 @@ import type {
   SenderPatch,
   Shelf,
   StatusResponse,
+  SummaryResponse,
   TopicListResponse,
+  UnreadCountsResponse,
   View,
 } from "@library/core/types";
 import type { Auth } from "./auth.js";
@@ -19,8 +21,10 @@ import type { AppConfig } from "./config.js";
 export interface ListIssuesOptions {
   view: View;
   shelf?: Shelf;
-  topic?: string;
-  sender?: string;
+  /** Any of these topics. */
+  topics?: string[];
+  /** Any of these senders; picked senders show even when muted. */
+  senders?: string[];
   cursor?: string;
   limit?: number;
 }
@@ -33,6 +37,9 @@ export interface LibraryApi {
   /** Move an issue to the other shelf; Claude never moves it back. */
   setShelf(id: string, shelf: Shelf): Promise<IssueListItem>;
   listTopics(): Promise<TopicListResponse>;
+  unreadCounts(): Promise<UnreadCountsResponse>;
+  /** The most relevant unread News, best first. */
+  summary(): Promise<SummaryResponse>;
   rate(id: string, value: Rating | 0): Promise<IssueListItem>;
   logOpen(id: string): Promise<void>;
   listSenders(): Promise<SenderListResponse>;
@@ -88,8 +95,8 @@ export class HttpLibraryApi implements LibraryApi {
   listIssues(opts: ListIssuesOptions) {
     const q = new URLSearchParams({ view: opts.view });
     if (opts.shelf) q.set("shelf", opts.shelf);
-    if (opts.topic) q.set("topic", opts.topic);
-    if (opts.sender) q.set("sender", opts.sender);
+    if (opts.topics?.length) q.set("topic", opts.topics.join(","));
+    if (opts.senders?.length) q.set("sender", opts.senders.join(","));
     if (opts.cursor) q.set("cursor", opts.cursor);
     if (opts.limit) q.set("limit", String(opts.limit));
     return this.request<IssueListResponse>("GET", `/issues?${q}`);
@@ -105,6 +112,12 @@ export class HttpLibraryApi implements LibraryApi {
   }
   listTopics() {
     return this.request<TopicListResponse>("GET", "/topics");
+  }
+  unreadCounts() {
+    return this.request<UnreadCountsResponse>("GET", "/unread-counts");
+  }
+  summary() {
+    return this.request<SummaryResponse>("GET", "/summary");
   }
   rate(id: string, value: Rating | 0) {
     return this.request<IssueListItem>("POST", `/issues/${encodeURIComponent(id)}/rating`, {

@@ -1,24 +1,35 @@
+import { createContext } from "preact";
+import { useContext } from "preact/hooks";
 import { BASE } from "../config.js";
-import { useApp } from "../context.js";
+import { SummaryIcon } from "./icons.js";
+
+/** Where Home puts its News | Learning control: in the header row on the Mac, under it on phones. */
+export const HeaderSlot = createContext<{
+  slot: HTMLElement | null;
+  setSlot: (el: HTMLElement | null) => void;
+}>({ slot: null, setSlot: () => undefined });
+
+export const useHeaderSlot = () => useContext(HeaderSlot).slot;
 
 export function Header() {
-  const { auth, cfg } = useApp();
+  const { setSlot } = useContext(HeaderSlot);
   return (
     <header class="site-header">
-      <a class="wordmark" href={`${BASE}/`}>
-        The Library
-      </a>
-      <nav>
-        <a href={`${BASE}/senders`}>Senders</a>
-        <a href={`${BASE}/status`}>Status</a>
-        {auth ? (
-          <button type="button" class="link" onClick={() => void auth.signOut()}>
-            Sign out
-          </button>
-        ) : (
-          <span class="muted">{cfg.stage}</span>
-        )}
-      </nav>
+      <div class="header-inner">
+        <a class="wordmark" href={`${BASE}/`}>
+          The Library
+        </a>
+        <div class="header-slot" ref={setSlot} />
+        <nav class="header-nav" aria-label="Main">
+          <a class="pill" href={`${BASE}/summary`}>
+            <SummaryIcon />
+            Summary
+          </a>
+          <a class="nav-link" href={`${BASE}/status`}>
+            Status
+          </a>
+        </nav>
+      </div>
     </header>
   );
 }

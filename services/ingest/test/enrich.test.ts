@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { INTERESTS } from "@library/core";
 import type { Shelf, Topic } from "@library/core/types";
 import type { ModelPort } from "../src/bedrock.js";
 import {
@@ -6,6 +7,7 @@ import {
   classifyRequest,
   compactText,
   enrich,
+  ensureInterests,
   parseClassification,
   parseTopics,
   proposeTopics,
@@ -44,10 +46,13 @@ function fakes(opts: {
   const embedded: string[] = [];
   const archived: { id: string; reason: string }[] = [];
   let stored: Topic[] | undefined = opts.topics;
+  let interests: { name: string; text: string; vector: number[] }[] | undefined;
   const store = {
     enrichCandidates: async () => opts.candidates,
     getTopics: async () => stored,
     putTopics: async (t: Topic[]) => void (stored = t),
+    getInterests: async () => interests?.map(({ name, text }) => ({ name, text })),
+    putInterests: async (list: typeof interests) => void (interests = list),
     senderSettings: async () => {
       const ids = new Set([...(opts.senderShelves?.keys() ?? []), ...(opts.mustRead ?? [])]);
       return new Map(
@@ -85,7 +90,15 @@ function fakes(opts: {
     }),
     embed: vi.fn(async () => ({ vector: new Array(512).fill(0.01), tokens: 900 })),
   };
-  return { store, model, classified, embedded, archived, stored: () => stored };
+  return {
+    store,
+    model,
+    classified,
+    embedded,
+    archived,
+    stored: () => stored,
+    interests: () => interests,
+  };
 }
 
 describe("classification request and parsing", () => {
@@ -131,6 +144,11 @@ describe("classification request and parsing", () => {
       parseTopics({ topics: [...topics, { name: "ai", description: "again" }] }),
     ).toThrow("unusable");
     expect(() => parseTopics({})).toThrow("no topic list");
+    expect(() =>
+      parseTopics({
+        topics: [...topics.slice(0, 3), { name: "Data, analytics", description: "x" }],
+      }),
+    ).toThrow("commas");
   });
 });
 
@@ -171,7 +189,8 @@ describe("enrich", () => {
       errors: 0,
       inputTokens: 2000,
       outputTokens: 80,
-      embedTokens: 2700,
+      // Three issues, plus the five interests on the first run.
+      embedTokens: 2700 + 4500,
     });
     expect(f.classified).toEqual(
       expect.arrayContaining([
@@ -180,6 +199,25 @@ describe("enrich", () => {
       ]),
     );
     expect(f.embedded.sort()).toEqual(["a", "b", "half"]);
+  });
+
+  it("embeds the five interests once, and again only when the list changes", async () => {
+    const f = fakes({ candidates: [], topics });
+    await enrich(f.store, f.model, { sinceIso: since });
+    expect(f.interests()?.map((i) => i.name)).toEqual(INTERESTS.map((i) => i.name));
+    expect(f.model.embed).toHaveBeenCalledTimes(5);
+    expect(await ensureInterests(f.store, f.model)).toBe(0);
+    expect(f.model.embed).toHaveBeenCalledTimes(5);
+  });
+
+  it("a failed interest embedding is reported and the issues still get enriched", async () => {
+    const f = fakes({ candidates: [candidate("a")], topics });
+    f.store.getInterests = async () => {
+      throw new Error("ThrottlingException");
+    };
+    const stats = await enrich(f.store, f.model, { sinceIso: since });
+    expect(stats).toMatchObject({ classified: 1, embedded: 1, errors: 1 });
+    expect(stats.errorSamples).toEqual(["interests: ThrottlingException"]);
   });
 
   it("force redoes everything", async () => {

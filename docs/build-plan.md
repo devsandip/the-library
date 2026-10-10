@@ -11,7 +11,7 @@ Every milestone ends with `pnpm test`, `pnpm lint` and `pnpm typecheck` green, a
 
 Open work (fixes, new features, the rest of Phase 2) is tracked as [GitHub issues](https://github.com/devsandip/the-library/issues). This file keeps the plan for each phase.
 
-## Status (2026-10-09)
+## Status (2026-10-10)
 
 | Milestone | State |
 |---|---|
@@ -19,6 +19,7 @@ Open work (fixes, new features, the rest of Phase 2) is tracked as [GitHub issue
 | R2 | Done. Amplify rule live; every hosting check passes through `sandip.dev`. |
 | R5 | Done. 4-week backfill: 549 messages, 394 newsletters, 155 filtered, 0 errors. Two-hourly schedule and staleness alarm on. |
 | R8 | Live, and Sandip has signed in. Left: rate, archive and reopen issues on iPhone and Mac. |
+| Clean list | The new look (#12, direction B), the sender picker (#9), topic chips (#10), the Summary page with read-time relevance (#11) and the Mac standfirst (#14). 144 unit tests, 15 API integration tests on dev. On dev only: the prod deploy waits for an SSO sign-in (the session expired 2026-10-10), then acceptance on iPhone and Mac. |
 | R9 | README and `pnpm reprocess` done. The errors alarm emailed during the first backfill attempt, so alerting works end to end. Left: a week with no alarms, the AWS Budget (#6), the `sandip.dev` repo change (#7). |
 
 ## Phase 1 (rebuild)
@@ -53,7 +54,7 @@ Reshaped by issues #2 to #5 (2026-10-09): Must Read shipped (#2); enrichment and
 | # | Milestone | Done when |
 |---|---|---|
 | P2.1 | Enrichment per issue: Haiku summary, News/Learning shelf, one topic, promo flag (thinking off); Titan embedding into the `EMB` item; retry for un-enriched issues; topic list proposed once; enrich the backfill. | Every non-filtered issue enriched; backfill cost logged. |
-| P2.2 | Ranking math in `packages/core` + rank step after ingest and after each rating. | Cold start orders keep-list senders above neutral; 5 Irrelevant ratings drop a sender; order stable within a day. |
+| P2.2 | Ranking math in `packages/core` + rank step after ingest and after each rating. | Cold start orders keep-list senders above neutral; 5 Irrelevant ratings drop a sender; order stable within a day. **Math done** (`rank.ts`, all three checks are unit tests); it scores the Summary page at read time. The stored rank step is left. |
 | P2.3 | Rank sort, reason line, yellow box on top 5, topic filter, digest logging. | Ranked list with reasons; one digest row per day. |
 | P2.4 | Success metric: rolling 14-day share of digest items rated Relevant. | Visible in the app; target >= 60%. |
 

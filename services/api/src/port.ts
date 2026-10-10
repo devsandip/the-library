@@ -9,16 +9,20 @@ import type {
   SenderPatch,
   Shelf,
   StatusResponse,
+  SummaryResponse,
   Topic,
+  UnreadCountsResponse,
   View,
 } from "@library/core/types";
 
 export interface ListOptions {
   limit: number;
   cursor?: string;
-  senderId?: string;
+  /** One or more senders (any of them). */
+  senderIds?: string[];
   shelf?: Shelf;
-  topic?: string;
+  /** One or more topics (any of them). */
+  topics?: string[];
 }
 
 /** Everything the routes need from storage. DynamoRepo implements it; tests use a fake. */
@@ -34,6 +38,9 @@ export interface RepoPort {
   getSender(senderId: string): Promise<SenderDetailResponse>;
   updateSender(senderId: string, patch: SenderPatch): Promise<SenderListItem>;
   listTopics(): Promise<Topic[]>;
+  unreadCounts(): Promise<UnreadCountsResponse>;
+  /** The most relevant unread News, best first. */
+  summary(): Promise<SummaryResponse>;
   status(): Promise<StatusResponse>;
 }
 

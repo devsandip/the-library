@@ -86,6 +86,27 @@ export interface TopicListResponse {
   topics: Topic[];
 }
 
+/** Unread issues for one sender, shelf and topic. Muted senders are included; the web skips them. */
+export interface UnreadCount {
+  senderId: string;
+  /** Absent until Claude sorts the issue; it then shows under News. */
+  shelf?: Shelf;
+  topic?: string;
+  n: number;
+}
+
+/** GET /unread-counts: the numbers on the tabs, the topic chips and the sender picker. */
+export interface UnreadCountsResponse {
+  counts: UnreadCount[];
+}
+
+/** GET /summary: the most relevant unread News, best first, each with a `scoreReason`. */
+export interface SummaryResponse {
+  items: IssueListItem[];
+  /** Unread News issues from the last two weeks that were scored. */
+  candidates: number;
+}
+
 export interface SenderDetailResponse extends SenderListItem {
   addresses: string[];
   issues: IssueListItem[];
