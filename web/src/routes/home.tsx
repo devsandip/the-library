@@ -285,7 +285,13 @@ export function Home() {
         {panes && (
           <section class="pane-reader" aria-label="Reading pane">
             {filters.issue ? (
-              <IssueReader key={filters.issue} id={filters.issue} wide onChange={patch} />
+              <IssueReader
+                key={filters.issue}
+                id={filters.issue}
+                wide
+                onChange={patch}
+                onOpen={openInPane}
+              />
             ) : (
               <div class="reader-empty">
                 <p class="empty-title">Pick an issue to read it here.</p>

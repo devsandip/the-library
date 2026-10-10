@@ -27,11 +27,13 @@ import {
   pickTop,
   rank,
   readerDay,
+  relatedIssues,
   retryOnConflict,
   s3Keys,
   senderItemKey,
   TOPICS_KEY,
   type InterestVector,
+  type RelatedMatch,
 } from "@library/core";
 import type {
   IssueDetailResponse,
@@ -40,6 +42,8 @@ import type {
   IssueState,
   Rating,
   ReaderState,
+  RelatedItem,
+  RelatedResponse,
   SenderDetailResponse,
   SenderListItem,
   SenderPatch,
@@ -211,6 +215,8 @@ export class DynamoRepo implements RepoPort {
   private readonly table: string;
   private readonly bucket: string;
   private readonly stage: string;
+  /** Issue embeddings already read (they do not change); see `embeddings`. */
+  private readonly vectorCache = new Map<string, Float32Array>();
 
   constructor(opts: {
     table: string;
@@ -808,6 +814,62 @@ export class DynamoRepo implements RepoPort {
     };
   }
 
+  /**
+   * Issues related to `id` (#20): nearest neighbours over every stored issue's embedding, at read
+   * time. Promos and muted newsletters stay out. Fine to a few thousand issues; past that, keep
+   * the vectors packed in one object instead of reading them item by item.
+   */
+  async related(id: string): Promise<RelatedResponse> {
+    const [items, senders] = await Promise.all([this.everyIssue(), this.listSenders()]);
+    const muted = new Set(senders.filter((s) => s.muted).map((s) => s.senderId));
+    const vectors = await this.embeddings(
+      items.map((i) => i.id as string),
+      true,
+    );
+    const byId = new Map(items.map((i) => [i.id as string, i]));
+    const res = relatedIssues(
+      id,
+      items.flatMap((i) => {
+        const vector = vectors.get(i.id as string);
+        return vector
+          ? [
+              {
+                id: i.id as string,
+                senderId: i.senderId as string,
+                receivedAt: i.receivedAt as string,
+                vector,
+              },
+            ]
+          : [];
+      }),
+      { eligible: (c) => !muted.has(c.senderId) && byId.get(c.id)?.promo !== true },
+    );
+    const item = (m: RelatedMatch): RelatedItem => ({
+      ...toListItem(byId.get(m.id)!),
+      similarity: Math.round(m.similarity * 1000) / 1000,
+    });
+    return { earlier: res.earlier.map(item), since: res.since.map(item) };
+  }
+
+  /** Every issue that is not filtered out: the inbox and the archive. */
+  private async everyIssue(): Promise<Item[]> {
+    const out: Item[] = [];
+    for (const partition of [PARTITION.inbox, PARTITION.archive]) {
+      let start: Item | undefined;
+      do {
+        const res: QueryCommandOutput = await this.query({
+          IndexName: INDEX.list,
+          KeyConditionExpression: "gsi1pk = :p",
+          ExpressionAttributeValues: { ":p": partition },
+          ExclusiveStartKey: start,
+        });
+        out.push(...(res.Items ?? []));
+        start = res.LastEvaluatedKey;
+      } while (start);
+    }
+    return out;
+  }
+
   /** The five interests' embeddings, written by enrichment; empty until the first run. */
   private async interestVectors(): Promise<InterestVector[]> {
     const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: INTERESTS_KEY }));
@@ -842,9 +904,18 @@ export class DynamoRepo implements RepoPort {
   }
 
   /** Embeddings by issue id, 100 keys per batch; issues not embedded yet are simply missing. */
-  private async embeddings(ids: string[]): Promise<Map<string, Float32Array>> {
+  /**
+   * Embeddings by issue id. With `keep`, vectors read stay with this instance (a warm Lambda
+   * serves later calls from memory); an issue re-embedded by `pnpm enrich --force` shows its new
+   * vector once the instance is recycled.
+   */
+  private async embeddings(ids: string[], keep = false): Promise<Map<string, Float32Array>> {
     const out = new Map<string, Float32Array>();
-    const unique = [...new Set(ids)];
+    const unique = [...new Set(ids)].filter((id) => {
+      const v = keep ? this.vectorCache.get(id) : undefined;
+      if (v) out.set(id, v);
+      return !v;
+    });
     for (let n = 0; n < unique.length; n += 100) {
       let keys: Record<string, unknown>[] | undefined = unique
         .slice(n, n + 100)
@@ -863,7 +934,10 @@ export class DynamoRepo implements RepoPort {
           }),
         );
         for (const item of res.Responses?.[this.table] ?? []) {
-          out.set((item.pk as string).slice("ISSUE#".length), toVector(item.vector as Uint8Array));
+          const id = (item.pk as string).slice("ISSUE#".length);
+          const vector = toVector(item.vector as Uint8Array);
+          out.set(id, vector);
+          if (keep) this.vectorCache.set(id, vector);
         }
         keys = res.UnprocessedKeys?.[this.table]?.Keys;
       }

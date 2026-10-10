@@ -100,6 +100,18 @@ export interface UnreadCountsResponse {
   counts: UnreadCount[];
 }
 
+/** An issue shown as related to the open one (#20). */
+export interface RelatedItem extends IssueListItem {
+  /** Cosine between the two embeddings once newsletter style is taken out, to 3 decimals. */
+  similarity: number;
+}
+
+/** GET /issues/{id}/related: the closest issues from before and since, above a cutoff. */
+export interface RelatedResponse {
+  earlier: RelatedItem[];
+  since: RelatedItem[];
+}
+
 /** GET /summary: the most relevant unread News, best first, each with a `scoreReason`. */
 export interface SummaryResponse {
   items: IssueListItem[];

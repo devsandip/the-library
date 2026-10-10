@@ -8,6 +8,7 @@ import type {
   IssueListResponse,
   Rating,
   ReaderState,
+  RelatedResponse,
   SenderDetailResponse,
   SenderListItem,
   SenderListResponse,
@@ -413,6 +414,22 @@ export class MockLibraryApi implements LibraryApi {
     }
     return { counts: [...tally.values()] };
   }
+  async related(id: string): Promise<RelatedResponse> {
+    await delay();
+    // A stand-in for the API's nearest neighbours: other issues on the same topic.
+    const me = issues.find((i) => i.id === id);
+    const muted = new Set(senders.filter((s) => s.muted).map((s) => s.senderId));
+    const near = issues
+      .filter(
+        (i) =>
+          me?.topic && i.id !== id && i.topic === me.topic && !i.promo && !muted.has(i.senderId),
+      )
+      .map((i) => ({ ...strip(i), similarity: 0.3 }));
+    const side = (before: boolean) =>
+      near.filter((i) => i.receivedAt < me!.receivedAt === before).slice(0, 3);
+    return { earlier: side(true), since: side(false) };
+  }
+
   async summary(): Promise<SummaryResponse> {
     await delay();
     // A stand-in for the API's ranking: Must Read and AI topics lift, freshness decays.

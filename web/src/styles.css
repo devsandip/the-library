@@ -1577,6 +1577,61 @@ a.button {
   border-radius: 8px;
 }
 
+/* Related issues under the newsletter (#20). */
+.related {
+  margin-top: 28px;
+}
+
+.related h2 {
+  margin: 0 0 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.related h3 {
+  margin: 14px 0 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.related-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--divider);
+}
+
+.related-list li {
+  border-bottom: 1px solid var(--divider);
+}
+
+.related-list a {
+  display: grid;
+  gap: 2px;
+  padding: 10px 0;
+  color: var(--fg);
+}
+
+.related-list a:hover .related-line {
+  color: var(--accent-hover);
+}
+
+.related-pub {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.related-line {
+  font-family: var(--serif);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
 /* ---------- sender picker: a bottom sheet on the phone ---------- */
 
 .sheet {

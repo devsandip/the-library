@@ -242,6 +242,7 @@ export function Summary() {
               onChange={(id, change) => {
                 if (change.state) hide([id], change.state === "archived");
               }}
+              onOpen={(id) => route(`${BASE}/summary?issue=${encodeURIComponent(id)}`, true)}
             />
           ) : (
             <div class="reader-empty">

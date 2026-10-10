@@ -9,6 +9,7 @@ import { useAsync } from "../hooks.js";
 import { useLibrary } from "../library.js";
 import { backIfPossible } from "../nav.js";
 import { NewsletterFrame } from "./newsletter-frame.js";
+import { Related } from "./related.js";
 import { ArchiveIcon, BackIcon, ExternalIcon, ThumbDown, ThumbUp, UnreadIcon } from "./icons.js";
 
 /**
@@ -21,6 +22,7 @@ export function IssueReader({
   wide,
   standalone = false,
   onChange,
+  onOpen,
 }: {
   id: string;
   wide: boolean;
@@ -28,6 +30,8 @@ export function IssueReader({
   standalone?: boolean;
   /** Tells the list beside the pane what changed, so its row keeps up. */
   onChange?: (id: string, patch: Partial<IssueListItem>) => void;
+  /** Opens a related issue in the pane instead of on its own page. */
+  onOpen?: (id: string) => void;
 }) {
   const { api } = useApp();
   const { counts } = useLibrary();
@@ -36,9 +40,9 @@ export function IssueReader({
   const [notice, setNotice] = useState<string>();
   const opened = useRef<string | undefined>(undefined);
 
-  // A new issue in the pane starts at its top.
+  // A new issue starts at its top, in the pane or on its own page (a related link keeps the page).
   useEffect(() => {
-    if (!standalone) scrollTo(0, 0);
+    scrollTo(0, 0);
   }, [id]);
 
   // Opening marks the issue read (and logs the open) once per visit.
@@ -265,6 +269,7 @@ export function IssueReader({
       {notice && <p class="notice">{notice}</p>}
 
       <NewsletterFrame html={d.html} title={d.subject} />
+      <Related id={d.id} onOpen={onOpen} />
     </article>
   );
 }
