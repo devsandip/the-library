@@ -4,6 +4,7 @@ import { Bedrock } from "./bedrock.js";
 import { archiveOldNews, enrich, proposeTopics } from "./enrich.js";
 import { Gmail, type GmailCredentials } from "./gmail.js";
 import { ingest } from "./ingest.js";
+import { writeNarrative } from "./narrative.js";
 import { reprocess } from "./reprocess.js";
 import { rebuildSenders } from "./senders.js";
 import { Store } from "./store.js";
@@ -59,6 +60,8 @@ export interface IngestEvent {
   proposeTopics?: { days?: number; apply?: boolean; replace?: boolean };
   /** Split stored issues into stories (`pnpm stories`); `relink` only recomputes event links. */
   stories?: { days?: number; force?: boolean; relink?: boolean };
+  /** Write today's narrative now (`pnpm narrative`); `force` even if the last one is recent. */
+  narrative?: { force?: boolean };
 }
 
 export async function handler(event: IngestEvent = {}) {
@@ -85,6 +88,11 @@ export async function handler(event: IngestEvent = {}) {
       deadline: started + 8.5 * 60_000,
     });
     console.log(JSON.stringify({ level: "info", msg: "stories done", ...stats }));
+    return stats;
+  }
+  if (event.narrative) {
+    const stats = await writeNarrative(store, bedrock, { force: event.narrative.force === true });
+    console.log(JSON.stringify({ level: "info", msg: "narrative done", ...stats }));
     return stats;
   }
   if (event.proposeTopics) {
@@ -160,6 +168,14 @@ export async function handler(event: IngestEvent = {}) {
     durationMs: 0,
   }));
   console.log(JSON.stringify({ level: "info", msg: "stories done", ...storied }));
+  // Then today's narrative (#18), when the day's News has moved on. It never fails the run either.
+  await writeNarrative(store, bedrock, { deadline: started + 9 * 60_000 })
+    .then((told) => console.log(JSON.stringify({ level: "info", msg: "narrative done", ...told })))
+    .catch((err: Error) =>
+      console.error(
+        JSON.stringify({ level: "error", msg: "narrative failed", error: String(err) }),
+      ),
+    );
   await store.putIngestState(stats, enriched, storied);
   // A run with errors fails the invocation so the alarm fires. What was stored stays stored,
   // and async retries are off, so this is one failed run, not three.

@@ -122,6 +122,27 @@ describe("story index on dev", () => {
     expect(await get(storyKey(id, 1))).toMatchObject({ senderId: "s0000000000ff" });
   });
 
+  it("reads stories with their text, and keeps one narrative", async () => {
+    const texts = await store.storyTexts(since, until);
+    expect(texts).toHaveLength(FIXTURE_NEWSLETTER_IDS.length);
+    for (const t of texts) {
+      expect(t.headline.length).toBeGreaterThan(0);
+      expect(t.eventId).toMatch(/#\d\d$/);
+    }
+
+    expect(await store.getNarrative()).toBeUndefined();
+    const narrative = {
+      at: "2026-10-10T12:00:00.000Z",
+      threads: [{ title: "T", text: "Text.", sources: [{ issueId: "a", publication: "A" }] }],
+      stories: 6,
+      newsletters: 3,
+      storyKeys: ["a#01"],
+      model: "m",
+    };
+    await store.putNarrative(narrative);
+    expect(await store.getNarrative()).toEqual(narrative);
+  });
+
   it("relinks every story and writes only what changed", async () => {
     const report = await relinkStories(store);
     expect(report.stories).toBe(FIXTURE_NEWSLETTER_IDS.length);

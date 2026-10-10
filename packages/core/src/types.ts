@@ -124,6 +124,24 @@ export interface DigestStats {
 }
 
 /** GET /summary: the most relevant unread News, best first, each with a `scoreReason`. */
+/** One thread of today's narrative (#18): connected stories told as one paragraph. */
+export interface NarrativeThread {
+  title: string;
+  text: string;
+  /** The issues its stories came from, in the order the thread uses them. */
+  sources: { issueId: string; publication: string }[];
+}
+
+/** Today's news as a few threads (#18), written by Claude from the last day's News stories. */
+export interface Narrative {
+  /** When it was written. */
+  at: string;
+  threads: NarrativeThread[];
+  /** How many stories, from how many newsletters, it was written from. */
+  stories: number;
+  newsletters: number;
+}
+
 export interface SummaryResponse {
   items: IssueListItem[];
   /** Unread News issues from the last two weeks that were scored. */
@@ -131,6 +149,8 @@ export interface SummaryResponse {
   /** Today's digest: the top 5 as first shown today. They carry the yellow box. */
   digest?: string[];
   digestStats?: DigestStats;
+  /** The latest narrative, if it was written in the last 24 hours. */
+  narrative?: Narrative;
 }
 
 export interface SenderDetailResponse extends SenderListItem {
@@ -185,6 +205,20 @@ export interface StoryStats {
   inputTokens: number;
   outputTokens: number;
   embedTokens: number;
+  durationMs: number;
+}
+
+/** One narrative check (#18): whether a new version was written, and if not, why. */
+export interface NarrativeStats {
+  written: boolean;
+  skipped?: string;
+  /** News stories from the last day. */
+  stories: number;
+  threads: number;
+  /** The new version's thread titles. */
+  titles?: string[];
+  inputTokens: number;
+  outputTokens: number;
   durationMs: number;
 }
 

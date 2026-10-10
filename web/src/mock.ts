@@ -7,6 +7,7 @@ import type {
   IssueDetailResponse,
   IssueListItem,
   IssueListResponse,
+  Narrative,
   Rating,
   ReaderState,
   RelatedResponse,
@@ -364,6 +365,43 @@ function digestStats(): DigestStats {
   };
 }
 
+/** A stand-in for the day in brief (#18): sample threads citing the top News issues. */
+function mockNarrative(top: IssueListItem[]): Narrative | undefined {
+  if (top.length < 4) return undefined;
+  const from = (...n: number[]) =>
+    n.map((k) => ({ issueId: top[k]!.id, publication: top[k]!.publication }));
+  return {
+    at: new Date(now - 2 * HOUR).toISOString(),
+    stories: 42,
+    newsletters: 7,
+    threads: [
+      {
+        title: "Cheaper small models reach the enterprise",
+        text:
+          "Two labs released small models priced for high-volume work, and a cloud provider cut " +
+          "its per-token rates by a third the same day. Together they make routine agent work " +
+          "cheaper for teams already paying for larger models.",
+        sources: from(0, 2),
+      },
+      {
+        title: "App stores set rules for AI agents",
+        text:
+          "An app store now requires apps to say when an agent acts for the user. Two developer " +
+          "newsletters walked through what changes for apps that book, buy or message on a " +
+          "user's behalf.",
+        sources: from(1),
+      },
+      {
+        title: "Chip demand keeps suppliers stretched",
+        text:
+          "A foundry reported another record month on AI chip orders, and a memory maker said " +
+          "its supply is sold out through next year.",
+        sources: from(3),
+      },
+    ],
+  };
+}
+
 export class MockLibraryApi implements LibraryApi {
   async listIssues(opts: ListIssuesOptions): Promise<IssueListResponse> {
     await delay();
@@ -473,6 +511,7 @@ export class MockLibraryApi implements LibraryApi {
       candidates: news.length,
       digest: (mockDigest ??= scored.slice(0, 5).map((s) => s.i.id)),
       digestStats: digestStats(),
+      narrative: mockNarrative(scored.map((s) => s.i)),
     };
   }
   async rate(id: string, value: Rating | 0) {

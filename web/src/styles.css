@@ -792,7 +792,8 @@ a.pill:hover {
 @media (prefers-reduced-motion: reduce) {
   .swipe-face,
   .swipe-under svg,
-  .side-fold svg {
+  .side-fold svg,
+  .narrative-fold svg {
     transition: none;
   }
 
@@ -1255,6 +1256,120 @@ a.pill:hover {
 }
 
 /* ---------- summary ---------- */
+
+/* The day in brief (#18): a card above the list, or the Mac's empty reading pane. */
+.narrative {
+  margin: 0 0 20px;
+}
+
+.narrative.foldable {
+  padding: 12px 16px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.narrative-head {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.narrative-fold {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  margin-left: -6px;
+  padding: 0 6px 0 2px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.narrative-fold:hover {
+  color: var(--fg);
+}
+
+.narrative-fold svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.15s ease;
+}
+
+.narrative-fold[aria-expanded="false"] svg {
+  transform: rotate(-90deg);
+}
+
+.narrative-meta {
+  margin: 2px 0 12px;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.narrative-threads {
+  display: grid;
+  gap: 16px;
+  padding-bottom: 12px;
+}
+
+.narrative-threads[hidden] {
+  display: none;
+}
+
+.thread h3 {
+  margin: 0 0 4px;
+  font-family: var(--serif);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.thread-text {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.thread .thread-sources {
+  margin: 4px 0 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.thread-sources a {
+  color: var(--accent-text);
+}
+
+.pane-brief {
+  max-width: 640px;
+}
+
+.pane-brief .narrative-threads {
+  gap: 24px;
+}
+
+.pane-brief .thread h3 {
+  font-size: 1.25rem;
+}
+
+.pane-brief .thread-text {
+  font-size: 1.0625rem;
+}
+
+.pane-brief-hint {
+  margin: 28px 0 0;
+  font-size: 0.875rem;
+}
 
 .summary-list {
   margin: 0;

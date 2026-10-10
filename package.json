@@ -26,7 +26,8 @@
     "rebuild-senders": "tsx scripts/rebuild-senders.ts",
     "topics": "tsx scripts/topics.ts",
     "enrich": "tsx scripts/enrich.ts",
-    "stories": "tsx scripts/stories.ts"
+    "stories": "tsx scripts/stories.ts",
+    "narrative": "tsx scripts/narrative.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-amplify": "^3.1148.0",
