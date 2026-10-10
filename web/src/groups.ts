@@ -35,7 +35,7 @@ export function topicSections(items: IssueListItem[], order: string[]): TopicSec
 export function patchIssue<T extends { id: string }>(
   items: T[],
   id: string,
-  patch: Partial<T>,
+  patch: Partial<NoInfer<T>>,
 ): T[] {
   return items.map((i) => (i.id === id ? { ...i, ...patch } : i));
 }

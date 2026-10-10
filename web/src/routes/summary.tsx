@@ -5,16 +5,87 @@ import { BASE } from "../config.js";
 import { useApp } from "../context.js";
 import { issueHref } from "../filters.js";
 import { todayLine } from "../format.js";
+import { patchIssue } from "../groups.js";
 import { useAsync } from "../hooks.js";
 import { PANES, useMedia, WIDE } from "../media.js";
 import { backIfPossible, clickInPlace } from "../nav.js";
 import { IssueReader } from "../components/issue-reader.js";
-import { ArchiveIcon, BackIcon, StarIcon } from "../components/icons.js";
+import { ArchiveIcon, BackIcon, StarIcon, ThumbDown, ThumbUp } from "../components/icons.js";
+import { SwipeUnder, useSwipe, useSwipeRating, type SwipeActions } from "../components/swipe.js";
 
 /** Skimming one-line summaries runs at about 200 words a minute. */
 function skimMinutes(lines: string[]): number {
   const words = lines.join(" ").split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.round(words / 200));
+}
+
+/** One line of the Summary: the newsletter, Claude's line and why it ranks there. */
+function SummaryRow({
+  issue: i,
+  selected,
+  phone,
+  onOpen,
+  onArchive,
+  swipe,
+}: {
+  issue: IssueListItem;
+  selected: boolean;
+  phone: boolean;
+  /** Open in the reading pane instead of on its own page. */
+  onOpen?: (id: string) => void;
+  onArchive: (id: string) => void;
+  /** Swipe to rate (#13), on the phone. */
+  swipe?: SwipeActions;
+}) {
+  const s = useSwipe(swipe);
+  return (
+    <li class={`summary-row${selected ? " selected" : ""}${swipe ? " swipe" : ""}`} {...s.rowProps}>
+      {swipe && <SwipeUnder />}
+      <div class="swipe-face" ref={s.face}>
+        <a
+          href={issueHref(i.id)}
+          aria-current={selected ? "true" : undefined}
+          onClick={(e) => {
+            if (onOpen) clickInPlace(e, () => onOpen(i.id));
+          }}
+        >
+          <span class="row-pub">
+            {phone && <span class="dot" aria-hidden="true" />}
+            <span class="row-name">{i.publication}</span>
+            {i.mustRead && (
+              <span class="star" title="Must Read">
+                <StarIcon filled />
+                <span class="sr-only">Must Read</span>
+              </span>
+            )}
+            {i.rating === 1 && (
+              <span class="rated up" title="Relevant">
+                <ThumbUp filled />
+                <span class="sr-only">Rated Relevant</span>
+              </span>
+            )}
+            {i.rating === -1 && (
+              <span class="rated down" title="Irrelevant">
+                <ThumbDown filled />
+                <span class="sr-only">Rated Irrelevant</span>
+              </span>
+            )}
+          </span>
+          <span class="summary-line">{i.summary ?? i.subject}</span>
+          {i.scoreReason && <span class="reason">{i.scoreReason}</span>}
+        </a>
+        <button
+          type="button"
+          class="icon-button"
+          title="Archive"
+          aria-label={`Archive ${i.subject}`}
+          onClick={() => onArchive(i.id)}
+        >
+          <ArchiveIcon />
+        </button>
+      </div>
+    </li>
+  );
 }
 
 /**
@@ -42,6 +113,11 @@ export function Summary() {
       }
       return next;
     });
+
+  const rating = useSwipeRating({
+    patch: (id, change) => summary.set((d) => ({ ...d, items: patchIssue(d.items, id, change) })),
+    hide: (id, on) => hide([id], on),
+  });
 
   const archive = async (id: string) => {
     setError(undefined);
@@ -73,43 +149,22 @@ export function Summary() {
     }
   };
 
-  const candidates = summary.data?.candidates ?? 0;
+  // Archived lines are no longer candidates.
+  const candidates = Math.max(0, (summary.data?.candidates ?? 0) - gone.size);
   const minutes = skimMinutes(items.map((i) => i.summary ?? i.subject));
 
   const row = (i: IssueListItem) => (
-    <li class={`summary-row${i.id === open ? " selected" : ""}`} key={i.id}>
-      <a
-        href={issueHref(i.id)}
-        aria-current={i.id === open ? "true" : undefined}
-        onClick={(e) => {
-          if (panes) {
-            clickInPlace(e, () => route(`${BASE}/summary?issue=${encodeURIComponent(i.id)}`, true));
-          }
-        }}
-      >
-        <span class="row-pub">
-          {!wide && <span class="dot" aria-hidden="true" />}
-          <span class="row-name">{i.publication}</span>
-          {i.mustRead && (
-            <span class="star" title="Must Read">
-              <StarIcon filled />
-              <span class="sr-only">Must Read</span>
-            </span>
-          )}
-        </span>
-        <span class="summary-line">{i.summary ?? i.subject}</span>
-        {i.scoreReason && <span class="reason">{i.scoreReason}</span>}
-      </a>
-      <button
-        type="button"
-        class="icon-button"
-        title="Archive"
-        aria-label={`Archive ${i.subject}`}
-        onClick={() => void archive(i.id)}
-      >
-        <ArchiveIcon />
-      </button>
-    </li>
+    <SummaryRow
+      key={i.id}
+      issue={i}
+      selected={i.id === open}
+      phone={!wide}
+      onOpen={
+        panes ? (id) => route(`${BASE}/summary?issue=${encodeURIComponent(id)}`, true) : undefined
+      }
+      onArchive={(id) => void archive(id)}
+      swipe={wide ? undefined : rating.actions(i)}
+    />
   );
 
   const body = (
@@ -163,6 +218,7 @@ export function Summary() {
         <h1>Summary</h1>
         {subline}
         {body}
+        {rating.toast}
       </section>
     );
   }
