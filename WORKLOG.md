@@ -59,3 +59,26 @@ Append-only session log. Newest entry at the bottom.
 - Stories live in `gsi1` under `STORIES` instead of a new index; no infra change.
 - Event linking has no merging and compares names exactly; `pnpm stories --relink` recomputes all links for free after a threshold change.
 - Sandip picked icon option 1, the typewriter L in the yellow box.
+
+## 2026-10-10: The day in brief
+
+**Did:**
+
+- Built the day in brief (#18, PR #39): after the story index on each scheduled run, one Haiku call writes the last day's News stories, merged by event, as 3 to 6 threads with the issues they came from.
+- Probed it on prod data first. The first prompt joined unrelated stories under one title; the shipped one keeps each thread to one development. Em-dashes become commas.
+- Deployed to prod and wrote the first version with `pnpm narrative --force`: 6 threads from 39 News stories, $0.007. `GET /summary` returns it.
+
+**State now:**
+
+- On prod, a new version is written at most every 6 hours, once 5 News stories are new to it: about $1 a month. The planned budget alert (#6) is now $8.
+- It shows above the Summary's list in a card that folds shut, and in the Mac's empty reading pane. Sandip has not seen it on a device yet.
+
+**Next:**
+
+- After a weekday (about 90 News stories), read the threads and check the cost in the CloudWatch logs (`narrative done`).
+- Then #20's second version (related stories inside a digest, from the story index) or #19 (how a story evolved).
+
+**Decisions:**
+
+- Written on the schedule, not when the Summary opens: the API Lambda times out at 15 seconds.
+- On a wide Mac it fills the empty reading pane, so the list column keeps the top 5 in view.
