@@ -57,7 +57,7 @@ Reshaped by issues #2 to #5 (2026-10-09): Must Read shipped (#2); enrichment and
 | P2.2 | Ranking math in `packages/core` + rank step after ingest and after each rating. | Cold start orders keep-list senders above neutral; 5 Irrelevant ratings drop a sender; order stable within a day. **Math done** (`rank.ts`, all three checks are unit tests); it scores the Summary page at read time. The stored rank step is left. |
 | P2.3 | Rank sort, reason line, yellow box on top 5, topic filter, digest logging. | Ranked list with reasons; one digest row per day. **Summary page done** (reasons, yellow box on the day's top 5, digest logged on the first Summary of each day); the "Best first" sort inside the tabs waits for ratings. |
 | P2.4 | Success metric: rolling 14-day share of digest items rated Relevant. | Visible in the app; target >= 60%. **Done** (under the Summary and on Status), counting from 2026-10-10. |
-| P2.5 | Story index (#15): Claude splits each issue into stories (headline, summary, names, source link), Titan embeds each, and stories about the same event are linked across newsletters. Groundwork for #16 to #23. | Every non-promo issue split; linking thresholds checked against prod pairs; backlog cost logged. |
+| P2.5 | Story index (#15): Claude splits each issue into stories (headline, summary, names, source link), Titan embeds each, and stories about the same event are linked across newsletters. Groundwork for #16 to #23. | Every non-promo issue split; linking thresholds checked against prod pairs; backlog cost logged. **Done** (2026-10-10): 357 issues, 2,210 stories, $2.25; cutoffs 0.70, or 0.55 with a shared name. |
 
 ## Phase 3 (optional, later)
 

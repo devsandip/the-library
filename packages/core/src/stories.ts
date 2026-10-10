@@ -8,10 +8,17 @@ import { cosine } from "./rank.js";
 
 /** Stories further apart than this are never one event. */
 export const EVENT_WINDOW_DAYS = 3;
-/** Similar enough to be one event on its own (cosine of Titan embeddings). */
-export const EVENT_SIMILAR = 0.8;
-/** Similar enough when the two stories also name the same company, person or product. */
-export const EVENT_SIMILAR_NAMED = 0.6;
+/**
+ * Similar enough to be one event on its own (cosine of Titan embeddings). Picked from prod pairs
+ * (2,210 stories, 2026-10-10): from 0.70 up every sampled pair was the same event.
+ */
+export const EVENT_SIMILAR = 0.7;
+/**
+ * Similar enough when the two stories also name the same company, person or product: most shared
+ * name pairs from 0.55 up were the same event. At 0.50, chaining merged two weeks of Meta Muse
+ * coverage into one 24-story event.
+ */
+export const EVENT_SIMILAR_NAMED = 0.55;
 
 const DAY_MS = 86_400_000;
 

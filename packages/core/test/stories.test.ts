@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { eventFor, linkEvents, nameKey, storyRef, type EventCandidate } from "../src/stories.js";
+import {
+  EVENT_SIMILAR,
+  EVENT_SIMILAR_NAMED,
+  eventFor,
+  linkEvents,
+  nameKey,
+  storyRef,
+  type EventCandidate,
+} from "../src/stories.js";
 
 const at = (day: number, hour = 8) =>
   `2026-10-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:00:00.000Z`;
@@ -37,11 +45,15 @@ describe("eventFor", () => {
   });
 
   it("needs a shared name when the stories are only fairly similar", () => {
-    expect(eventFor(base, [story("a", 4, near(0.7), ["Google"], "a#01")])).toEqual({
+    const fairly = (EVENT_SIMILAR + EVENT_SIMILAR_NAMED) / 2;
+    expect(eventFor(base, [story("a", 4, near(fairly), ["Google"], "a#01")])).toEqual({
       eventId: "b#01",
     });
-    expect(eventFor(base, [story("a", 4, near(0.7), ["The openai"], "a#01")]).eventId).toBe("a#01");
-    expect(eventFor(base, [story("a", 4, near(0.5), ["OpenAI"], "a#01")]).eventId).toBe("b#01");
+    expect(eventFor(base, [story("a", 4, near(fairly), ["The openai"], "a#01")]).eventId).toBe(
+      "a#01",
+    );
+    const loosely = EVENT_SIMILAR_NAMED - 0.05;
+    expect(eventFor(base, [story("a", 4, near(loosely), ["OpenAI"], "a#01")]).eventId).toBe("b#01");
   });
 
   it("ignores its own issue, stories days away and stories not linked yet", () => {

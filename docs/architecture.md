@@ -298,9 +298,9 @@ Each issue gets one forced tool call to Claude Haiku (cross-region profile, `thi
 Claude splits every issue into its stories and stories about the same event are linked across newsletters; decisions and the probe are in `docs/features/story-index.md`.
 
 - **Split:** a second forced tool call to Haiku per issue (`record_stories`), reading the whole issue up to 60,000 characters from the stored HTML, with each outside link marked `[n]`. Each story gets a headline (at most 12 words), a summary (at most 45 words), up to 6 names and the number of its own source link, which the code turns back into the URL. Sponsor slots and housekeeping are left out; an essay is one story. Promos and muted newsletters are skipped.
-- **Embed and link:** Titan V2 embeds headline, summary and names (no newsletter name). In arrival order, a story joins the event of the most similar story from another issue within 3 days at a cosine of 0.80, or 0.60 with a shared name; otherwise it starts an event named after itself. `pnpm stories --relink` recomputes every link without model calls, for threshold changes.
+- **Embed and link:** Titan V2 embeds headline, summary and names (no newsletter name). In arrival order, a story joins the event of the most similar story from another issue within 3 days at a cosine of 0.70, or 0.55 with a shared name; otherwise it starts an event named after itself. Both cutoffs were read off prod pairs (feature doc); on the backlog they give 64 events covered by more than one newsletter, the largest 8 stories. `pnpm stories --relink` recomputes every link without model calls, for threshold changes.
 - **When:** after enrichment on every scheduled run, for the last 14 days, inside the run's time budget; `pnpm stories --days 30` for the backlog. A split that fails three times is left alone (`--force` retries). Like enrichment, it never fails the ingest run; `/status` shows the last run's line.
-- **Cost:** about 0.7 cents per issue (5 prod issues, 2026-10-10: ~3,300 tokens in and ~830 out each), so about $3 for the 4-week backlog and about $3 a month.
+- **Cost:** about 0.6 cents per issue. The backlog (357 issues, 2,210 stories, 2026-10-10) took 1.12 million tokens in and 225,000 out: $2.25. About $3 a month at ~25 issues a day.
 
 ## 12. Cost (steady state, ~25 issues/day)
 
