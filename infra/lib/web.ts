@@ -46,6 +46,8 @@ function handler(event) {
     uri.indexOf("${BASE_PATH}/assets/") === 0 ||
     uri === "${BASE_PATH}/config.json" ||
     uri === "${BASE_PATH}/favicon.svg" ||
+    uri === "${BASE_PATH}/favicon-32.png" ||
+    uri === "${BASE_PATH}/apple-touch-icon.png" ||
     uri === "${BASE_PATH}/about.html" ||
     uri === "${BASE_PATH}/privacy.html" ||
     uri === "${BASE_PATH}/terms.html"
