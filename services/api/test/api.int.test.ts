@@ -8,14 +8,18 @@ import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   embeddingKey,
+  eventKey,
   INTERESTS_KEY,
   issueIndexAttributes,
   issueKey,
   NARRATIVE_KEY,
+  openIndexAttributes,
+  readerDay,
   senderIdentity,
   TOPICS_KEY,
 } from "@library/core";
 import type {
+  HistoryResponse,
   IssueDetailResponse,
   IssueListResponse,
   RelatedResponse,
@@ -523,5 +527,47 @@ describe("API on dev", () => {
     const muted = await call<RelatedResponse>("GET", "/issues/fx-tldr/related");
     expect([...muted.body.earlier, ...muted.body.since]).toEqual([]);
     await call("PATCH", `/senders/${LENNY}`, { body: { muted: false } });
+  });
+  it("history: issues opened on a day, latest first and once each, with the days around it", async () => {
+    for (const id of ["fx-lenny", "fx-tldr", "fx-lenny"]) {
+      expect((await call("POST", `/issues/${id}/events`, { body: { type: "open" } })).status).toBe(
+        204,
+      );
+    }
+    const today = readerDay(Date.now());
+    const r = await eventually(
+      () => call<HistoryResponse>("GET", "/history"),
+      (x) => x.body.items[0]?.id === "fx-lenny",
+    );
+    expect(r.status).toBe(200);
+    expect(r.body.day).toBe(today);
+    const ids = r.body.items.map((i) => i.id);
+    expect(ids.slice(0, 2)).toEqual(["fx-lenny", "fx-tldr"]);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(r.body.items[0]?.openedAt).toMatch(/^\d{4}-/);
+    expect(r.body.nextDay).toBeUndefined();
+
+    // An open two days ago, stored the way the API stores one, makes that day the previous one.
+    const at = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    await ddb.send(
+      new PutCommand({
+        TableName: stack.tableName,
+        Item: {
+          ...eventKey("fx-pragmatic", at, "inttest1"),
+          type: "open",
+          ...openIndexAttributes("fx-pragmatic", at),
+        },
+      }),
+    );
+    const earlierDay = readerDay(Date.parse(at));
+    const again = await eventually(
+      () => call<HistoryResponse>("GET", "/history"),
+      (x) => x.body.previousDay === earlierDay,
+    );
+    expect(again.body.previousDay).toBe(earlierDay);
+    const earlier = await call<HistoryResponse>("GET", "/history", { query: { day: earlierDay } });
+    expect(earlier.body.items.map((i) => i.id)).toEqual(["fx-pragmatic"]);
+    expect(earlier.body.nextDay).toBe(today);
+    expect((await call("GET", "/history", { query: { day: "2026-02-30" } })).status).toBe(400);
   });
 });

@@ -1,3 +1,4 @@
+import { isReaderDay, readerDay } from "@library/core/days";
 import type { Rating, ReaderState, SenderPatch, Shelf, View } from "@library/core/types";
 import { badRequest, HttpError, notFound } from "./errors.js";
 import type { Services } from "./port.js";
@@ -175,6 +176,15 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     method: "GET",
     pattern: /^\/summary$/,
     handler: async (svc) => ok(await svc.repo.summary()),
+  },
+  {
+    method: "GET",
+    pattern: /^\/history$/,
+    handler: async (svc, req) => {
+      const day = req.query.day ?? readerDay(Date.now());
+      if (!isReaderDay(day)) throw badRequest("day must be a date like 2026-10-10");
+      return ok(await svc.repo.history(day));
+    },
   },
   {
     method: "POST",

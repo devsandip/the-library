@@ -27,7 +27,8 @@
     "topics": "tsx scripts/topics.ts",
     "enrich": "tsx scripts/enrich.ts",
     "stories": "tsx scripts/stories.ts",
-    "narrative": "tsx scripts/narrative.ts"
+    "narrative": "tsx scripts/narrative.ts",
+    "history-backfill": "tsx scripts/history-backfill.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-amplify": "^3.1148.0",

@@ -46,6 +46,11 @@ function setup(overrides: Partial<RepoPort> = {}) {
       items: [{ ...issue, scoreReason: "From a Must Read newsletter", mustRead: true }],
       candidates: 1,
     })),
+    history: vi.fn(async (day: string) => ({
+      day,
+      items: [{ ...issue, openedAt: "2026-10-10T03:00:00.000Z" }],
+      previousDay: "2026-10-08",
+    })),
     status: vi.fn(async () => ({ stage: "test", lastError: null })),
     ...overrides,
   };
@@ -139,6 +144,19 @@ describe("routing and validation", () => {
       items: [{ id: "abc123", scoreReason: "From a Must Read newsletter", mustRead: true }],
     });
     expect((await call("POST", "/summary")).status).toBe(405);
+  });
+
+  it("serves read history for a day, today by default", async () => {
+    const { call, repo } = setup();
+    const res = await call("GET", "/history", { query: { day: "2026-10-09" } });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ day: "2026-10-09", previousDay: "2026-10-08" });
+    expect(repo.history).toHaveBeenCalledWith("2026-10-09");
+    await call("GET", "/history");
+    expect(repo.history).toHaveBeenLastCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
+    for (const day of ["2026-02-30", "yesterday", "2026-1-5"]) {
+      expect((await call("GET", "/history", { query: { day } })).status).toBe(400);
+    }
   });
 
   it("serves related issues", async () => {

@@ -1,8 +1,8 @@
 import { BASE } from "../config.js";
 import { todayLine } from "../format.js";
-import { SettingsIcon, SummaryIcon } from "./icons.js";
+import { HistoryIcon, SettingsIcon, SummaryIcon } from "./icons.js";
 
-/** The phone's Home header: the wordmark and today's date, the Summary and Status. */
+/** The phone's Home header: the wordmark and today's date, the Summary, History and Status. */
 export function BriefHeader() {
   return (
     <header class="brief-head">
@@ -16,6 +16,9 @@ export function BriefHeader() {
         <a class="pill" href={`${BASE}/summary`}>
           <SummaryIcon />
           Summary
+        </a>
+        <a class="icon-button" href={`${BASE}/history`} title="History" aria-label="History">
+          <HistoryIcon />
         </a>
         <a class="icon-button" href={`${BASE}/status`} title="Status" aria-label="Status">
           <SettingsIcon />

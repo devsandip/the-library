@@ -8,9 +8,6 @@ import type { Rating } from "./types.js";
 
 export const WEIGHTS = { sender: 0.4, topic: 0.4, fresh: 0.2 } as const;
 
-/** The reader's day seeds the sender sample, so the order holds still within a day. */
-export const READER_TIME_ZONE = "Asia/Kolkata";
-
 /** Candidates are unread issues from the last two weeks. */
 export const CANDIDATE_DAYS = 14;
 
@@ -99,21 +96,6 @@ export interface Ranked {
   score: number;
   parts: { sender: number; topic: number; fresh: number };
   reason: string;
-}
-
-/** YYYY-MM-DD in the reader's time zone. */
-export function readerDay(now: number, timeZone = READER_TIME_ZONE): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
-}
-
-/** The reader's last `n` calendar days, today first. IST has no daylight saving. */
-export function recentDays(now: number, n: number, timeZone = READER_TIME_ZONE): string[] {
-  return Array.from({ length: n }, (_, k) => readerDay(now - k * 86_400_000, timeZone));
 }
 
 /** mulberry32 seeded with an FNV-1a hash of the string: the same seed gives the same numbers. */

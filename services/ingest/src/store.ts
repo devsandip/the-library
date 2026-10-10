@@ -23,6 +23,7 @@ import {
   INGEST_STATE_KEY,
   INTERESTS_KEY,
   NARRATIVE_KEY,
+  openIndexAttributes,
   PARTITION,
   TOPICS_KEY,
   issueIndexAttributes,
@@ -901,6 +902,48 @@ export class Store {
       start = res.LastEvaluatedKey;
     } while (start);
     return out;
+  }
+
+  // ---------- read history (#42) ----------
+
+  /**
+   * Index the `open` events logged before read history existed, so they show in it. Finds them by
+   * a scan (the table is small) and returns how many it indexed. Safe to run again.
+   */
+  async indexOpens(): Promise<number> {
+    let indexed = 0;
+    let start: Record<string, unknown> | undefined;
+    do {
+      const res: ScanCommandOutput = await this.ddb.send(
+        new ScanCommand({
+          TableName: this.table,
+          FilterExpression:
+            "begins_with(sk, :evt) AND #type = :open AND attribute_not_exists(gsi1pk)",
+          ExpressionAttributeNames: { "#type": "type" },
+          ExpressionAttributeValues: { ":evt": "EVT#", ":open": "open" },
+          ProjectionExpression: "pk, sk",
+          ExclusiveStartKey: start,
+        }),
+      );
+      await mapLimit(res.Items ?? [], 8, async (i) => {
+        const pk = i.pk as string;
+        const sk = i.sk as string;
+        // EVT#<at>#<rand> on ISSUE#<id>
+        const at = sk.split("#")[1]!;
+        const idx = openIndexAttributes(pk.slice("ISSUE#".length), at);
+        await this.ddb.send(
+          new UpdateCommand({
+            TableName: this.table,
+            Key: { pk, sk },
+            UpdateExpression: "SET gsi1pk = :p, gsi1sk = :s",
+            ExpressionAttributeValues: { ":p": idx.gsi1pk, ":s": idx.gsi1sk },
+          }),
+        );
+        indexed++;
+      });
+      start = res.LastEvaluatedKey;
+    } while (start);
+    return indexed;
   }
 
   // ---------- narrative (#18) ----------

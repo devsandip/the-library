@@ -25,7 +25,7 @@ export const storyKey = (id: string, n: number) => ({
 });
 
 export const INDEX = {
-  /** INBOX (unread + read) | ARCHIVE | SENDERS | STORIES */
+  /** INBOX (unread + read) | ARCHIVE | SENDERS | STORIES | OPENS */
   list: "gsi1",
   /** Sparse: unread issues only. */
   unread: "gsi2",
@@ -40,6 +40,7 @@ export const PARTITION = {
   archive: "ARCHIVE",
   senders: "SENDERS",
   stories: "STORIES",
+  opens: "OPENS",
   unread: "UNREAD",
   rated: "RATED",
 } as const;
@@ -87,6 +88,12 @@ export function issueIndexAttributes(issue: {
   }
   return { set, remove: ISSUE_INDEX_ATTRS.filter((a) => !(a in set)) };
 }
+
+/** An `open` event in `gsi1`, by time, so read history (#42) reads a day in one query. */
+export const openIndexAttributes = (id: string, at: string) => ({
+  gsi1pk: PARTITION.opens,
+  gsi1sk: `${at}#${id}`,
+});
 
 export const senderIndexAttributes = (senderId: string, publication: string) => ({
   gsi1pk: PARTITION.senders,

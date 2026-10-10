@@ -7,6 +7,7 @@ import { Ctx, type AppContext } from "./context.js";
 import { LibraryProvider } from "./library.js";
 import { useMedia, WIDE } from "./media.js";
 import { Sidebar } from "./components/sidebar.js";
+import { History } from "./routes/history.js";
 import { Home } from "./routes/home.js";
 import { Issue } from "./routes/issue.js";
 import { NotFound } from "./routes/not-found.js";
@@ -46,6 +47,7 @@ function Shell() {
         <Router>
           <Route path={`${BASE}/`} component={Home} />
           <Route path={`${BASE}/summary`} component={Summary} />
+          <Route path={`${BASE}/history`} component={History} />
           <Route path={`${BASE}/issue/:id`} component={Issue} />
           <Route path={`${BASE}/senders`} component={Senders} />
           <Route path={`${BASE}/senders/:senderId`} component={Sender} />

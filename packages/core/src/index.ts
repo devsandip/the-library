@@ -5,6 +5,7 @@ export * from "./sanitize.js";
 export * from "./extract.js";
 export * from "./process.js";
 export * from "./retry.js";
+export * from "./days.js";
 export * from "./rank.js";
 export * from "./related.js";
 export * from "./stories.js";

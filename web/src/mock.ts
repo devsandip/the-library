@@ -2,8 +2,10 @@
  * In-memory backend for local UI work (VITE_MOCK=1 pnpm --filter @library/web dev).
  * Loaded with a dynamic import, so production bundles never include it.
  */
+import { readerDay } from "@library/core/days";
 import type {
   DigestStats,
+  HistoryResponse,
   IssueDetailResponse,
   IssueListItem,
   IssueListResponse,
@@ -365,6 +367,35 @@ function digestStats(): DigestStats {
   };
 }
 
+/**
+ * A stand-in for read history (#42): four issues opened on each of today, yesterday and three
+ * days ago, so previous and next skip the empty day between. Opens after now are not shown yet.
+ */
+function mockHistory(day: string): HistoryResponse {
+  const days = [0, 1, 3].map((k) => readerDay(now - k * 24 * HOUR));
+  const opens = days
+    .flatMap((d, k) =>
+      issues.slice(k * 4, k * 4 + 4).map((issue, n) => ({
+        day: d,
+        issue,
+        at: new Date(`${d}T${String(8 + n * 3).padStart(2, "0")}:15:00+05:30`).toISOString(),
+      })),
+    )
+    .filter((o) => Date.parse(o.at) <= now);
+  const withReads = [...new Set(opens.map((o) => o.day))].sort();
+  const earlier = withReads.filter((d) => d < day).pop();
+  const later = withReads.find((d) => d > day);
+  return {
+    day,
+    items: opens
+      .filter((o) => o.day === day)
+      .map((o) => ({ ...withStar(strip(o.issue)), openedAt: o.at }))
+      .sort((a, b) => b.openedAt.localeCompare(a.openedAt)),
+    ...(earlier ? { previousDay: earlier } : {}),
+    ...(later ? { nextDay: later } : {}),
+  };
+}
+
 /** A stand-in for the day in brief (#18): sample threads citing the top News issues. */
 function mockNarrative(top: IssueListItem[]): Narrative | undefined {
   if (top.length < 4) return undefined;
@@ -513,6 +544,10 @@ export class MockLibraryApi implements LibraryApi {
       digestStats: digestStats(),
       narrative: mockNarrative(scored.map((s) => s.i)),
     };
+  }
+  async history(day?: string): Promise<HistoryResponse> {
+    await delay();
+    return mockHistory(day ?? readerDay(now));
   }
   async rate(id: string, value: Rating | 0) {
     await delay(80);

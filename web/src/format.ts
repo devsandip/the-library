@@ -1,3 +1,4 @@
+import { READER_TIME_ZONE } from "@library/core/days";
 import type { DigestStats, Narrative } from "@library/core/types";
 
 /** "3h ago", "yesterday", "Oct 2". */
@@ -39,4 +40,36 @@ export function digestLine(s: DigestStats): string {
 export function narrativeLine(n: Narrative, now = Date.now()): string {
   const papers = n.newsletters === 1 ? "1 newsletter" : `${n.newsletters} newsletters`;
   return `From ${n.stories} stories in ${papers}, updated ${relativeTime(n.at, now)}.`;
+}
+
+/** Noon of a reader's day, safe to format in the reader's time zone. */
+const noonOf = (day: string) => new Date(`${day}T12:00:00+05:30`);
+
+/** "Friday 9 October", for read history's day (#42). */
+export function dayLine(day: string): string {
+  return noonOf(day).toLocaleDateString(undefined, {
+    timeZone: READER_TIME_ZONE,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+}
+
+/** "Thu 8 Oct", for read history's previous and next buttons. */
+export function shortDay(day: string): string {
+  return noonOf(day).toLocaleDateString(undefined, {
+    timeZone: READER_TIME_ZONE,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+
+/** "6:42 PM" (or "18:42", by locale), when an issue was opened. */
+export function clockTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, {
+    timeZone: READER_TIME_ZONE,
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
