@@ -30,3 +30,32 @@ Append-only session log. Newest entry at the bottom.
 - Topic names cannot contain commas, because the API takes several as one comma-separated value; `parseTopics` rejects them.
 - Fonts are self-hosted from `@fontsource-variable` packages, so no CSP change.
 - CDK cannot resolve the account from `AWS_PROFILE=admin`; deploys export the SSO credentials into the command's environment instead.
+
+## 2026-10-10: New look shipped, swipe, related issues, digest log, icon, story index
+
+**Did:**
+
+- Merged and deployed to prod, each with `pnpm check-hosting` passing: the new look (#30), honest Summary reasons with at most three per newsletter (#31), swipe to rate on the phone (#32), related issues while reading (#33), the digest log, yellow box and success measure (#34), the app icon and favicon (#35), and folding Topics and Senders in the Mac sidebar (#36).
+- Built the story index (#15, PR #37): Claude splits each issue into stories with names and source links, Titan embeds them, and stories about one event are linked across newsletters. Ran the backlog on prod: 357 issues, 2,210 stories, $2.25, no errors.
+- Calibrated the event links on prod pairs: 0.70 alone, 0.55 with a shared name (`docs/features/story-index.md`).
+- Stored the five interests on prod, activated the `project` cost-allocation tag (#6), and noted on #6 that the budget alert should be $6.
+
+**State now:**
+
+- Prod runs everything above. The scheduled run now classifies, then splits new issues into stories, inside its time budget. `/status` shows a Stories line.
+- Not yet tried by Sandip on a real iPhone: swipe, the icon on the home screen, the yellow box.
+- Nothing reads stories yet; they are groundwork for #16 to #23.
+
+**Next:**
+
+- #18, today's news as a narrative: one Claude call over today's News stories grouped by `eventId`, stored per day, shown collapsible at the top of the Summary. Generate it in the ingest Lambda (the API Lambda times out at 15 seconds).
+- Then #20's second version (related stories inside a digest) and #19 (how a story evolved).
+- Around 2026-10-16: create the AWS Budget (#6) at $6 once a week of tagged costs exists.
+
+**Decisions:**
+
+- Every issue gets a story split, not only digests: essays name the people and companies linking needs. About $3 a month.
+- Links are numbered in Claude's input and it answers with a number, so URLs never pass through the model.
+- Stories live in `gsi1` under `STORIES` instead of a new index; no infra change.
+- Event linking has no merging and compares names exactly; `pnpm stories --relink` recomputes all links for free after a threshold change.
+- Sandip picked icon option 1, the typewriter L in the yellow box.
