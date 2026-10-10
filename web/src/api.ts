@@ -3,6 +3,7 @@ import type {
   IssueDetailResponse,
   IssueListItem,
   IssueListResponse,
+  IssueStoriesResponse,
   NowReadingResponse,
   Rating,
   ReaderState,
@@ -57,6 +58,8 @@ export interface LibraryApi {
   savePosition(id: string, position: number, keepalive?: boolean): Promise<void>;
   /** Issues close to this one, from before and since (#20). */
   related(id: string): Promise<RelatedResponse>;
+  /** The issue's stories from the story index, for a tap on its row (#41). */
+  stories(id: string): Promise<IssueStoriesResponse>;
   listSenders(): Promise<SenderListResponse>;
   getSender(senderId: string): Promise<SenderDetailResponse>;
   updateSender(senderId: string, patch: SenderPatch): Promise<SenderListItem>;
@@ -158,6 +161,9 @@ export class HttpLibraryApi implements LibraryApi {
   }
   related(id: string) {
     return this.request<RelatedResponse>("GET", `/issues/${encodeURIComponent(id)}/related`);
+  }
+  stories(id: string) {
+    return this.request<IssueStoriesResponse>("GET", `/issues/${encodeURIComponent(id)}/stories`);
   }
   listSenders() {
     return this.request<SenderListResponse>("GET", "/senders");

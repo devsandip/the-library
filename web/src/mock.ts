@@ -9,6 +9,7 @@ import type {
   IssueDetailResponse,
   IssueListItem,
   IssueListResponse,
+  IssueStoriesResponse,
   Narrative,
   NowReadingResponse,
   Rating,
@@ -472,6 +473,31 @@ function mockNarrative(top: IssueListItem[]): Narrative | undefined {
   };
 }
 
+/**
+ * A stand-in for the story index (#15): a digest's subject or Claude's line lists its stories with
+ * semicolons, so each part is a story; anything else is one story. Promos have none, as in the API.
+ */
+function mockStories(i: IssueListItem): IssueStoriesResponse {
+  if (i.promo) return { stories: [] };
+  const listed = [i.subject, i.summary ?? ""].find((t) => t.includes(";")) ?? i.subject;
+  const parts = listed
+    .split(";")
+    .map((p) => p.trim().replace(/\.$/, ""))
+    .filter(Boolean);
+  return {
+    stories: parts.map((part, k) => ({
+      n: k + 1,
+      headline: part.charAt(0).toUpperCase() + part.slice(1),
+      summary:
+        parts.length > 1
+          ? `What ${i.publication} says about this, in a sentence or two, with the source linked.`
+          : (i.summary ?? i.snippet) +
+            " A second sentence from the story index says a little more than the line above.",
+      ...(parts.length > 1 ? { link: `https://example.test/${i.id}/story-${k + 1}` } : {}),
+    })),
+  };
+}
+
 export class MockLibraryApi implements LibraryApi {
   async listIssues(opts: ListIssuesOptions): Promise<IssueListResponse> {
     await delay();
@@ -570,6 +596,11 @@ export class MockLibraryApi implements LibraryApi {
     const side = (before: boolean) =>
       near.filter((i) => i.receivedAt < me!.receivedAt === before).slice(0, 3);
     return { earlier: side(true), since: side(false) };
+  }
+
+  async stories(id: string): Promise<IssueStoriesResponse> {
+    await delay(250);
+    return mockStories(find(id));
   }
 
   async summary(): Promise<SummaryResponse> {

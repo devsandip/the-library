@@ -3,6 +3,7 @@ import type {
   IssueDetailResponse,
   IssueListItem,
   IssueListResponse,
+  IssueStoriesResponse,
   NowReadingResponse,
   Rating,
   ReaderState,
@@ -46,6 +47,8 @@ export interface RepoPort {
   savePosition(id: string, position: number): Promise<void>;
   /** Issues close to this one, from before and since (#20). */
   related(id: string): Promise<RelatedResponse>;
+  /** The issue's stories from the story index (#15), in order (#41). */
+  stories(id: string): Promise<IssueStoriesResponse>;
   listSenders(): Promise<SenderListItem[]>;
   getSender(senderId: string): Promise<SenderDetailResponse>;
   updateSender(senderId: string, patch: SenderPatch): Promise<SenderListItem>;

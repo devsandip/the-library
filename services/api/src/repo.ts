@@ -52,6 +52,8 @@ import type {
   IssueListItem,
   IssueListResponse,
   IssueState,
+  IssueStoriesResponse,
+  IssueStory,
   Narrative,
   NowReadingResponse,
   Rating,
@@ -820,6 +822,29 @@ export class DynamoRepo implements RepoPort {
     });
     const sk = res.Items?.[0]?.gsi1sk as string | undefined;
     return sk?.split("#")[0];
+  }
+
+  // ---------- stories (#15, #41) ----------
+
+  /** The issue's stories from the story index, in the order they appear in it. */
+  async stories(id: string): Promise<IssueStoriesResponse> {
+    const [, res] = await Promise.all([
+      this.mustGetIssue(id),
+      this.query({
+        KeyConditionExpression: "pk = :pk AND begins_with(sk, :story)",
+        ExpressionAttributeValues: { ":pk": issueKey(id).pk, ":story": "STORY#" },
+        // Not the embedding: a few lines of text each.
+        ProjectionExpression: "#n, #h, #s, #l",
+        ExpressionAttributeNames: { "#n": "n", "#h": "headline", "#s": "summary", "#l": "link" },
+      }),
+    ]);
+    const stories: IssueStory[] = (res.Items ?? []).map((s) => ({
+      n: s.n as number,
+      headline: s.headline as string,
+      summary: s.summary as string,
+      ...(typeof s.link === "string" ? { link: s.link } : {}),
+    }));
+    return { stories: stories.sort((a, b) => a.n - b.n) };
   }
 
   // ---------- senders ----------
