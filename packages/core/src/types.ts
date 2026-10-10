@@ -225,6 +225,8 @@ export interface EnrichStats {
   embedded: number;
   /** Promos archived as Claude flagged them. */
   promosArchived: number;
+  /** Account mail Claude found (a sign-in code, an email confirmation), filed as filtered (#50). */
+  accountFiltered: number;
   /** Unread news over a week old, archived (Must Read newsletters are exempt). */
   oldNewsArchived: number;
   /** Issues waiting because there is no topic list yet (`pnpm topics --apply` creates it). */

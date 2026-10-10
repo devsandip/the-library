@@ -69,6 +69,7 @@ export function Status() {
               <dt>Claude</dt>
               <dd>
                 {enrich.classified} sorted, {enrich.embedded} embedded
+                {enrich.accountFiltered > 0 && `, ${enrich.accountFiltered} account mail filtered`}
                 {enrich.waitingForTopics > 0 &&
                   `, ${enrich.waitingForTopics} waiting for the topic list`}
                 {enrich.deferred > 0 && `, ${enrich.deferred} left for the next run`}

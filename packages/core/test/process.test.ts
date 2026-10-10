@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { issueIndexAttributes } from "../src/keys.js";
 import { processMessage, type ProcessedMessage } from "../src/process.js";
 import { cleanLink, sanitizeNewsletterHtml } from "../src/sanitize.js";
-import { gmailQuery, senderIdentity } from "../src/sources.js";
+import { classify, gmailQuery, senderIdentity } from "../src/sources.js";
 import * as f from "./fixtures.js";
 
 const run = (raw: Buffer, labelIds: string[] = [], snippet?: string) =>
@@ -19,6 +19,12 @@ describe("classification", () => {
     ["substack notes", f.substackNotes, [f.LABEL_MECO], "substack-notes"],
     ["weekly stack", f.substackWeeklyStack, [f.LABEL_MECO], "substack-weekly-stack"],
     ["stripe receipt", f.stripeReceipt, [f.LABEL_NEWSLETTERS], "receipt"],
+    [
+      "a verification code from an allowlisted sender",
+      f.substackVerificationCode,
+      ["INBOX"],
+      "account",
+    ],
     ["unlabeled random substack", f.randomSubstack, [], "not-a-source"],
     ["unlabeled platformer", f.platformerLabeled, ["INBOX"], "not-a-source"],
   ])("filters %s", async (_name, raw, labels, reason) => {
@@ -36,6 +42,53 @@ describe("classification", () => {
   it("includes labeled newsletters from any sender", async () => {
     expect((await run(f.platformerLabeled, [f.LABEL_NEWSLETTERS])).kind).toBe("newsletter");
     expect((await run(f.tldrPlainText, [f.LABEL_MECO])).kind).toBe("newsletter");
+  });
+});
+
+describe("account mail (#50)", () => {
+  const subjectOf = (subject: string) =>
+    classify({ fromAddr: "bytebytego@substack.com", subject, labelIds: [] });
+
+  it.each([
+    "643423 is your Substack verification code",
+    "Your verification code is 123456",
+    "Your one-time code: 482913",
+    "123456 is your code",
+    "Your login code for Medium",
+    "Your Substack sign-in link",
+    "🔑 Secure sign in link for Platformer",
+    "Sign in to Substack",
+    "Your magic link",
+    "Please confirm your email address",
+    "Verify your e-mail",
+    "Activate your account",
+    "Please Confirm Subscription",
+    "Confirm your subscription to TLDR",
+    "🙌 Complete your sign up to Platformer!",
+    "You’re now subscribed",
+    "Reset your password",
+    "Password reset request",
+    "Your password has been changed",
+  ])("filters %s", (subject) => {
+    expect(subjectOf(subject)).toEqual({ kind: "filtered", reason: "account" });
+  });
+
+  // Real subjects from the archive and close calls: issues write about codes and logins too.
+  it.each([
+    "You’re Probably Using Claude Code Wrong",
+    "Claude Code on Autopilot: Schedule It Once and Walk Away",
+    "Musk: Don't learn to code?",
+    "Historic UN Security Council Briefing on AI",
+    "The Saturday Read: Magical thinking",
+    "Your security code review is missing these things",
+    "Your login code is a mess",
+    "How magic links work",
+    "How password reset works",
+    "2026 is your year to code",
+    "Verify your assumptions",
+    "Signing in with passkeys",
+  ])("keeps %s", (subject) => {
+    expect(subjectOf(subject)).toEqual({ kind: "newsletter" });
   });
 });
 

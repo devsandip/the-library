@@ -4,12 +4,19 @@
  * model access (a one-time form in the Bedrock console); otherwise those tests are skipped.
  */
 import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
-import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
-import { embeddingKey, issueKey, senderIdentity, senderItemKey, TOPICS_KEY } from "@library/core";
+import {
+  embeddingKey,
+  issueKey,
+  senderIdentity,
+  senderItemKey,
+  storyKey,
+  TOPICS_KEY,
+} from "@library/core";
 import type { Topic } from "@library/core/types";
 import { Bedrock, MODELS } from "../src/bedrock.js";
-import { archiveOldNews, enrich } from "../src/enrich.js";
+import { archiveOldNews, classifyRequest, enrich, parseClassification } from "../src/enrich.js";
 import { Store } from "../src/store.js";
 import {
   docClient,
@@ -72,7 +79,7 @@ describe("enrichment on dev", () => {
     if (!haiku) ctx.skip();
     await ddb.send(new PutCommand({ TableName: stack.tableName, Item: { ...TOPICS_KEY, topics } }));
     const stats = await enrich(store, bedrock, { sinceIso: since });
-    expect(stats).toMatchObject({ classified: 6, errors: 0 });
+    expect(stats).toMatchObject({ classified: 6, accountFiltered: 0, errors: 0 });
     expect(stats.inputTokens).toBeGreaterThan(0);
     for (const id of FIXTURE_NEWSLETTER_IDS) {
       const i = await get(issueKey(id));
@@ -85,6 +92,36 @@ describe("enrichment on dev", () => {
       ).toContain(i?.topic);
       expect(typeof i?.promo).toBe("boolean");
     }
+  });
+
+  it("Claude calls a sign-up confirmation account mail, and an issue about codes an issue (#50)", async (ctx) => {
+    if (!haiku) ctx.skip();
+    const selling = async (subject: string, text: string) =>
+      parseClassification(
+        (
+          await bedrock.callTool(
+            classifyRequest({ publication: "ByteByteGo", subject, text }, topics),
+          )
+        ).input,
+        topics,
+      ).selling;
+    // Worded so the noise rules miss it: this is what the fourth answer is for.
+    expect(
+      await selling(
+        "One more step",
+        "Tap the button below to finish signing up for ByteByteGo. Confirm. If you did not ask " +
+          "for this, ignore this email.",
+      ),
+    ).toBe("account");
+    expect(
+      await selling(
+        "EP183: How one-time passwords work",
+        "A one-time password is derived from a shared secret and the current time. The server " +
+          "and the authenticator app each compute an HMAC of the 30-second window and keep six " +
+          "digits. This week: why the window drifts, how servers allow for it, and why SMS codes " +
+          "are weaker than app codes. Sponsored by Clerk.",
+      ),
+    ).not.toBe("account");
   });
 });
 
@@ -154,5 +191,69 @@ describe("archive rules on dev", () => {
     expect(await store.autoArchive("fx-lenny", "promo")).toBe(false);
     expect(await archiveOldNews(store, { now: Date.parse("2026-10-09T00:00:00.000Z") })).toBe(0);
     expect((await get(issueKey("fx-lenny")))?.state).toBe("unread");
+  });
+});
+
+describe("filing a stored issue as filtered on dev (#50)", () => {
+  it("takes it out of every index, deletes its stories and lowers its sender's count", async () => {
+    const id = "fx-pragmatic";
+    const issue = (await get(issueKey(id)))!;
+    const senderKey = senderItemKey(issue.senderId as string);
+    const count = (await get(senderKey))?.issueCount as number;
+    await store.putStories(
+      { id, senderId: issue.senderId as string, receivedAt: issue.receivedAt as string },
+      [
+        {
+          n: 1,
+          headline: "H",
+          summary: "S",
+          names: [],
+          eventId: "e1",
+          vector: Array(512).fill(0.01),
+        },
+      ],
+    );
+
+    expect(await store.fileAsFiltered(id, "account", "claude")).toBe(true);
+    const filtered = await get(issueKey(id));
+    expect(filtered).toMatchObject({ state: "filtered", filterReason: "account" });
+    for (const a of ["gsi1pk", "gsi1sk", "gsi2pk", "gsi2sk", "gsi3pk", "gsi3sk"]) {
+      expect(filtered?.[a], a).toBeUndefined();
+    }
+    expect((await get(senderKey))?.issueCount).toBe(count - 1);
+    expect(await get(storyKey(id, 1))).toBeUndefined();
+    const events = await ddb.send(
+      new QueryCommand({
+        TableName: stack.tableName,
+        KeyConditionExpression: "pk = :pk AND begins_with(sk, :evt)",
+        ExpressionAttributeValues: { ":pk": issueKey(id).pk, ":evt": "EVT#" },
+      }),
+    );
+    expect(events.Items).toContainEqual(
+      expect.objectContaining({
+        type: "state",
+        value: "filtered",
+        prev: "unread",
+        by: "claude:account",
+      }),
+    );
+    // Once is enough: the sender's count moves only once.
+    expect(await store.fileAsFiltered(id, "account", "rule")).toBe(false);
+    expect((await get(senderKey))?.issueCount).toBe(count - 1);
+  });
+
+  it("never files an issue Sandip rated or saved", async () => {
+    // fx-lenny was saved above.
+    expect(await store.fileAsFiltered("fx-lenny", "account", "rule")).toBe(false);
+    await ddb.send(
+      new UpdateCommand({
+        TableName: stack.tableName,
+        Key: issueKey("fx-bytebytego"),
+        UpdateExpression: "SET rating = :r, ratedAt = :at",
+        ExpressionAttributeValues: { ":r": 1, ":at": "2026-10-02T00:00:00.000Z" },
+      }),
+    );
+    expect(await store.fileAsFiltered("fx-bytebytego", "account", "rule")).toBe(false);
+    expect((await get(issueKey("fx-bytebytego")))?.state).not.toBe("filtered");
   });
 });

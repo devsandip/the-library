@@ -40,11 +40,14 @@ function fakes(opts: {
   mustRead?: string[];
   failOn?: string;
   promo?: boolean;
+  /** Claude answers "account" (#50); `keep` lists issues Sandip rated or saved. */
+  account?: { keep?: string[] };
   staleNews?: { id: string; senderId: string }[];
 }) {
   const classified: { id: string; shelf: Shelf; senderShelf?: Shelf }[] = [];
   const embedded: string[] = [];
   const archived: { id: string; reason: string }[] = [];
+  const filtered: { id: string; reason: string; by: string }[] = [];
   let stored: Topic[] | undefined = opts.topics;
   let interests: { name: string; text: string; vector: number[] }[] | undefined;
   const store = {
@@ -66,6 +69,11 @@ function fakes(opts: {
       archived.push({ id, reason });
       return true;
     },
+    fileAsFiltered: async (id: string, reason: string, by: string) => {
+      if (opts.account?.keep?.includes(id)) return false;
+      filtered.push({ id, reason, by });
+      return true;
+    },
     unreadNewsBefore: async () => opts.staleNews ?? [],
     getText: async (id: string) => `Body of ${id}`,
     putClassification: async (id: string, c: { shelf: Shelf }, senderShelf?: Shelf) =>
@@ -82,7 +90,7 @@ function fakes(opts: {
           summary: "  A sentence  about it. ",
           shelf: "learning",
           topic: "engineering",
-          selling: opts.promo ? "promo" : "ad-supported",
+          selling: opts.account ? "account" : opts.promo ? "promo" : "ad-supported",
         },
         inputTokens: 1000,
         outputTokens: 40,
@@ -96,6 +104,7 @@ function fakes(opts: {
     classified,
     embedded,
     archived,
+    filtered,
     stored: () => stored,
     interests: () => interests,
   };
@@ -127,6 +136,23 @@ describe("classification request and parsing", () => {
         topics,
       ),
     ).toEqual({ summary: "Two lines", shelf: "news", topic: "AI", selling: "promo", promo: true });
+  });
+
+  it("reads an account answer as no promo (#50)", () => {
+    const c = parseClassification(
+      { summary: "A sign-in code.", shelf: "news", topic: "AI", selling: "account" },
+      topics,
+    );
+    expect(c).toMatchObject({ selling: "account", promo: false });
+  });
+
+  it("describes account mail and asks for it only when plain", () => {
+    const req = classifyRequest({ publication: "ByteByteGo", subject: "Code", text: "" }, topics);
+    expect(req.system).toContain('"account": not an issue at all');
+    expect(req.system).toContain('Answer "account" only when the mail plainly is one.');
+    expect(req.tool.schema).toMatchObject({
+      properties: { selling: { enum: ["none", "ad-supported", "promo", "account"] } },
+    });
   });
 
   it("rejects answers outside the schema", () => {
@@ -252,6 +278,21 @@ describe("archive rules", () => {
     const stats = await enrich(f.store, f.model, { sinceIso: "x" });
     expect(stats.promosArchived).toBe(1);
     expect(f.archived).toEqual([{ id: "offer", reason: "promo" }]);
+  });
+
+  it("files account mail as filtered and does not embed it (#50)", async () => {
+    const f = fakes({ candidates: [candidate("code")], topics, account: {} });
+    const stats = await enrich(f.store, f.model, { sinceIso: "x" });
+    expect(stats).toMatchObject({ classified: 1, accountFiltered: 1, embedded: 0, errors: 0 });
+    expect(f.filtered).toEqual([{ id: "code", reason: "account", by: "claude" }]);
+    expect(f.archived).toEqual([]);
+  });
+
+  it("keeps an issue Sandip rated or saved even when Claude calls it account mail", async () => {
+    const f = fakes({ candidates: [candidate("kept")], topics, account: { keep: ["kept"] } });
+    const stats = await enrich(f.store, f.model, { sinceIso: "x" });
+    expect(stats).toMatchObject({ classified: 1, accountFiltered: 0, embedded: 1 });
+    expect(f.filtered).toEqual([]);
   });
 
   it("archives week-old unread news, but never from a Must Read newsletter", async () => {

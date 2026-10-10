@@ -8,7 +8,11 @@ export interface ReprocessStats {
   updated: number;
   /** Older than the 30-day raw retention: nothing to re-run. */
   missingRaw: number;
-  /** Would now be filtered by the current rules; left as is and only reported. */
+  /** Caught by a noise rule now (account mail, say, #50), so filed as filtered. */
+  filtered: number;
+  /** "<id> (<reason>): <subject>" for the first few filed, to check none was a real issue. */
+  filteredSamples: string[];
+  /** Would now be filtered but left as is: rated or saved, or no longer from a source. */
   nowFiltered: number;
   errors: number;
   errorSamples: string[];
@@ -16,7 +20,9 @@ export interface ReprocessStats {
 
 /**
  * Re-run classification, sanitizing and extraction on stored issues from their raw MIME, after a
- * change to packages/core. Content only: state, ratings and sender counts are never touched.
+ * change to packages/core. Content only, with one exception: an issue a noise rule now catches is
+ * filed as filtered, unless Sandip rated or saved it. A sender that is no longer a source keeps
+ * its issues.
  */
 export async function reprocess(store: Store, opts: { days: number }): Promise<ReprocessStats> {
   const since = new Date(Date.now() - opts.days * 86_400_000).toISOString();
@@ -26,6 +32,8 @@ export async function reprocess(store: Store, opts: { days: number }): Promise<R
     checked: issues.length,
     updated: 0,
     missingRaw: 0,
+    filtered: 0,
+    filteredSamples: [],
     nowFiltered: 0,
     errors: 0,
     errorSamples: [],
@@ -46,7 +54,12 @@ export async function reprocess(store: Store, opts: { days: number }): Promise<R
         internalDate: String(Date.parse(issue.receivedAt)),
       });
       if (p.kind === "filtered") {
-        stats.nowFiltered++;
+        const filed =
+          p.reason !== "not-a-source" && (await store.fileAsFiltered(issue.id, p.reason, "rule"));
+        if (!filed) stats.nowFiltered++;
+        else if (stats.filtered++ < 10) {
+          stats.filteredSamples.push(`${issue.id} (${p.reason}): ${p.subject}`);
+        }
         return;
       }
       await store.updateContent(p);

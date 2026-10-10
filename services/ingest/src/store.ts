@@ -718,6 +718,88 @@ export class Store {
     return true;
   }
 
+  /**
+   * Take a stored issue out of the library once it turns out not to be one (#50): account mail
+   * Claude spotted, or mail a new noise rule catches. It becomes a filtered marker like the ones
+   * ingest writes: out of every list and index, its stories deleted, its sender one issue lighter.
+   * Never an issue Sandip rated or saved. Returns whether it was filtered.
+   */
+  async fileAsFiltered(id: string, reason: string, by: "claude" | "rule"): Promise<boolean> {
+    const item = (
+      await this.ddb.send(
+        new GetCommand({ TableName: this.table, Key: issueKey(id), ConsistentRead: true }),
+      )
+    ).Item;
+    if (!item || item.state === "filtered" || item.rating || item.savedAt) return false;
+    const now = new Date().toISOString();
+    const { remove } = issueIndexAttributes({
+      id,
+      senderId: item.senderId as string,
+      receivedAt: item.receivedAt as string,
+      state: "filtered",
+    });
+    try {
+      await retryOnConflict(() =>
+        this.ddb.send(
+          new TransactWriteCommand({
+            TransactItems: [
+              {
+                Update: {
+                  TableName: this.table,
+                  Key: issueKey(id),
+                  UpdateExpression:
+                    "SET #st = :filtered, filterReason = :why, stateChangedAt = :now " +
+                    `REMOVE ${remove.join(", ")}`,
+                  ConditionExpression:
+                    "#st = :prev AND attribute_not_exists(rating) AND attribute_not_exists(savedAt)",
+                  ExpressionAttributeNames: { "#st": "state" },
+                  ExpressionAttributeValues: {
+                    ":filtered": "filtered",
+                    ":why": reason,
+                    ":now": now,
+                    ":prev": item.state,
+                  },
+                },
+              },
+              {
+                Update: {
+                  TableName: this.table,
+                  Key: senderItemKey(item.senderId as string),
+                  UpdateExpression: "ADD issueCount :minusOne",
+                  ConditionExpression: "attribute_exists(pk)",
+                  ExpressionAttributeValues: { ":minusOne": -1 },
+                },
+              },
+            ],
+          }),
+        ),
+      );
+    } catch (err) {
+      const e = err as { name?: string; CancellationReasons?: { Code?: string }[] };
+      const failed =
+        e.name === "TransactionCanceledException" &&
+        e.CancellationReasons?.some((r) => r.Code === "ConditionalCheckFailed");
+      if (failed) return false;
+      throw err;
+    }
+    const stories = await this.storyKeys(id);
+    await this.batchWrite([
+      ...stories.map((Key) => ({ DeleteRequest: { Key } })),
+      {
+        PutRequest: {
+          Item: {
+            ...eventKey(id, now, randomUUID().slice(0, 8)),
+            type: "state",
+            value: "filtered",
+            prev: item.state,
+            by: `${by}:${reason}`,
+          },
+        },
+      },
+    ]);
+    return true;
+  }
+
   /** Unread issues on the News shelf received before `cutoffIso`, not yet archived by a rule. */
   async unreadNewsBefore(cutoffIso: string): Promise<{ id: string; senderId: string }[]> {
     const out: { id: string; senderId: string }[] = [];
