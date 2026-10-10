@@ -21,6 +21,7 @@ import { IssueCard } from "../components/issue-card.js";
 import { IssueReader } from "../components/issue-reader.js";
 import { IssueRow } from "../components/issue-row.js";
 import { SenderPicker } from "../components/sender-picker.js";
+import { useSwipeRating } from "../components/swipe.js";
 
 /**
  * Home (#12). On the phone, briefing cards: Must Read as a row of large cards, then the rest
@@ -53,6 +54,8 @@ export function Home() {
   const [more, setMore] = useState<{ items: IssueListItem[]; cursor?: string; loading: boolean }>();
   const [refreshing, setRefreshing] = useState(false);
   const [picking, setPicking] = useState(false);
+  // Issues swiped away (#13): archived, waiting out the Undo.
+  const [gone, setGone] = useState<Set<string>>(new Set());
 
   const setFilter = (next: Partial<HomeFilters>) => {
     setMore(undefined);
@@ -83,7 +86,9 @@ export function Home() {
     .filter((t) => t.on || t.n > 0 || !f);
 
   const cursor = more ? more.cursor : list.data?.cursor;
-  const items = [...(list.data?.items ?? []), ...(more?.items ?? [])];
+  const items = [...(list.data?.items ?? []), ...(more?.items ?? [])].filter(
+    (i) => !gone.has(i.id),
+  );
   // Unread lists Must Read newsletters first; they lead as their own group.
   const grouped = view === "unread" && !picked.length && items.some((i) => i.mustRead);
   const must = grouped ? items.filter((i) => i.mustRead) : [];
@@ -121,11 +126,20 @@ export function Home() {
     }
   };
 
-  /** Keeps rows in step with what the reading pane changes (read, rated, archived, moved). */
+  /** Keeps rows in step with what the reading pane or a swipe changes. */
   const patch = (id: string, change: Partial<IssueListItem>) => {
-    if (list.data) list.set({ ...list.data, items: patchIssue(list.data.items, id, change) });
+    list.set((d) => ({ ...d, items: patchIssue(d.items, id, change) }));
     setMore((m) => (m ? { ...m, items: patchIssue(m.items, id, change) } : m));
   };
+  const hide = (id: string, on: boolean) =>
+    setGone((cur) => {
+      const next = new Set(cur);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  // The Archived view keeps archived issues, so a left swipe there only rates.
+  const rating = useSwipeRating({ patch, hide: view === "archived" ? undefined : hide });
 
   const countLine =
     view === "unread"
@@ -382,7 +396,7 @@ export function Home() {
           </h2>
           <ul class="cards">
             {s.items.map((i) => (
-              <IssueCard key={i.id} issue={i} />
+              <IssueCard key={i.id} issue={i} swipe={rating.actions(i)} />
             ))}
           </ul>
         </section>
@@ -401,6 +415,7 @@ export function Home() {
         }}
         onClose={() => setPicking(false)}
       />
+      {rating.toast}
     </section>
   );
 }

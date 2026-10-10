@@ -6,6 +6,8 @@ import { useApp } from "../context.js";
 import { BackIcon, StarIcon } from "../components/icons.js";
 import { IssueCard } from "../components/issue-card.js";
 import { IssueRow } from "../components/issue-row.js";
+import { useSwipeRating } from "../components/swipe.js";
+import { patchIssue } from "../groups.js";
 import { useAsync } from "../hooks.js";
 import { useMedia, WIDE } from "../media.js";
 
@@ -17,6 +19,10 @@ export function Sender() {
   const wide = useMedia(WIDE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
+  // Swipe to rate (#13). This page lists archived issues too, so swiped rows stay.
+  const rating = useSwipeRating({
+    patch: (id, change) => sender.set((d) => ({ ...d, issues: patchIssue(d.issues, id, change) })),
+  });
 
   const update = async (patch: SenderPatch) => {
     const before = sender.data;
@@ -117,10 +123,11 @@ export function Sender() {
       ) : (
         <ul class="cards">
           {s.issues.map((i) => (
-            <IssueCard key={i.id} issue={i} showPublication={false} />
+            <IssueCard key={i.id} issue={i} showPublication={false} swipe={rating.actions(i)} />
           ))}
         </ul>
       )}
+      {!wide && rating.toast}
     </section>
   );
 }

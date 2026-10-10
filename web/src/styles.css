@@ -25,6 +25,9 @@
   --selected-fg: #0b524d;
   --pill: #f2f2ef; /* search fields */
   --danger: #b3261e;
+  --good: #1e7a4f; /* swipe right: Relevant */
+  --good-bg: #dcefe4;
+  --bad-bg: #f6dcda; /* swipe left: Irrelevant */
   --machine: #e3b505; /* the yellow box */
   --backdrop: rgba(20, 20, 18, 0.45);
   --ui:
@@ -57,6 +60,9 @@
     --selected-fg: #f7e3a0;
     --pill: #23262b;
     --danger: #f2948d;
+    --good: #5cc98f;
+    --good-bg: #173a2a;
+    --bad-bg: #3d1f1d;
     --machine: #f5c518;
     --backdrop: rgba(0, 0, 0, 0.6);
   }
@@ -84,6 +90,9 @@
     --selected-fg: #ececec;
     --pill: #23262b;
     --danger: #f2948d;
+    --good: #5cc98f;
+    --good-bg: #173a2a;
+    --bad-bg: #3d1f1d;
     --machine: #f5c518;
     --backdrop: rgba(0, 0, 0, 0.6);
     --ui: "Figtree Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
@@ -597,7 +606,7 @@ a.pill:hover {
   list-style: none;
 }
 
-.issue-card > a {
+.issue-card a {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -609,7 +618,7 @@ a.pill:hover {
   color: var(--fg);
 }
 
-.issue-card > a:hover {
+.issue-card a:hover {
   color: var(--fg);
   border-color: var(--control);
 }
@@ -665,6 +674,130 @@ a.pill:hover {
 
 .issue-card:not(.unread) .card-line {
   color: var(--muted);
+}
+
+/* ---------- swipe to rate (#13) ---------- */
+
+/* Vertical scrolling stays the browser's; sideways drags are the row's. */
+.swipe {
+  position: relative;
+  touch-action: pan-y;
+}
+
+.swipe a {
+  -webkit-user-drag: none;
+}
+
+.swipe[data-swipe] {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.swipe-face {
+  position: relative;
+  transition: transform 0.18s ease-out;
+}
+
+.swipe-under {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  padding: 0 22px;
+  border-radius: 14px;
+}
+
+.summary-row .swipe-under {
+  border-radius: 8px;
+}
+
+.swipe[data-swipe] .swipe-under {
+  display: flex;
+}
+
+.swipe[data-swipe="right"] .swipe-under {
+  justify-content: flex-start;
+  background: var(--good-bg);
+  color: var(--good);
+}
+
+.swipe[data-swipe="left"] .swipe-under {
+  justify-content: flex-end;
+  background: var(--bad-bg);
+  color: var(--danger);
+}
+
+.swipe[data-swipe="right"] .swipe-down,
+.swipe[data-swipe="left"] .swipe-up {
+  display: none;
+}
+
+.swipe-under svg {
+  width: 22px;
+  height: 22px;
+  transition: transform 0.12s ease-out;
+}
+
+/* Letting go now would commit. */
+.swipe[data-armed] .swipe-under svg {
+  transform: scale(1.3);
+}
+
+/* This swipe would change nothing (already rated that way). */
+.swipe[data-off] .swipe-under {
+  opacity: 0.45;
+}
+
+.toast-slot {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  padding: 0 16px;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 6px 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--fg);
+  font-size: 0.9375rem;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+  animation: toast-in 0.18s ease-out;
+}
+
+.toast button.link {
+  min-height: var(--tap);
+  padding: 0 14px;
+  font-size: inherit;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swipe-face,
+  .swipe-under svg {
+    transition: none;
+  }
+
+  .toast {
+    animation: none;
+  }
 }
 
 /* ---------- Mac: sidebar ---------- */
@@ -1089,10 +1222,22 @@ a.pill:hover {
 }
 
 .summary-row {
+  position: relative;
+  border-bottom: 1px solid var(--divider);
+}
+
+.summary-row > .swipe-face {
   display: flex;
   align-items: flex-start;
   gap: 4px;
-  border-bottom: 1px solid var(--divider);
+}
+
+.summary-row.swipe > .swipe-face {
+  background: var(--surface);
+}
+
+.summary-row .rated {
+  margin-left: 2px;
 }
 
 .summary-row:last-child {
