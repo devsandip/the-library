@@ -1,7 +1,7 @@
 # The Library: Journal
 
-Last refreshed: 2026-10-10 19:49
-Latest entry: [2026-10-10-1949-read-history.md](entries/2026-10-10-1949-read-history.md)
+Last refreshed: 2026-10-10 21:11
+Latest entry: [2026-10-10-2111-now-reading-saved-and-a-peek.md](entries/2026-10-10-2111-now-reading-saved-and-a-peek.md)
 
 A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Live at https://sandip.dev/thelibrary/.
 
@@ -13,10 +13,13 @@ Ranking runs when the Summary opens: the 20 most relevant unread News issues, at
 
 Since 2026-10-10 every issue is split into stories, linked into events across newsletters, and the Summary opens with the day in brief: three to six threads written from the last day's news. A History page lists what I opened, a day at a time, back to 2026-10-09. Spend is about $5.50 a month, mostly Claude.
 
-Next: Save for later (#43) and Now reading (#44), then a tap for a summary with a double tap to open (#41), related stories inside a digest (#20, second version) and how a story evolved (#19).
+Three ways back to an issue went live on the evening of 2026-10-10. Now reading takes me back to the last issue at the place I stopped, on either device. A bookmark keeps an issue on the Saved list, out of Unread and away from the archive rules. One tap on a row shows what is inside the issue, from the story index, and a double tap opens it. None of it has been tried on a real iPhone yet.
+
+Next: keep account mail, like a Substack verification code, out of the list (#50), then related stories inside a digest (#20, second version) and how a story evolved (#19).
 
 ## Recent entries
 
+- [2026-10-10 21:11: Now reading, Saved, and a peek inside](entries/2026-10-10-2111-now-reading-saved-and-a-peek.md)
 - [2026-10-10 19:49: Read history, and four more ideas](entries/2026-10-10-1949-read-history.md)
 - [2026-10-10 19:30: Stories, and the day in brief](entries/2026-10-10-1930-stories-and-the-day-in-brief.md)
 - [2026-10-10 19:29: The reader is live on the phone and the Mac](entries/2026-10-10-1929-reader-live-on-phone-and-mac.md)
@@ -37,9 +40,7 @@ None yet. The first, 2026-W41, is due on Monday 2026-10-12.
 
 - Will ranking hit the 60% aim once ratings exist (#5)?
 - How do the day in brief's threads and cost hold up on a weekday, with about 90 news stories?
-- In #41, is the story a row in the lists or one story inside a digest?
-- Should saving an issue for later take it out of Unread (#43)?
-- For Now reading, does the page or the newsletter's frame scroll (#44)?
+- How to keep account mail out: a subject rule, a fourth answer to Claude's promo question, or Jev (#50)?
 - Which decision model for the bounded calls: Claude, Jev or OpenAI Decisions (#27)?
 - What to do about `robots.txt` on `sandip.dev` (#7)?
 - When does the AWS account get Haiku 5.5?
@@ -54,3 +55,6 @@ None yet. The first, 2026-W41, is due on Monday 2026-10-12.
 - Event links at a cosine of 0.50 with a shared name: two weeks of Muse coverage became one event (2026-10-10).
 - Matching names on their leading words: one more event in 2,210 stories (2026-10-10).
 - Writing the brief on every run: 12 calls a day for little change (2026-10-10).
+- A Save button in the phone's bottom bar: a sixth control cut off the Relevant and Irrelevant labels, so it sits at the top of the issue page (2026-10-10).
+- Peeking in the Must Read row: one card that grew would stretch the whole sideways row, so those cards open on a tap (2026-10-10).
+- A reading place in pixels: the phone's narrower frame is taller, so the place is a share of the newsletter (2026-10-10).
