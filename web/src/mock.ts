@@ -537,6 +537,19 @@ export class MockLibraryApi implements LibraryApi {
         durationMs: 1800,
       },
       lastError: null,
+      lastStories: {
+        checked: 2,
+        storied: 2,
+        stories: 14,
+        linked: 3,
+        deferred: 0,
+        errors: 0,
+        errorSamples: [],
+        inputTokens: 9100,
+        outputTokens: 1650,
+        embedTokens: 900,
+        durationMs: 21_000,
+      },
     };
   }
 }

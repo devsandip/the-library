@@ -26,6 +26,7 @@ export function Status() {
 
   const stats = status?.lastRunStats;
   const enrich = status?.lastEnrich;
+  const stories = status?.lastStories;
   return (
     <section class="status">
       <a class="back" href={`${BASE}/`} onClick={backIfPossible}>
@@ -77,6 +78,23 @@ export function Status() {
                 <>
                   <dt>Claude error</dt>
                   <dd class="error">{enrich.errorSamples[0]}</dd>
+                </>
+              )}
+            </>
+          )}
+          {stories && (
+            <>
+              <dt>Stories</dt>
+              <dd>
+                {stories.storied} issues split into {stories.stories} stories, {stories.linked}{" "}
+                joined an event from another issue
+                {stories.deferred > 0 && `, ${stories.deferred} left for the next run`}
+                {`, ${stories.errors} errors`}
+              </dd>
+              {stories.errorSamples.length > 0 && (
+                <>
+                  <dt>Story error</dt>
+                  <dd class="error">{stories.errorSamples[0]}</dd>
                 </>
               )}
             </>

@@ -7,3 +7,5 @@ export * from "./process.js";
 export * from "./retry.js";
 export * from "./rank.js";
 export * from "./related.js";
+export * from "./stories.js";
+export * from "./vectors.js";
