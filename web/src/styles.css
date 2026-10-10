@@ -791,7 +791,8 @@ a.pill:hover {
 
 @media (prefers-reduced-motion: reduce) {
   .swipe-face,
-  .swipe-under svg {
+  .swipe-under svg,
+  .side-fold svg {
     transition: none;
   }
 
@@ -879,6 +880,49 @@ a.pill:hover {
   font-size: 0.75rem;
   letter-spacing: 0;
   text-transform: none;
+}
+
+/* Topics and Senders fold from their headings. */
+.side-fold {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  margin-left: -6px;
+  padding: 0 6px 0 2px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.side-fold:hover {
+  color: var(--fg);
+}
+
+.side-fold svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.15s ease;
+}
+
+.side-fold[aria-expanded="false"] svg {
+  transform: rotate(-90deg);
+}
+
+.side-fold .n {
+  margin-left: 4px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.side-chips[hidden] {
+  display: none;
 }
 
 .side-chips {

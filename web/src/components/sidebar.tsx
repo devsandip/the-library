@@ -5,10 +5,56 @@ import { BASE } from "../config.js";
 import { facets } from "../counts.js";
 import { homeHref, readFilters, SHELVES, type HomeFilters } from "../filters.js";
 import { useLibrary } from "../library.js";
-import { SearchIcon, StarIcon } from "./icons.js";
+import { ChevronIcon, SearchIcon, StarIcon } from "./icons.js";
 
-const toggle = (list: string[], v: string) =>
+const toggle = <T,>(list: T[], v: T): T[] =>
   list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
+
+type Section = "topics" | "senders";
+
+/** The sections folded shut, remembered in this browser. */
+const FOLDED_KEY = "library.sidebar.folded";
+
+function readFolded(): Section[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(FOLDED_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((s): s is Section => s === "topics" || s === "senders") : [];
+  } catch {
+    return []; // Blocked storage or a bad value: everything starts open.
+  }
+}
+
+/** A heading that folds the section under it. Clear stays on it, folded or not. */
+function SectionHead(props: {
+  section: Section;
+  label: string;
+  open: boolean;
+  picked: number;
+  onFold: () => void;
+  onClear: () => void;
+}) {
+  const { section, label, open, picked, onFold, onClear } = props;
+  return (
+    <h2 class="side-label">
+      <button
+        type="button"
+        class="side-fold"
+        aria-expanded={open}
+        aria-controls={`side-${section}`}
+        onClick={onFold}
+      >
+        <ChevronIcon />
+        {label}
+        {!open && picked > 0 && <span class="n">{picked} picked</span>}
+      </button>
+      {picked > 0 && (
+        <button type="button" class="link" onClick={onClear}>
+          Clear
+        </button>
+      )}
+    </h2>
+  );
+}
 
 /**
  * The Mac's left column (#12, two-pane): News and Learning, the Summary, topic chips (#10) and
@@ -18,6 +64,16 @@ export function Sidebar() {
   const { path, query, route } = useLocation();
   const { topics, senders, counts } = useLibrary();
   const [search, setSearch] = useState("");
+  const [folded, setFolded] = useState(readFolded);
+  const fold = (s: Section) => {
+    const next = toggle(folded, s);
+    setFolded(next);
+    try {
+      localStorage.setItem(FOLDED_KEY, JSON.stringify(next));
+    } catch {
+      // Blocked storage: the fold lasts until the page reloads.
+    }
+  };
 
   // preact-iso drops the trailing slash: Home's path is "/thelibrary".
   const home = path === (BASE || "/");
@@ -112,15 +168,21 @@ export function Sidebar() {
 
       {chips.length > 0 && (
         <>
-          <h2 class="side-label">
-            Topics
-            {f.topics.length > 0 && (
-              <button type="button" class="link" onClick={() => go({ topics: [] })}>
-                Clear
-              </button>
-            )}
-          </h2>
-          <div class="side-chips" role="group" aria-label="Topics">
+          <SectionHead
+            section="topics"
+            label="Topics"
+            open={!folded.includes("topics")}
+            picked={f.topics.length}
+            onFold={() => fold("topics")}
+            onClear={() => go({ topics: [] })}
+          />
+          <div
+            id="side-topics"
+            class="side-chips"
+            role="group"
+            aria-label="Topics"
+            hidden={folded.includes("topics")}
+          >
             {chips.map((t) => (
               <button
                 key={t.name}
@@ -137,30 +199,32 @@ export function Sidebar() {
         </>
       )}
 
-      <h2 class="side-label">
-        Senders
-        {f.senders.length > 0 && (
-          <button type="button" class="link" onClick={() => go({ senders: [] })}>
-            Clear
-          </button>
+      <SectionHead
+        section="senders"
+        label="Senders"
+        open={!folded.includes("senders")}
+        picked={f.senders.length}
+        onFold={() => fold("senders")}
+        onClear={() => go({ senders: [] })}
+      />
+      <div id="side-senders" hidden={folded.includes("senders")}>
+        <label class="search side-search">
+          <SearchIcon />
+          <input
+            type="search"
+            aria-label="Search senders"
+            placeholder="Search senders"
+            value={search}
+            onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
+          />
+        </label>
+        <ul class="side-senders" aria-label="Senders">
+          {ordered.map(sender)}
+        </ul>
+        {all.length > 0 && shown.length === 0 && (
+          <p class="muted small side-none">No newsletter matches "{search.trim()}".</p>
         )}
-      </h2>
-      <label class="search side-search">
-        <SearchIcon />
-        <input
-          type="search"
-          aria-label="Search senders"
-          placeholder="Search senders"
-          value={search}
-          onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
-        />
-      </label>
-      <ul class="side-senders" aria-label="Senders">
-        {ordered.map(sender)}
-      </ul>
-      {all.length > 0 && shown.length === 0 && (
-        <p class="muted small side-none">No newsletter matches "{search.trim()}".</p>
-      )}
+      </div>
 
       <nav class="side-foot" aria-label="More">
         <a href={`${BASE}/senders`}>Manage senders</a>
