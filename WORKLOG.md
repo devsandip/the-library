@@ -106,3 +106,31 @@ Append-only session log. Newest entry at the bottom.
 
 - Read history indexes the open events that already exist rather than keeping a separate history. One row per issue per day, at its latest open.
 - The reader-day helpers moved to `@library/core/days`, shared by the API and the web app.
+
+## 2026-10-10: Now reading, Save for later, tap for a summary
+
+**Did:**
+
+- Committed the journal as Sandip approved it (PR #47). Checked the first scheduled run with the brief step (20:00 IST): clean, the brief skipped as designed ("written recently"), one story split failed on a Substack verification code.
+- Built, merged and deployed three backlog items, each with `pnpm check-hosting` passing: Now reading (#44, PR #48), Save for later (#43, PR #49) and a tap for a summary (#41, PR #51).
+- Filed #50 at Sandip's request: keep account mail (verification codes, sign-in links) out of the list. The code arrived from ByteByteGo's own address, so the sender allowlist let it in.
+- Wrote the journal entry for the evening and refreshed `journal/INDEX.md`.
+
+**State now:**
+
+- Prod runs everything through 4f7e7a7. `pnpm test` 212, `pnpm test:int` 41 on dev, typecheck and lint clean (prettier only flags the app's own `.claude/settings.local.json`).
+- Prod has no `STATE/NOW_READING` item and no saved issues yet; the first issue Sandip opens fills Now reading.
+- Not tried on a real iPhone: Now reading from the Mac to the phone, the bookmarks, the Saved page, and the single tap that now peeks.
+- Sandip's main checkout is 4 commits behind `origin/main`, with no local changes. The old worktree `open-backlog-items-7dd3ce` still holds an untracked copy of the journal, now redundant.
+
+**Next:**
+
+- Ask Sandip how the three features feel on the iPhone, starting with the single tap, which changed from open to peek.
+- Then #50: an `account` noise rule beside `receipt` in `packages/core/src/sources.ts` (verification and login codes, sign-in links, email confirmations, password resets), a fixture test, deploy, and `pnpm reprocess` to filter item `1a1261e7cc130a34`.
+- Monday 2026-10-12: the weekly journal summary for 2026-W41, and read a weekday's day in brief and its cost (`narrative done` in the ingest logs).
+
+**Decisions:**
+
+- Now reading: one `STATE/NOW_READING` item; the place is the share of the newsletter above the top of the screen, saved at most every 5 seconds and as the page goes away (`keepalive`). A place saved in an older window moves Now reading back to that issue. Rating after opening, archiving or finishing hides it.
+- Save for later: saved issues move from `UNREAD` to a `SAVED` partition of `gsi2`, so Unread, the counts, the Summary and the 7-day rule leave them out unchanged; `autoArchive` skips them outright. Archiving unsaves; an archived issue cannot be saved. On the phone, Save sits at the top of the issue page because the bottom bar is full.
+- Tap for a summary: `GET /issues/{id}/stories` from the story index, no new Claude call. A 250 ms double-tap window; Enter opens, Space peeks. The reading pane keeps its click, and the Must Read row's lead cards open on a tap.
