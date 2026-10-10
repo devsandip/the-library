@@ -24,20 +24,22 @@ export function swipeDecision(dx: number, width: number, speed: number): SwipeWa
   return flick ? way : undefined;
 }
 
-export type SwipeChange = Partial<Pick<IssueListItem, "rating" | "state">>;
+export type SwipeChange = Partial<Pick<IssueListItem, "rating" | "state" | "savedAt">>;
 
 /**
- * What a swipe changes: right rates Relevant; left rates Irrelevant and archives. Undefined when
- * it would change nothing, so a second swipe the same way does nothing.
+ * What a swipe changes: right rates Relevant; left rates Irrelevant and archives, which also takes
+ * a saved issue off the Saved list (#43). Undefined when it would change nothing, so a second
+ * swipe the same way does nothing.
  */
 export function swipeChange(
-  issue: Pick<IssueListItem, "rating" | "state">,
+  issue: Pick<IssueListItem, "rating" | "state" | "savedAt">,
   way: SwipeWay,
 ): SwipeChange | undefined {
   if (way === "right") return issue.rating === 1 ? undefined : { rating: 1 };
   const change: SwipeChange = {
     ...(issue.rating === -1 ? {} : { rating: -1 }),
     ...(issue.state === "archived" ? {} : { state: "archived" }),
+    ...(issue.state !== "archived" && issue.savedAt !== undefined ? { savedAt: undefined } : {}),
   };
   return Object.keys(change).length ? change : undefined;
 }

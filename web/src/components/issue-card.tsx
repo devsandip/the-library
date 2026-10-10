@@ -2,6 +2,7 @@ import type { IssueListItem } from "@library/core/types";
 import { issueHref } from "../filters.js";
 import { clockTime, relativeTime } from "../format.js";
 import { StarIcon, ThumbDown, ThumbUp } from "./icons.js";
+import { SaveButton } from "./save.js";
 import { SwipeUnder, useSwipe, type SwipeActions } from "./swipe.js";
 
 /**
@@ -14,6 +15,7 @@ export function IssueCard({
   showPublication = true,
   openedAt,
   swipe,
+  onSave,
 }: {
   issue: IssueListItem;
   lead?: boolean;
@@ -22,9 +24,13 @@ export function IssueCard({
   openedAt?: string;
   /** Swipe to rate (#13); absent where cards do not swipe (the sideways Must Read row). */
   swipe?: SwipeActions;
+  /** Save for later (#43): the card gets a bookmark. */
+  onSave?: (issue: IssueListItem) => void;
 }) {
   const unread = issue.state === "unread";
   const s = useSwipe(swipe);
+  const saves = onSave !== undefined && issue.state !== "archived";
+  const bookmark = onSave && <SaveButton issue={issue} onSave={onSave} />;
   const link = (
     <a href={issueHref(issue.id)}>
       {lead && <span class="card-pub">{issue.publication}</span>}
@@ -68,7 +74,7 @@ export function IssueCard({
   );
   return (
     <li
-      class={`issue-card${lead ? " lead" : ""}${unread ? " unread" : ""}${swipe ? " swipe" : ""}`}
+      class={`issue-card${lead ? " lead" : ""}${unread ? " unread" : ""}${swipe ? " swipe" : ""}${saves ? " can-save" : ""}`}
       {...s.rowProps}
     >
       {swipe ? (
@@ -76,10 +82,14 @@ export function IssueCard({
           <SwipeUnder />
           <div class="swipe-face" ref={s.face}>
             {link}
+            {bookmark}
           </div>
         </>
       ) : (
-        link
+        <>
+          {link}
+          {bookmark}
+        </>
       )}
     </li>
   );

@@ -32,6 +32,10 @@ function setup(overrides: Partial<RepoPort> = {}) {
     getIssue: vi.fn(async () => ({ ...issue, fromAddr: "a@b.c", html: "<p>x</p>" })),
     setState: vi.fn(async (_id, state) => ({ ...issue, state })),
     setShelf: vi.fn(async (_id, shelf) => ({ ...issue, shelf })),
+    setSaved: vi.fn(async (_id, saved) => ({
+      ...issue,
+      savedAt: saved ? "2026-10-10T10:00:00.000Z" : undefined,
+    })),
     listTopics: vi.fn(async () => [{ name: "AI", description: "Models and tools" }]),
     setRating: vi.fn(async (_id, value) => ({ ...issue, rating: value === 0 ? undefined : value })),
     logOpen: vi.fn(async () => undefined),
@@ -45,6 +49,7 @@ function setup(overrides: Partial<RepoPort> = {}) {
     updateSender: vi.fn(async (_id, patch) => ({ ...sender, ...patch })),
     unreadCounts: vi.fn(async () => ({
       counts: [{ senderId: sender.senderId, shelf: "news" as const, topic: "AI", n: 2 }],
+      saved: 1,
     })),
     summary: vi.fn(async () => ({
       items: [{ ...issue, scoreReason: "From a Must Read newsletter", mustRead: true }],
@@ -211,6 +216,25 @@ describe("routing and validation", () => {
     expect(repo.setShelf).toHaveBeenCalledWith("abc123", "learning");
     expect(repo.setState).not.toHaveBeenCalled();
     expect((await call("PATCH", "/issues/abc123", { body: { shelf: "later" } })).status).toBe(400);
+  });
+
+  it("PATCH saved saves or unsaves an issue; anything but a boolean is a 400", async () => {
+    const { call, repo } = setup();
+    const saved = await call("PATCH", "/issues/abc123", { body: { saved: true } });
+    expect(saved.status).toBe(200);
+    expect(saved.body.savedAt).toBe("2026-10-10T10:00:00.000Z");
+    expect(repo.setSaved).toHaveBeenCalledWith("abc123", true);
+    await call("PATCH", "/issues/abc123", { body: { saved: false } });
+    expect(repo.setSaved).toHaveBeenLastCalledWith("abc123", false);
+    expect(repo.setState).not.toHaveBeenCalled();
+    expect((await call("PATCH", "/issues/abc123", { body: { saved: "yes" } })).status).toBe(400);
+  });
+
+  it("lists the Saved view", async () => {
+    const { call, repo } = setup();
+    expect((await call("GET", "/issues", { query: { view: "saved" } })).status).toBe(200);
+    expect(repo.listIssues).toHaveBeenCalledWith("saved", expect.objectContaining({ limit: 30 }));
+    expect((await call("GET", "/issues", { query: { view: "later" } })).status).toBe(400);
   });
 
   it("serves the topic list", async () => {

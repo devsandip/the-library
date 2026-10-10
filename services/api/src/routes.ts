@@ -22,7 +22,7 @@ type Handler = (svc: Services, req: Request, params: string[]) => Promise<Respon
 
 const ISSUE_ID = "([A-Za-z0-9_-]{1,64})";
 const SENDER_ID = "(s[0-9a-f]{12})";
-const VIEWS: readonly View[] = ["unread", "all", "archived"];
+const VIEWS: readonly View[] = ["unread", "all", "archived", "saved"];
 const READER_STATES: readonly ReaderState[] = ["unread", "read", "archived"];
 const SHELVES: readonly Shelf[] = ["news", "learning"];
 
@@ -54,7 +54,9 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     pattern: /^\/issues$/,
     handler: async (svc, req) => {
       const view = (req.query.view ?? "unread") as View;
-      if (!VIEWS.includes(view)) throw badRequest("view must be unread, all or archived");
+      if (!VIEWS.includes(view)) {
+        throw badRequest("view must be unread, all, archived or saved");
+      }
       const limit = req.query.limit === undefined ? 30 : Number(req.query.limit);
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
         throw badRequest("limit must be an integer from 1 to 100");
@@ -92,18 +94,26 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     method: "PATCH",
     pattern: new RegExp(`^/issues/${ISSUE_ID}$`),
     handler: async (svc, req, p) => {
-      const { state, shelf } = json<{ state?: unknown; shelf?: unknown }>(req);
-      if (state === undefined && shelf === undefined) throw badRequest("send state or shelf");
+      const { state, shelf, saved } = json<{ state?: unknown; shelf?: unknown; saved?: unknown }>(
+        req,
+      );
+      if (state === undefined && shelf === undefined && saved === undefined) {
+        throw badRequest("send state, shelf or saved");
+      }
       if (state !== undefined && !READER_STATES.includes(state as ReaderState)) {
         throw badRequest("state must be unread, read or archived");
       }
       if (shelf !== undefined && !SHELVES.includes(shelf as Shelf)) {
         throw badRequest("shelf must be news or learning");
       }
+      if (saved !== undefined && typeof saved !== "boolean") {
+        throw badRequest("saved must be true or false");
+      }
       const id = param(p, 0);
       let item =
         state === undefined ? undefined : await svc.repo.setState(id, state as ReaderState);
       if (shelf !== undefined) item = await svc.repo.setShelf(id, shelf as Shelf);
+      if (saved !== undefined) item = await svc.repo.setSaved(id, saved);
       return ok(item);
     },
   },

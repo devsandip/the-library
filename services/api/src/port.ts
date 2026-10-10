@@ -35,6 +35,8 @@ export interface RepoPort {
   setState(id: string, state: ReaderState): Promise<IssueListItem>;
   /** Sandip moves an issue to a shelf; Claude never moves it back. */
   setShelf(id: string, shelf: Shelf): Promise<IssueListItem>;
+  /** Save an issue for later, or take it off the Saved list (#43). */
+  setSaved(id: string, saved: boolean): Promise<IssueListItem>;
   setRating(id: string, value: Rating | 0): Promise<IssueListItem>;
   /** Logs the open (read history, #42) and points Now reading at the issue (#44). */
   logOpen(id: string): Promise<void>;

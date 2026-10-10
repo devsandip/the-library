@@ -628,7 +628,8 @@ export class Store {
 
   /**
    * Archive an unread issue by rule. Only once: an issue Sandip took back out of the archive is
-   * never archived again by a rule. Returns whether it was archived.
+   * never archived again by a rule, and a saved one (#43) is left alone. Returns whether it was
+   * archived.
    */
   async autoArchive(id: string, reason: "promo" | "old-news"): Promise<boolean> {
     const now = new Date().toISOString();
@@ -642,7 +643,8 @@ export class Store {
           UpdateExpression:
             "SET #st = :archived, gsi1pk = :archive, stateChangedAt = :now, autoArchived = :why " +
             "REMOVE gsi2pk, gsi2sk",
-          ConditionExpression: "#st = :unread AND attribute_not_exists(autoArchived)",
+          ConditionExpression:
+            "#st = :unread AND attribute_not_exists(autoArchived) AND attribute_not_exists(savedAt)",
           ExpressionAttributeNames: { "#st": "state" },
           ExpressionAttributeValues: {
             ":archived": "archived",

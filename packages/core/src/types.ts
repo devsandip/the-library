@@ -7,7 +7,8 @@ export type IssueState = "unread" | "read" | "archived" | "filtered";
 /** States a reader can move an issue to. */
 export type ReaderState = Exclude<IssueState, "filtered">;
 export type Rating = 1 | -1;
-export type View = "unread" | "all" | "archived";
+/** Saved (#43) is its own queue: saved issues leave Unread, whatever their state. */
+export type View = "unread" | "all" | "archived" | "saved";
 /** Home's two tabs: what's happening now, or worth reading in three months. */
 export type Shelf = "news" | "learning";
 /** Who decided an issue's shelf: Claude, the sender's "always" setting, or Sandip moving it. */
@@ -38,6 +39,8 @@ export interface IssueListItem {
   promo?: boolean;
   /** Archived by a rule rather than by Sandip: a promo, or news left unread for a week. */
   autoArchived?: "promo" | "old-news";
+  /** Saved for later (#43): when. Saved issues are out of Unread and safe from the rules. */
+  savedAt?: string;
   // Phase 2
   scoreReason?: string;
 }
@@ -100,6 +103,8 @@ export interface UnreadCount {
 /** GET /unread-counts: the numbers on the tabs, the topic chips and the sender picker. */
 export interface UnreadCountsResponse {
   counts: UnreadCount[];
+  /** Issues saved for later (#43), read or not. */
+  saved: number;
 }
 
 /** An issue shown as related to the open one (#20). */

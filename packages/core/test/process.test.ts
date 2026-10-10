@@ -275,6 +275,16 @@ describe("issueIndexAttributes", () => {
     expect(remove).toEqual(["gsi2pk", "gsi2sk", "gsi4pk", "gsi4sk"]);
   });
 
+  it("saved: its own partition by when it was saved, out of unread, read or not", () => {
+    const savedAt = "2026-10-03T00:00:00.000Z";
+    for (const state of ["unread", "read"] as const) {
+      const { set } = issueIndexAttributes({ ...base, state, savedAt });
+      expect(set.gsi1pk).toBe("INBOX");
+      expect(set.gsi2pk).toBe("SAVED");
+      expect(set.gsi2sk).toBe(`${savedAt}#m1`);
+    }
+  });
+
   it("filtered: in no index", () => {
     const { set, remove } = issueIndexAttributes({ ...base, state: "filtered" });
     expect(set).toEqual({});
