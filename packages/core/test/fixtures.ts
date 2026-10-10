@@ -100,6 +100,14 @@ export const substackWeeklyStack = eml({
   html: "<p>stack</p>",
 });
 
+/** Account mail from a newsletter's own address, which the allowlist lets in (#50). */
+export const substackVerificationCode = eml({
+  from: '"ByteByteGo" <bytebytego@substack.com>',
+  subject: "643423 is your Substack verification code",
+  listUnsubscribe: "<https://bytebytego.substack.com/action/disable_email?token=abc>",
+  html: "<p>Here's your verification code: 643423. It expires in 10 minutes.</p>",
+});
+
 export const stripeReceipt = eml({
   from: '"The Ken" <receipts@stripe.com>',
   subject: "Your receipt from The Ken #1234-5678",

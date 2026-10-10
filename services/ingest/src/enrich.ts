@@ -1,6 +1,7 @@
 /**
  * Enrichment: Claude reads each stored issue once and returns a one-line summary, its shelf (News
- * or Learning), one topic from the topic list, and how much of it is selling (a promo is archived).
+ * or Learning), one topic from the topic list, and how much of it is selling (a promo is archived;
+ * account mail, which is no issue at all, is filtered).
  * Titan adds an embedding
  * for Phase 2 ranking. Runs after every ingest for new issues (retrying recent failures) and on
  * demand for the backlog (`pnpm enrich`). The topic list is proposed once (`pnpm topics`).
@@ -28,9 +29,10 @@ export function compactText(text: string): string {
 
 /**
  * Three answers rather than yes/no: asked "is this a promo?", Haiku flagged most issues that merely
- * carry a sponsor slot (158 of 396 on the first backlog run). Only "promo" is archived.
+ * carry a sponsor slot (158 of 396 on the first backlog run). Only "promo" is archived. The fourth,
+ * "account", is not an issue at all (#50): account mail the noise rules missed, filed as filtered.
  */
-export const SELLING = ["none", "ad-supported", "promo"] as const;
+export const SELLING = ["none", "ad-supported", "promo", "account"] as const;
 export type Selling = (typeof SELLING)[number];
 
 export interface Classification {
@@ -58,7 +60,7 @@ export function classifyRequest(
         '"learning" if it would still be worth reading in three months: explanations, deep ' +
         "dives, how-tos, frameworks, case studies, interviews about craft, essays.",
       "- topic: the one topic below that fits best.",
-      "- selling: how much of the issue is selling something.",
+      "- selling: how much of the issue is selling something, or whether it is an issue at all.",
       '  "promo": the whole issue exists to sell: a subscription or upgrade offer, a course or ' +
         "cohort enrollment, an event or webinar invite, a launch of the sender's own paid " +
         "product, or a post marked sponsored. Nothing else of substance is in it.",
@@ -66,7 +68,11 @@ export function classifyRequest(
         "practice questions) that also carries sponsor slots, ads or a plug for the sender's " +
         "course. Most newsletters are this.",
       '  "none": no ads at all.',
-      '  When unsure between "promo" and "ad-supported", answer "ad-supported".',
+      '  "account": not an issue at all but mail about the reader\'s account: a verification or ' +
+        "sign-in code, a sign-in link, a request to confirm an email address or a subscription, " +
+        "a password reset, a receipt, or a welcome that only confirms a subscription.",
+      '  When unsure between "promo" and "ad-supported", answer "ad-supported". Answer ' +
+        '"account" only when the mail plainly is one.',
       "",
       "Topics:",
       ...topics.map((t) => `- ${t.name}: ${t.description}`),
@@ -251,6 +257,7 @@ export async function enrich(
     classified: 0,
     embedded: 0,
     promosArchived: 0,
+    accountFiltered: 0,
     oldNewsArchived: 0,
     waitingForTopics: 0,
     deferred: 0,
@@ -289,6 +296,22 @@ export async function enrich(
           await store.putClassification(issue.id, c, senders.get(issue.senderId)?.shelf);
           summary = c.summary;
           stats.classified++;
+          // Account mail is not an issue (#50): filed as filtered, it needs no embedding.
+          if (
+            c.selling === "account" &&
+            (await store.fileAsFiltered(issue.id, "account", "claude"))
+          ) {
+            stats.accountFiltered++;
+            console.log(
+              JSON.stringify({
+                level: "info",
+                msg: "account mail filtered",
+                id: issue.id,
+                summary,
+              }),
+            );
+            return;
+          }
           if (c.promo && (await store.autoArchive(issue.id, "promo"))) stats.promosArchived++;
         }
       }

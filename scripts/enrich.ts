@@ -25,6 +25,7 @@ console.log(
   `${stage}: ${s.checked} to do, ${s.classified} sorted by Claude, ${s.embedded} embedded, ` +
     `${s.errors} errors in ${Math.round(s.durationMs / 1000)}s.`,
 );
+if (s.accountFiltered) console.log(`${s.accountFiltered} account mail filed as filtered (#50)`);
 if (s.waitingForTopics)
   console.log(`${s.waitingForTopics} wait for a topic list: pnpm topics --apply`);
 if (s.deferred) console.log(`${s.deferred} left for another run: rerun pnpm enrich`);

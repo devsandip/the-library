@@ -573,6 +573,22 @@ describe("API on dev", () => {
     expect(earlier.body.items.map((i) => i.id)).toEqual(["fx-pragmatic"]);
     expect(earlier.body.nextDay).toBe(today);
     expect((await call("GET", "/history", { query: { day: "2026-02-30" } })).status).toBe(400);
+
+    // Opened, then found to be account mail and filtered (#50): no longer in the history.
+    const setState = (state: string) =>
+      ddb.send(
+        new UpdateCommand({
+          TableName: stack.tableName,
+          Key: issueKey("fx-pragmatic"),
+          UpdateExpression: "SET #st = :s",
+          ExpressionAttributeNames: { "#st": "state" },
+          ExpressionAttributeValues: { ":s": state },
+        }),
+      );
+    await setState("filtered");
+    const gone = await call<HistoryResponse>("GET", "/history", { query: { day: earlierDay } });
+    expect(gone.body.items).toEqual([]);
+    await setState("unread");
   });
 
   it("now reading: the last issue opened, its place, and when it hides", async () => {

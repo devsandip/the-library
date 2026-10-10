@@ -771,6 +771,8 @@ export class DynamoRepo implements RepoPort {
     const starred = new Set(senders.filter((s) => s.mustRead).map((s) => s.senderId));
     const issues = await this.batchGet([...latest.keys()].map(issueKey), LIST_ATTRIBUTES);
     const items: HistoryItem[] = issues
+      // An issue opened and later found to be account mail (#50) is no longer an issue.
+      .filter((i) => i.state !== "filtered")
       .map((i) => ({
         ...toListItem(i),
         ...(starred.has(i.senderId as string) ? { mustRead: true } : {}),

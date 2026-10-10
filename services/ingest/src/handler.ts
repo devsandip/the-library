@@ -146,6 +146,7 @@ export async function handler(event: IngestEvent = {}) {
       classified: 0,
       embedded: 0,
       promosArchived: 0,
+      accountFiltered: 0,
       oldNewsArchived: 0,
       waitingForTopics: 0,
       deferred: 0,

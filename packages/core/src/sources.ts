@@ -56,6 +56,25 @@ const NOISE_RULES: NoiseRule[] = [
     reason: "receipt",
     from: /@(stripe\.com|paddle\.com|email\.apple\.com|razorpay\.com|gumroad\.com)$/,
   },
+  // Account mail (#50): sign-in codes and links, email and subscription confirmations, password
+  // resets. It can come from a newsletter's own address, so only the subject tells it apart, and
+  // only by phrases addressed to the account holder: issues write about codes and logins too.
+  {
+    reason: "account",
+    subject:
+      /\b(your|secure) ([\w-]+ )?(verification|log-?in|sign[- ]?in|security|confirmation|one[- ]time|access|authentication|magic) (code|passcode|link)\b(?=\s*($|[:.!,(]|is:? *\d|(for|from|to)\b))|^\W*\d{4,8} is your ([\w-]+ )?(code|passcode)\b|\b(code|passcode) is:? *\d{4,8}\b/i,
+  },
+  { reason: "account", subject: /^\W*(sign|log) ?in to\b/i },
+  {
+    reason: "account",
+    subject:
+      /\b(confirm|verify|activate) your (e-?mail|account|subscription)\b|\bplease confirm (your )?subscription\b|\bcomplete your (sign[- ]?up|registration)\b|\byou(['’]re| are) (now )?subscribed\b/i,
+  },
+  {
+    reason: "account",
+    subject:
+      /\breset your password\b|\bpassword reset (request|link|instructions)\b|\byour password (has been|was) (changed|reset|updated)\b/i,
+  },
 ];
 
 export type Classification =
