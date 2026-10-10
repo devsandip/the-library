@@ -25,12 +25,14 @@ import {
   INGEST_STATE_KEY,
   INTERESTS_KEY,
   NARRATIVE_KEY,
+  openIndexAttributes,
   issueIndexAttributes,
   issueKey,
   PARTITION,
   pickTop,
   rank,
   readerDay,
+  readerDayBounds,
   recentDays,
   relatedIssues,
   retryOnConflict,
@@ -43,6 +45,8 @@ import {
 } from "@library/core";
 import type {
   DigestStats,
+  HistoryItem,
+  HistoryResponse,
   IssueDetailResponse,
   IssueListItem,
   IssueListResponse,
@@ -68,6 +72,25 @@ import { badRequest, conflict, notFound } from "./errors.js";
 import type { ListOptions, RepoPort } from "./port.js";
 
 type Item = Record<string, unknown>;
+
+/** The attributes `toListItem` reads, for batch reads. */
+const LIST_ATTRIBUTES = [
+  "id",
+  "senderId",
+  "publication",
+  "subject",
+  "snippet",
+  "receivedAt",
+  "readMinutes",
+  "state",
+  "rating",
+  "viewOnlineUrl",
+  "summary",
+  "shelf",
+  "topic",
+  "promo",
+  "autoArchived",
+];
 
 export function toListItem(i: Item): IssueListItem {
   return {
@@ -578,7 +601,83 @@ export class DynamoRepo implements RepoPort {
   async logOpen(id: string): Promise<void> {
     await this.mustGetIssue(id);
     const now = new Date().toISOString();
-    await this.ddb.send(new PutCommand(this.event(id, now, { type: "open" }).Put));
+    // Indexed by time for read history (#42).
+    const open = { type: "open", ...openIndexAttributes(id, now) };
+    await this.ddb.send(new PutCommand(this.event(id, now, open).Put));
+  }
+
+  // ---------- read history (#42) ----------
+
+  /**
+   * The issues opened on a reader's day, each once at its latest open, latest first, with the
+   * nearest earlier and later days that have reads (so paging skips empty days).
+   */
+  async history(day: string): Promise<HistoryResponse> {
+    const { from, to } = readerDayBounds(day);
+    const [opens, before, after, senders] = await Promise.all([
+      this.opensBetween(from, to),
+      this.nearestOpen(from, "before"),
+      this.nearestOpen(to, "after"),
+      this.listSenders(),
+    ]);
+    const latest = new Map<string, string>();
+    for (const o of opens) {
+      if ((latest.get(o.id) ?? "") < o.at) latest.set(o.id, o.at);
+    }
+    const starred = new Set(senders.filter((s) => s.mustRead).map((s) => s.senderId));
+    const issues = await this.batchGet([...latest.keys()].map(issueKey), LIST_ATTRIBUTES);
+    const items: HistoryItem[] = issues
+      .map((i) => ({
+        ...toListItem(i),
+        ...(starred.has(i.senderId as string) ? { mustRead: true } : {}),
+        openedAt: latest.get(i.id as string)!,
+      }))
+      .sort((a, b) => b.openedAt.localeCompare(a.openedAt));
+    return {
+      day,
+      items,
+      ...(before ? { previousDay: readerDay(Date.parse(before)) } : {}),
+      ...(after ? { nextDay: readerDay(Date.parse(after)) } : {}),
+    };
+  }
+
+  /** Open events between two instants (inclusive), from the `OPENS` partition of `gsi1`. */
+  private async opensBetween(from: string, to: string): Promise<{ id: string; at: string }[]> {
+    const out: { id: string; at: string }[] = [];
+    let start: Item | undefined;
+    do {
+      const res: QueryCommandOutput = await this.query({
+        IndexName: INDEX.list,
+        KeyConditionExpression: "gsi1pk = :p AND gsi1sk BETWEEN :from AND :to",
+        ExpressionAttributeValues: { ":p": PARTITION.opens, ":from": from, ":to": `${to}\uffff` },
+        ProjectionExpression: "gsi1sk",
+        ExclusiveStartKey: start,
+      });
+      for (const i of res.Items ?? []) {
+        const [at, id] = (i.gsi1sk as string).split("#");
+        out.push({ id: id!, at: at! });
+      }
+      start = res.LastEvaluatedKey;
+    } while (start);
+    return out;
+  }
+
+  /** The time of the last open before `edge`, or the first after it. */
+  private async nearestOpen(edge: string, side: "before" | "after"): Promise<string | undefined> {
+    const res = await this.query({
+      IndexName: INDEX.list,
+      KeyConditionExpression:
+        side === "before" ? "gsi1pk = :p AND gsi1sk < :edge" : "gsi1pk = :p AND gsi1sk > :edge",
+      ExpressionAttributeValues: {
+        ":p": PARTITION.opens,
+        ":edge": side === "before" ? edge : `${edge}\uffff`,
+      },
+      ProjectionExpression: "gsi1sk",
+      ScanIndexForward: side === "after",
+      Limit: 1,
+    });
+    const sk = res.Items?.[0]?.gsi1sk as string | undefined;
+    return sk?.split("#")[0];
   }
 
   // ---------- senders ----------

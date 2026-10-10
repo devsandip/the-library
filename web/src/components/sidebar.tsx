@@ -164,6 +164,13 @@ export function Sidebar() {
         >
           <span>Summary</span>
         </a>
+        <a
+          class={path === `${BASE}/history` ? "on" : ""}
+          aria-current={path === `${BASE}/history` ? "page" : undefined}
+          href={`${BASE}/history`}
+        >
+          <span>History</span>
+        </a>
       </nav>
 
       {chips.length > 0 && (

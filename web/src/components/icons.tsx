@@ -84,6 +84,16 @@ export function ChevronIcon() {
   );
 }
 
+/** A clock: read history. */
+export function HistoryIcon() {
+  return (
+    <svg {...base}>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 8v4l2.5 2.5" />
+    </svg>
+  );
+}
+
 export function SearchIcon() {
   return (
     <svg {...base}>

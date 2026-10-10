@@ -1255,6 +1255,49 @@ a.pill:hover {
   font-size: 1.2rem;
 }
 
+/* ---------- read history (#42) ---------- */
+
+.history-days {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.list-head .history-days {
+  margin: 12px 0 0;
+}
+
+.history-days .pill {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.history-days .pill svg {
+  width: 16px;
+  height: 16px;
+}
+
+.history-days .pill:disabled {
+  opacity: 0.45;
+}
+
+.history-days .forward svg {
+  transform: scaleX(-1);
+}
+
+.day-pick {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--control);
+  border-radius: var(--control-radius);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.875rem;
+}
+
 /* ---------- summary ---------- */
 
 /* The day in brief (#18): a card above the list, or the Mac's empty reading pane. */

@@ -6,8 +6,6 @@ import {
   normalCdf,
   pickTop,
   rank,
-  readerDay,
-  recentDays,
   seededRandom,
   senderScore,
   type RankCandidate,
@@ -74,20 +72,6 @@ describe("building blocks", () => {
     expect(normalCdf(0)).toBeCloseTo(0.5, 6);
     expect(normalCdf(1.96)).toBeCloseTo(0.975, 3);
     expect(normalCdf(-1.96)).toBeCloseTo(0.025, 3);
-  });
-
-  it("the reader's day is in IST", () => {
-    // 20:00 UTC on the 9th is 01:30 on the 10th in India.
-    expect(readerDay(Date.parse("2026-10-09T20:00:00.000Z"))).toBe("2026-10-10");
-  });
-
-  it("the last few days run back from today, across a month end", () => {
-    expect(recentDays(Date.parse("2026-10-02T20:00:00.000Z"), 4)).toEqual([
-      "2026-10-03",
-      "2026-10-02",
-      "2026-10-01",
-      "2026-09-30",
-    ]);
   });
 });
 

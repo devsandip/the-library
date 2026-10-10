@@ -1,6 +1,6 @@
 import type { IssueListItem } from "@library/core/types";
 import { issueHref } from "../filters.js";
-import { relativeTime } from "../format.js";
+import { clockTime, relativeTime } from "../format.js";
 import { clickInPlace } from "../nav.js";
 import { StarIcon, ThumbDown, ThumbUp } from "./icons.js";
 
@@ -9,12 +9,15 @@ export function IssueRow({
   issue,
   showPublication = true,
   selected = false,
+  openedAt,
   onOpen,
 }: {
   issue: IssueListItem;
   showPublication?: boolean;
   /** Showing in the reading pane. */
   selected?: boolean;
+  /** In read history (#42): when it was opened, shown instead of when it arrived. */
+  openedAt?: string;
   /** Open in the reading pane instead of on its own page. */
   onOpen?: (id: string) => void;
 }) {
@@ -59,7 +62,13 @@ export function IssueRow({
                 <span class="sr-only">Rated Irrelevant</span>
               </span>
             )}
-            <time dateTime={issue.receivedAt}>{relativeTime(issue.receivedAt)}</time>
+            {openedAt ? (
+              <time dateTime={openedAt} title="Opened">
+                {clockTime(openedAt)}
+              </time>
+            ) : (
+              <time dateTime={issue.receivedAt}>{relativeTime(issue.receivedAt)}</time>
+            )}
           </span>
         </span>
         <span class="subject">{issue.subject}</span>

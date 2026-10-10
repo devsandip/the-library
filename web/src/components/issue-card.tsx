@@ -1,6 +1,6 @@
 import type { IssueListItem } from "@library/core/types";
 import { issueHref } from "../filters.js";
-import { relativeTime } from "../format.js";
+import { clockTime, relativeTime } from "../format.js";
 import { StarIcon, ThumbDown, ThumbUp } from "./icons.js";
 import { SwipeUnder, useSwipe, type SwipeActions } from "./swipe.js";
 
@@ -12,11 +12,14 @@ export function IssueCard({
   issue,
   lead = false,
   showPublication = true,
+  openedAt,
   swipe,
 }: {
   issue: IssueListItem;
   lead?: boolean;
   showPublication?: boolean;
+  /** In read history (#42): when it was opened, shown instead of when it arrived. */
+  openedAt?: string;
   /** Swipe to rate (#13); absent where cards do not swipe (the sideways Must Read row). */
   swipe?: SwipeActions;
 }) {
@@ -41,7 +44,11 @@ export function IssueCard({
             {" · "}
           </>
         )}
-        <time dateTime={issue.receivedAt}>{relativeTime(issue.receivedAt)}</time>
+        {openedAt ? (
+          <time dateTime={openedAt}>Opened {clockTime(openedAt)}</time>
+        ) : (
+          <time dateTime={issue.receivedAt}>{relativeTime(issue.receivedAt)}</time>
+        )}
         {` · ${issue.readMinutes} min`}
         {(lead || !showPublication) && issue.topic && ` · ${issue.topic}`}
         {issue.rating === 1 && (

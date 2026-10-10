@@ -62,6 +62,8 @@ export interface IngestEvent {
   stories?: { days?: number; force?: boolean; relink?: boolean };
   /** Write today's narrative now (`pnpm narrative`); `force` even if the last one is recent. */
   narrative?: { force?: boolean };
+  /** Index opens logged before read history existed (`pnpm history-backfill`). */
+  historyBackfill?: Record<string, never>;
 }
 
 export async function handler(event: IngestEvent = {}) {
@@ -89,6 +91,11 @@ export async function handler(event: IngestEvent = {}) {
     });
     console.log(JSON.stringify({ level: "info", msg: "stories done", ...stats }));
     return stats;
+  }
+  if (event.historyBackfill) {
+    const indexed = await store.indexOpens();
+    console.log(JSON.stringify({ level: "info", msg: "history backfill done", indexed }));
+    return { indexed };
   }
   if (event.narrative) {
     const stats = await writeNarrative(store, bedrock, { force: event.narrative.force === true });
