@@ -10,3 +10,4 @@ export * from "./rank.js";
 export * from "./related.js";
 export * from "./stories.js";
 export * from "./vectors.js";
+export * from "./search.js";

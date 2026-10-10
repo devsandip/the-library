@@ -17,7 +17,7 @@ import { useAsync } from "../hooks.js";
 import { useLibrary } from "../library.js";
 import { PANES, useMedia, WIDE } from "../media.js";
 import { BriefHeader } from "../components/header.js";
-import { CloseIcon, FilterIcon, RefreshIcon, StarIcon } from "../components/icons.js";
+import { CloseIcon, FilterIcon, RefreshIcon, SearchIcon, StarIcon } from "../components/icons.js";
 import { IssueCard } from "../components/issue-card.js";
 import { IssueReader } from "../components/issue-reader.js";
 import { IssueRow } from "../components/issue-row.js";
@@ -157,6 +157,17 @@ export function Home() {
 
   const viewTools = (
     <span class="list-tools">
+      {/* Search (#53): the Mac has its field in the sidebar; the phone's header has no room. */}
+      {!wide && (
+        <a
+          class="icon-button"
+          href={`${BASE}/search`}
+          title="Search"
+          aria-label="Search the library"
+        >
+          <SearchIcon />
+        </a>
+      )}
       <select
         aria-label="Which issues"
         value={view}

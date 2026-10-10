@@ -68,7 +68,18 @@ function setup(overrides: Partial<RepoPort> = {}) {
     status: vi.fn(async () => ({ stage: "test", lastError: null })),
     ...overrides,
   };
-  const svc: Services = { repo, startIngest: vi.fn(async () => undefined) };
+  const svc: Services = {
+    repo,
+    search: {
+      search: vi.fn(async (q: string) => ({
+        q,
+        terms: [q.toLowerCase()],
+        items: [{ ...issue, match: "words" as const }],
+        byMeaning: true,
+      })),
+    },
+    startIngest: vi.fn(async () => undefined),
+  };
   const handler = createHandler(svc);
   const call = async (
     method: string,
@@ -207,6 +218,28 @@ describe("routing and validation", () => {
     expect(r.body.stories[0]).toMatchObject({ n: 1, headline: "A model ships" });
     expect(repo.stories).toHaveBeenCalledWith("abc123");
     expect((await call("POST", "/issues/abc123/stories")).status).toBe(405);
+  });
+
+  it("searches, best match first unless newest is asked for (#53)", async () => {
+    const { call, svc } = setup();
+    const r = await call("GET", "/search", { query: { q: "  Kafka " } });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ q: "Kafka", items: [{ id: "abc123", match: "words" }] });
+    expect(svc.search.search).toHaveBeenCalledWith("Kafka", "best");
+    await call("GET", "/search", { query: { q: "kafka", sort: "newest" } });
+    expect(svc.search.search).toHaveBeenLastCalledWith("kafka", "newest");
+  });
+
+  it.each([
+    [{}, "q must be"],
+    [{ q: "   " }, "q must be"],
+    [{ q: "x".repeat(201) }, "q must be"],
+    [{ q: "kafka", sort: "oldest" }, "sort must be"],
+  ])("rejects a bad search %o", async (query, msg) => {
+    const { call } = setup();
+    const r = await call("GET", "/search", { query: query as Record<string, string> });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toContain(msg);
   });
 
   it("PATCH state validates the body", async () => {

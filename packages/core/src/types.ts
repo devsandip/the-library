@@ -133,6 +133,30 @@ export interface RelatedResponse {
   since: RelatedItem[];
 }
 
+/** Search's order (#53): best match first, or newest first. */
+export type SearchSort = "best" | "newest";
+
+/** An issue search found (#53). */
+export interface SearchHit extends IssueListItem {
+  /** It holds the query's words, it is close in meaning, or both. */
+  match: "words" | "meaning" | "both";
+  /** The story inside a digest that matched, shown on its row. */
+  story?: { n: number; headline: string };
+}
+
+/**
+ * GET /search: issues that hold the query's words, then those only close in meaning, each group
+ * in the order asked for. Filtered mail, promos and muted newsletters are left out.
+ */
+export interface SearchResponse {
+  q: string;
+  /** The query's words as search matched them, for highlighting. */
+  terms: string[];
+  items: SearchHit[];
+  /** False when search by meaning was unavailable: the results are by words alone. */
+  byMeaning: boolean;
+}
+
 /** How the Summary's daily top 5 fared over the last 14 days: the PRD's success measure (#5). */
 export interface DigestStats {
   /** Days with a digest logged. */

@@ -1237,6 +1237,55 @@ a.pill:hover {
   outline-offset: 1px;
 }
 
+/* ---------- search (#53) ---------- */
+
+.sidebar .search-form {
+  margin-top: 14px;
+}
+
+.sidebar .search-form .side-search {
+  margin: 0;
+}
+
+.search-page .search-form {
+  margin: 4px 0 12px;
+}
+
+.search-page .search:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.search-page .list-bar .subline {
+  margin: 0;
+}
+
+.search-page .list-head h1 {
+  overflow-wrap: anywhere;
+}
+
+/* The query's words in a result, in a tint of the accent so every palette keeps it readable. */
+mark {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  color: inherit;
+}
+
+/* The story inside a digest that matched. */
+.found-story {
+  display: block;
+  margin-top: 4px;
+  padding-left: 8px;
+  border-left: 2px solid var(--accent);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: var(--fg);
+}
+
+.issue-card .found-story {
+  margin-top: 0;
+}
+
 .side-senders {
   margin: 6px 0 0;
   padding: 0;

@@ -1,5 +1,12 @@
 import { isReaderDay, readerDay } from "@library/core/days";
-import type { Rating, ReaderState, SenderPatch, Shelf, View } from "@library/core/types";
+import type {
+  Rating,
+  ReaderState,
+  SearchSort,
+  SenderPatch,
+  Shelf,
+  View,
+} from "@library/core/types";
 import { badRequest, HttpError, notFound } from "./errors.js";
 import type { Services } from "./port.js";
 
@@ -25,6 +32,7 @@ const SENDER_ID = "(s[0-9a-f]{12})";
 const VIEWS: readonly View[] = ["unread", "all", "archived", "saved"];
 const READER_STATES: readonly ReaderState[] = ["unread", "read", "archived"];
 const SHELVES: readonly Shelf[] = ["news", "learning"];
+const SORTS: readonly SearchSort[] = ["best", "newest"];
 
 const ok = (body: unknown): Response => ({ status: 200, body });
 
@@ -126,6 +134,17 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     method: "GET",
     pattern: new RegExp(`^/issues/${ISSUE_ID}/stories$`),
     handler: async (svc, _req, p) => ok(await svc.repo.stories(param(p, 0))),
+  },
+  {
+    method: "GET",
+    pattern: /^\/search$/,
+    handler: async (svc, req) => {
+      const q = (req.query.q ?? "").trim();
+      if (!q || q.length > 200) throw badRequest("q must be 1 to 200 characters");
+      const sort = (req.query.sort ?? "best") as SearchSort;
+      if (!SORTS.includes(sort)) throw badRequest("sort must be best or newest");
+      return ok(await svc.search.search(q, sort));
+    },
   },
   {
     method: "POST",

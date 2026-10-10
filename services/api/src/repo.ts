@@ -41,6 +41,7 @@ import {
   senderItemKey,
   TOPICS_KEY,
   toVector,
+  EMBED_DIMENSIONS,
   type InterestVector,
   type RelatedMatch,
 } from "@library/core";
@@ -74,6 +75,7 @@ import type {
 } from "@library/core/types";
 import { badRequest, conflict, notFound } from "./errors.js";
 import type { ListOptions, RepoPort } from "./port.js";
+import type { CorpusIssue, CorpusStory, SearchSource } from "./search.js";
 
 type Item = Record<string, unknown>;
 
@@ -240,7 +242,7 @@ function decodePhase(cursor: string | undefined): { phase: 1 | 2; cursor?: strin
   return { phase: o.p, cursor: o.c as string | undefined };
 }
 
-export class DynamoRepo implements RepoPort {
+export class DynamoRepo implements RepoPort, SearchSource {
   private readonly ddb: DynamoDBDocumentClient;
   private readonly s3: S3Client;
   private readonly table: string;
@@ -847,6 +849,120 @@ export class DynamoRepo implements RepoPort {
       ...(typeof s.link === "string" ? { link: s.link } : {}),
     }));
     return { stories: stories.sort((a, b) => a.n - b.n) };
+  }
+
+  // ---------- search (#53) ----------
+
+  /** What search reads: every listed issue's words, and every story with its embedding. */
+  async searchCorpus(): Promise<{ issues: CorpusIssue[]; stories: CorpusStory[] }> {
+    const words = {
+      ProjectionExpression: "#id, #sid, #pub, #sub, #sum, #promo",
+      ExpressionAttributeNames: {
+        "#id": "id",
+        "#sid": "senderId",
+        "#pub": "publication",
+        "#sub": "subject",
+        "#sum": "summary",
+        "#promo": "promo",
+      },
+    };
+    const [inbox, archive, stories] = await Promise.all([
+      this.queryAll({ ...words, ...this.partition(PARTITION.inbox) }),
+      this.queryAll({ ...words, ...this.partition(PARTITION.archive) }),
+      this.everyStory(),
+    ]);
+    const issues: CorpusIssue[] = [...inbox, ...archive].map((i) => ({
+      id: i.id as string,
+      senderId: i.senderId as string,
+      publication: i.publication as string,
+      subject: i.subject as string,
+      summary: i.summary as string | undefined,
+      promo: i.promo === true,
+    }));
+    return { issues, stories };
+  }
+
+  /** These issues as list rows, read now (#53); any filtered since they were found are left out. */
+  async listItems(ids: string[]): Promise<IssueListItem[]> {
+    const items = await this.batchGet(ids.map(issueKey), LIST_ATTRIBUTES);
+    return items.filter((i) => i.state !== "filtered").map(toListItem);
+  }
+
+  /**
+   * Every story with its embedding: about 5 MB for 2,200 stories, so read a week at a time, eight
+   * weeks at once, rather than one 1 MB page after another.
+   */
+  private async everyStory(): Promise<CorpusStory[]> {
+    const first = await this.query({
+      ...this.partition(PARTITION.stories),
+      ProjectionExpression: "gsi1sk",
+      Limit: 1,
+    });
+    const oldest = first.Items?.[0]?.gsi1sk as string | undefined;
+    if (!oldest) return [];
+    const WEEK = 7 * 86_400_000;
+    const weeks: string[] = [];
+    for (let t = Date.parse(oldest.slice(0, 10)); t <= Date.now() + 86_400_000; t += WEEK) {
+      weeks.push(new Date(t).toISOString());
+    }
+    const out: CorpusStory[] = [];
+    for (let i = 0; i < weeks.length; i += 8) {
+      const slices = await Promise.all(
+        weeks.slice(i, i + 8).map((from) =>
+          this.queryAll({
+            IndexName: INDEX.list,
+            // Sort keys are "<receivedAt>#<id>#<nn>", so none equals a week's bound.
+            KeyConditionExpression: "gsi1pk = :p AND gsi1sk BETWEEN :from AND :to",
+            ExpressionAttributeValues: {
+              ":p": PARTITION.stories,
+              ":from": from,
+              ":to": new Date(Date.parse(from) + WEEK).toISOString(),
+            },
+            ProjectionExpression: "#id, #n, #h, #s, #names, #v",
+            ExpressionAttributeNames: {
+              "#id": "id",
+              "#n": "n",
+              "#h": "headline",
+              "#s": "summary",
+              "#names": "names",
+              "#v": "vector",
+            },
+          }),
+        ),
+      );
+      for (const s of slices.flat()) {
+        const vector = s.vector instanceof Uint8Array ? toVector(s.vector) : undefined;
+        out.push({
+          id: s.id as string,
+          n: s.n as number,
+          headline: s.headline as string,
+          summary: (s.summary as string | undefined) ?? "",
+          names: (s.names as string[] | undefined) ?? [],
+          ...(vector?.length === EMBED_DIMENSIONS ? { vector } : {}),
+        });
+      }
+    }
+    return out;
+  }
+
+  private partition(p: string) {
+    return {
+      IndexName: INDEX.list,
+      KeyConditionExpression: "gsi1pk = :p",
+      ExpressionAttributeValues: { ":p": p },
+    };
+  }
+
+  /** Every page of a query. */
+  private async queryAll(input: Omit<QueryCommandInput, "TableName">): Promise<Item[]> {
+    const out: Item[] = [];
+    let start: Item | undefined;
+    do {
+      const res: QueryCommandOutput = await this.query({ ...input, ExclusiveStartKey: start });
+      out.push(...(res.Items ?? []));
+      start = res.LastEvaluatedKey;
+    } while (start);
+    return out;
   }
 
   // ---------- senders ----------

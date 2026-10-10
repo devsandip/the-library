@@ -8,6 +8,8 @@ import type {
   Rating,
   ReaderState,
   RelatedResponse,
+  SearchResponse,
+  SearchSort,
   SenderDetailResponse,
   SenderListItem,
   SenderPatch,
@@ -61,8 +63,14 @@ export interface RepoPort {
   status(): Promise<StatusResponse>;
 }
 
+/** Search over what the newsletters said (#53). */
+export interface SearchPort {
+  search(q: string, sort: SearchSort): Promise<SearchResponse>;
+}
+
 export interface Services {
   repo: RepoPort;
+  search: SearchPort;
   /** Fire-and-forget ingest run ("refresh now"). */
   startIngest(): Promise<void>;
 }

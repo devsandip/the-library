@@ -8,6 +8,7 @@ import {
   ConverseCommand,
   InvokeModelCommand,
 } from "@aws-sdk/client-bedrock-runtime";
+import { EMBED_DIMENSIONS, EMBED_MODEL } from "@library/core";
 
 export const MODELS = {
   // Haiku 5.5 (us.anthropic.claude-haiku-5-5) answers "not available for this account" on this
@@ -15,10 +16,8 @@ export const MODELS = {
   // cheaper to run). Switching is this line (the ingest role allows both), then
   // `pnpm enrich --force` if older issues should be redone.
   classify: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-  embed: "amazon.titan-embed-text-v2:0",
+  embed: EMBED_MODEL,
 } as const;
-
-export const EMBED_DIMENSIONS = 512;
 
 export interface ToolSpec {
   name: string;

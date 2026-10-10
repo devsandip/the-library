@@ -3,6 +3,7 @@
  * Loaded with a dynamic import, so production bundles never include it.
  */
 import { readerDay } from "@library/core/days";
+import { issueDoc, queryTerms, rankByWords, storyDoc } from "@library/core/search";
 import type {
   DigestStats,
   HistoryResponse,
@@ -15,6 +16,9 @@ import type {
   Rating,
   ReaderState,
   RelatedResponse,
+  SearchHit,
+  SearchResponse,
+  SearchSort,
   SenderDetailResponse,
   SenderListItem,
   SenderListResponse,
@@ -601,6 +605,44 @@ export class MockLibraryApi implements LibraryApi {
   async stories(id: string): Promise<IssueStoriesResponse> {
     await delay(250);
     return mockStories(find(id));
+  }
+
+  /**
+   * Search (#53) by the API's word rules over the mock issues and their stories. The mock has no
+   * embeddings, so a stand-in for search by meaning: other issues on the topic of the best match.
+   */
+  async search(q: string, sort: SearchSort): Promise<SearchResponse> {
+    await delay(200);
+    const muted = new Set(senders.filter((s) => s.muted).map((s) => s.senderId));
+    const listed = issues.filter((i) => !i.promo && !muted.has(i.senderId));
+    const stories = new Map(listed.map((i) => [i.id, mockStories(i).stories]));
+    const docs = listed.flatMap((i) => [
+      issueDoc(i),
+      ...stories.get(i.id)!.map((s) => storyDoc({ ...s, id: i.id }, i.publication)),
+    ]);
+    const terms = queryTerms(q);
+    const byWords = rankByWords(terms, docs).filter((m) => !m.partial);
+    const found = new Set(byWords.map((m) => m.issueId));
+    const topic = listed.find((i) => i.id === byWords[0]?.issueId)?.topic;
+    const near = listed.filter((i) => topic && i.topic === topic && !found.has(i.id)).slice(0, 3);
+    const hit = (id: string, match: SearchHit["match"], story?: number): SearchHit => {
+      const i = find(id);
+      const all = stories.get(id) ?? [];
+      const headline = all.length > 1 ? all.find((s) => s.n === story)?.headline : undefined;
+      return {
+        ...withStar(strip(i)),
+        match,
+        ...(headline ? { story: { n: story!, headline } } : {}),
+      };
+    };
+    const newest = (a: SearchHit, b: SearchHit) => b.receivedAt.localeCompare(a.receivedAt);
+    const words = byWords.map((m) => hit(m.issueId, "words", m.story));
+    const meaning = near.map((i) => hit(i.id, "meaning", 1));
+    if (sort === "newest") {
+      words.sort(newest);
+      meaning.sort(newest);
+    }
+    return { q, terms, items: [...words, ...meaning], byMeaning: true };
   }
 
   async summary(): Promise<SummaryResponse> {
