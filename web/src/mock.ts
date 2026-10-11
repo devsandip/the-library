@@ -591,6 +591,42 @@ export class MockLibraryApi implements LibraryApi {
     // A stand-in for the API's nearest neighbours: other issues on the same topic.
     const me = issues.find((i) => i.id === id);
     const muted = new Set(senders.filter((s) => s.muted).map((s) => s.senderId));
+    const own = me ? mockStories(me).stories : [];
+    if (me && own.length > 1) {
+      // A digest: each story's relatives are other issues' stories sharing a word with it.
+      const words = (t: string) => new Set(queryTerms(t).filter((w) => w.length >= 4));
+      const theirs = issues
+        .filter((i) => i.id !== id && !i.promo && !muted.has(i.senderId))
+        .flatMap((i) => {
+          const st = mockStories(i).stories;
+          return st.map((s) => ({ i, s, digest: st.length > 1, words: words(s.headline) }));
+        });
+      const stories = own.flatMap((s) => {
+        const mine = words(s.headline);
+        const seen = new Set<string>();
+        const near = theirs
+          .filter((t) => [...t.words].some((w) => mine.has(w)) && !seen.has(t.i.id))
+          .filter((t) => seen.add(t.i.id))
+          .slice(0, 3)
+          .map((t) => ({
+            ...strip(t.i),
+            similarity: 0.5,
+            ...(t.digest ? { story: { n: t.s.n, headline: t.s.headline } } : {}),
+          }));
+        const before = (i: IssueListItem) => i.receivedAt < me.receivedAt;
+        return near.length
+          ? [
+              {
+                n: s.n,
+                headline: s.headline,
+                earlier: near.filter(before),
+                since: near.filter((i) => !before(i)),
+              },
+            ]
+          : [];
+      });
+      return { earlier: [], since: [], stories };
+    }
     const near = issues
       .filter(
         (i) =>

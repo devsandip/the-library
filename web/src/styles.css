@@ -2137,11 +2137,32 @@ a.button {
   color: var(--muted);
 }
 
-.related h3 {
+.related-side {
   margin: 14px 0 6px;
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--fg);
+}
+
+/* A digest's story and its relatives: the story under the accent bar, as search names it. */
+.related-story {
+  margin-top: 18px;
+}
+
+.related-story h3 {
+  margin: 0 0 6px;
+  padding-left: 8px;
+  border-left: 2px solid var(--accent);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--fg);
+}
+
+.related-story .related-side {
+  margin: 10px 0 4px;
+  font-size: 0.75rem;
+  color: var(--muted);
 }
 
 .related-list {

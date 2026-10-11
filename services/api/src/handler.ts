@@ -5,6 +5,8 @@ import type { Services } from "./port.js";
 import { TitanEmbedder } from "./embed.js";
 import { DynamoRepo } from "./repo.js";
 import { API_PREFIX, route, type Request } from "./routes.js";
+import { CorpusCache } from "./corpus.js";
+import { Related } from "./related.js";
 import { Search } from "./search.js";
 
 type Event = APIGatewayProxyEventV2WithJWTAuthorizer;
@@ -86,11 +88,14 @@ const repo = new DynamoRepo({
   stage: STAGE ?? "unknown",
 });
 
+// Kept between requests while the Lambda is warm: the corpus, and recent query embeddings.
+// Dev reads the corpus every time: integration tests rewrite it between calls.
+const corpus = new CorpusCache(repo, STAGE === "prod" ? {} : { ttlMs: 0 });
+
 export const handler = createHandler({
   repo,
-  // Kept between requests while the Lambda is warm: the corpus, and recent query embeddings.
-  // Dev reads the corpus every time: integration tests rewrite it between searches.
-  search: new Search(repo, new TitanEmbedder(), STAGE === "prod" ? {} : { ttlMs: 0 }),
+  search: new Search(repo, new TitanEmbedder(), corpus),
+  related: new Related(repo, corpus),
   startIngest: async () => {
     await lambda.send(
       new InvokeCommand({

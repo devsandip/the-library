@@ -4,7 +4,7 @@
  * Run with `pnpm test:int`.
  */
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
-import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   embeddingKey,
@@ -676,6 +676,69 @@ describe("API on dev", () => {
     });
     expect(digest.body.items[0]).toMatchObject({ id: "fx-tldr", story: { n: 2 } });
     expect((await call("GET", "/search")).status).toBe(400);
+  });
+
+  it("related: a digest's story finds its own relative, and the relative finds it (#20)", async () => {
+    // fx-tldr holds the two stories the search test wrote; Lenny's issue gets one close to the first.
+    const titan = new TitanEmbedder();
+    const lenny = (await getItem("fx-lenny"))!;
+    const headline = "OpenAI's new agents book flights and hotels for travellers";
+    const vector = await titan.embed(
+      [
+        headline,
+        "The agents plan trips, compare fares and make bookings on their own.",
+        "OpenAI",
+      ].join("\n\n"),
+    );
+    await ddb.send(
+      new PutCommand({
+        TableName: stack.tableName,
+        Item: {
+          ...storyKey("fx-lenny", 1),
+          id: "fx-lenny",
+          n: 1,
+          senderId: lenny.senderId,
+          receivedAt: lenny.receivedAt,
+          headline,
+          summary: "",
+          names: ["OpenAI"],
+          vector: vectorBytes(vector),
+          dims: vector.length,
+          gsi1pk: "STORIES",
+          gsi1sk: `${lenny.receivedAt as string}#${storyRef("fx-lenny", 1)}`,
+        },
+      }),
+    );
+    try {
+      const digest = await call<RelatedResponse>("GET", "/issues/fx-tldr/related");
+      expect(digest.status).toBe(200);
+      expect(digest.body.earlier).toEqual([]);
+      expect(digest.body.since).toEqual([]);
+      expect(digest.body.stories).toHaveLength(1);
+      const [travel] = digest.body.stories!;
+      expect(travel).toMatchObject({ n: 1, headline: "OpenAI ships agents that book travel" });
+      const found = [...travel!.earlier, ...travel!.since];
+      expect(found.map((i) => i.id)).toEqual(["fx-lenny"]);
+      expect(found[0]!.similarity).toBeGreaterThanOrEqual(0.45);
+      // Lenny's issue is one story: the issue itself, so its row names no story.
+      expect(found[0]!.story).toBeUndefined();
+
+      const single = await call<RelatedResponse>("GET", "/issues/fx-lenny/related");
+      expect(single.body.stories).toBeUndefined();
+      expect([...single.body.earlier, ...single.body.since]).toMatchObject([
+        { id: "fx-tldr", story: { n: 1, headline: "OpenAI ships agents that book travel" } },
+      ]);
+
+      const TLDR = (await getItem("fx-tldr"))!.senderId as string;
+      await call("PATCH", `/senders/${TLDR}`, { body: { muted: true } });
+      const muted = await call<RelatedResponse>("GET", "/issues/fx-lenny/related");
+      expect([...muted.body.earlier, ...muted.body.since]).toEqual([]);
+      await call("PATCH", `/senders/${TLDR}`, { body: { muted: false } });
+    } finally {
+      await ddb.send(
+        new DeleteCommand({ TableName: stack.tableName, Key: storyKey("fx-lenny", 1) }),
+      );
+    }
   });
 
   it("now reading: the last issue opened, its place, and when it hides", async () => {

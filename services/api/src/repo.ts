@@ -75,7 +75,9 @@ import type {
 } from "@library/core/types";
 import { badRequest, conflict, notFound } from "./errors.js";
 import type { ListOptions, RepoPort } from "./port.js";
-import type { CorpusIssue, CorpusStory, SearchSource } from "./search.js";
+import type { CorpusIssue, CorpusSource, CorpusStory } from "./corpus.js";
+import type { OwnStory, RelatedSource } from "./related.js";
+import type { SearchSource } from "./search.js";
 
 type Item = Record<string, unknown>;
 
@@ -242,7 +244,7 @@ function decodePhase(cursor: string | undefined): { phase: 1 | 2; cursor?: strin
   return { phase: o.p, cursor: o.c as string | undefined };
 }
 
-export class DynamoRepo implements RepoPort, SearchSource {
+export class DynamoRepo implements RepoPort, CorpusSource, SearchSource, RelatedSource {
   private readonly ddb: DynamoDBDocumentClient;
   private readonly s3: S3Client;
   private readonly table: string;
@@ -863,12 +865,42 @@ export class DynamoRepo implements RepoPort, SearchSource {
     return { stories: stories.sort((a, b) => a.n - b.n) };
   }
 
-  // ---------- search (#53) ----------
+  /** The issue's stories with their embeddings (#20), read now; any without one are left out. */
+  async storyVectors(id: string): Promise<OwnStory[]> {
+    const res = await this.query({
+      KeyConditionExpression: "pk = :pk AND begins_with(sk, :story)",
+      ExpressionAttributeValues: { ":pk": issueKey(id).pk, ":story": "STORY#" },
+      ProjectionExpression: "#n, #h, #sid, #at, #v",
+      ExpressionAttributeNames: {
+        "#n": "n",
+        "#h": "headline",
+        "#sid": "senderId",
+        "#at": "receivedAt",
+        "#v": "vector",
+      },
+    });
+    return (res.Items ?? []).flatMap((s) => {
+      const vector = s.vector instanceof Uint8Array ? toVector(s.vector) : undefined;
+      if (vector?.length !== EMBED_DIMENSIONS || typeof s.receivedAt !== "string") return [];
+      return [
+        {
+          issueId: id,
+          n: s.n as number,
+          headline: s.headline as string,
+          senderId: s.senderId as string,
+          receivedAt: s.receivedAt,
+          vector,
+        },
+      ];
+    });
+  }
 
-  /** What search reads: every listed issue's words, and every story with its embedding. */
-  async searchCorpus(): Promise<{ issues: CorpusIssue[]; stories: CorpusStory[] }> {
+  // ---------- search (#53) and related stories (#20) ----------
+
+  /** The corpus: every listed issue's words, and every story with its embedding. */
+  async readCorpus(): Promise<{ issues: CorpusIssue[]; stories: CorpusStory[] }> {
     const words = {
-      ProjectionExpression: "#id, #sid, #pub, #sub, #sum, #promo",
+      ProjectionExpression: "#id, #sid, #pub, #sub, #sum, #promo, #at",
       ExpressionAttributeNames: {
         "#id": "id",
         "#sid": "senderId",
@@ -876,6 +908,7 @@ export class DynamoRepo implements RepoPort, SearchSource {
         "#sub": "subject",
         "#sum": "summary",
         "#promo": "promo",
+        "#at": "receivedAt",
       },
     };
     const [inbox, archive, stories] = await Promise.all([
@@ -890,6 +923,7 @@ export class DynamoRepo implements RepoPort, SearchSource {
       subject: i.subject as string,
       summary: i.summary as string | undefined,
       promo: i.promo === true,
+      receivedAt: i.receivedAt as string,
     }));
     return { issues, stories };
   }
@@ -1246,11 +1280,12 @@ export class DynamoRepo implements RepoPort, SearchSource {
   }
 
   /**
-   * Issues related to `id` (#20): nearest neighbours over every stored issue's embedding, at read
-   * time. Promos and muted newsletters stay out. Fine to a few thousand issues; past that, keep
-   * the vectors packed in one object instead of reading them item by item.
+   * Issues related to `id` as a whole (#20, first version): nearest neighbours over every stored
+   * issue's embedding, at read time, for an issue not split into stories. Promos and muted
+   * newsletters stay out. Fine to a few thousand issues; past that, keep the vectors packed in
+   * one object instead of reading them item by item.
    */
-  async related(id: string): Promise<RelatedResponse> {
+  async relatedIssues(id: string): Promise<RelatedResponse> {
     const [items, senders] = await Promise.all([this.everyIssue(), this.listSenders()]);
     const muted = new Set(senders.filter((s) => s.muted).map((s) => s.senderId));
     const vectors = await this.embeddings(

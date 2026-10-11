@@ -128,7 +128,7 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
   {
     method: "GET",
     pattern: new RegExp(`^/issues/${ISSUE_ID}/related$`),
-    handler: async (svc, _req, p) => ok(await svc.repo.related(param(p, 0))),
+    handler: async (svc, _req, p) => ok(await svc.related.related(param(p, 0))),
   },
   {
     method: "GET",
