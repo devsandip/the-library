@@ -25,6 +25,7 @@ Prod runs what main holds, tested as main holds it. Asked for on 2026-10-11, aft
 - **One branch per change, cut from a fresh main, merged before the next starts.** If two are open at once, the second takes in main with GitHub's Update branch and CI runs again. No more testing several branches together on a laptop.
 - **The role is deployed by hand** (`pnpm cdk deploy -c stage=ci`), and the pipeline never deploys its stack. That does not put the role out of the pipeline's reach: CDK's bootstrap roles can change anything in the account, so a change merged to main could change the role too. The real gate is main itself, so the GitHub account that merges is now part of prod's security.
 - **The GitHub provider is the account's existing one.** An AWS account has one per URL, and another project created it.
+- **The role matches GitHub's immutable subject** (`repo:devsandip@19489947/the-library@1411266741:environment:dev`, and `prod`). The repository has immutable subjects on, so its tokens name the owner and the repository by ID as well as by name, and a renamed or recreated repository cannot match. The first Deploy run failed on the name-only subject the role first expected; CloudTrail's refused `AssumeRoleWithWebIdentity` calls showed the real one.
 - **Actions are pinned to commits**, with the release in a comment, since the deploy jobs hold AWS credentials.
 - **The repository stays private.** It already was on 2026-10-11.
 
