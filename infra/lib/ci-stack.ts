@@ -9,6 +9,11 @@ import type { Construct } from "constructs";
 
 /** The repository whose main branch deploys (docs/features/pipeline.md). */
 export const GITHUB_REPO = "devsandip/the-library";
+/**
+ * How GitHub names the repository in its tokens. Immutable subjects are on, so the owner and the
+ * repository carry their IDs as well, and a renamed or recreated repository cannot match.
+ */
+export const GITHUB_SUBJECT = "repo:devsandip@19489947/the-library@1411266741";
 /** The GitHub environments the deploy jobs run in; GitHub lets only main use them. */
 export const GITHUB_ENVIRONMENTS = ["dev", "prod"] as const;
 export const DEPLOY_ROLE_NAME = "TheLibrary-github-deploy";
@@ -40,7 +45,7 @@ export class CiStack extends Stack {
         StringEquals: {
           [`${GITHUB_OIDC}:aud`]: "sts.amazonaws.com",
           [`${GITHUB_OIDC}:sub`]: GITHUB_ENVIRONMENTS.map(
-            (env) => `repo:${GITHUB_REPO}:environment:${env}`,
+            (env) => `${GITHUB_SUBJECT}:environment:${env}`,
           ),
         },
       }),

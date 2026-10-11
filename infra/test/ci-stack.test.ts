@@ -32,8 +32,8 @@ describe("ci stack: the role GitHub Actions deploys with", () => {
       StringEquals: {
         "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
         "token.actions.githubusercontent.com:sub": [
-          "repo:devsandip/the-library:environment:dev",
-          "repo:devsandip/the-library:environment:prod",
+          "repo:devsandip@19489947/the-library@1411266741:environment:dev",
+          "repo:devsandip@19489947/the-library@1411266741:environment:prod",
         ],
       },
     });
