@@ -39,6 +39,7 @@ function setup(overrides: Partial<RepoPort> = {}) {
     listTopics: vi.fn(async () => [{ name: "AI", description: "Models and tools" }]),
     setRating: vi.fn(async (_id, value) => ({ ...issue, rating: value === 0 ? undefined : value })),
     logOpen: vi.fn(async () => undefined),
+    logPeek: vi.fn(async () => undefined),
     nowReading: vi.fn(async () => ({
       nowReading: { issue, position: 0.4, at: "2026-10-10T03:00:00.000Z" },
     })),
@@ -302,11 +303,16 @@ describe("routing and validation", () => {
     );
   });
 
-  it("events: open only, 204", async () => {
-    const { call } = setup();
+  it("events: an open or a peek, 204", async () => {
+    const { call, repo } = setup();
     expect((await call("POST", "/issues/abc123/events", { body: { type: "open" } })).status).toBe(
       204,
     );
+    expect((await call("POST", "/issues/abc123/events", { body: { type: "peek" } })).status).toBe(
+      204,
+    );
+    expect(repo.logOpen).toHaveBeenCalledTimes(1);
+    expect(repo.logPeek).toHaveBeenCalledWith("abc123");
     expect((await call("POST", "/issues/abc123/events", { body: { type: "dwell" } })).status).toBe(
       400,
     );

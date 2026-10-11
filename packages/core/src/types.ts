@@ -198,7 +198,7 @@ export interface SummaryResponse {
   narrative?: Narrative;
 }
 
-/** An issue in read history (#42): when it was last opened that day. */
+/** An issue in read history (#42): when it was last read that day, opened or peeked at (#56). */
 export interface HistoryItem extends IssueListItem {
   openedAt: string;
 }
@@ -206,7 +206,7 @@ export interface HistoryItem extends IssueListItem {
 export interface HistoryResponse {
   /** The reader's day, YYYY-MM-DD (India). */
   day: string;
-  /** Issues opened that day, each once at its latest open, latest first. */
+  /** Issues read that day (opened, or peeked at), each once at its latest read, latest first. */
   items: HistoryItem[];
   /** The nearest days before and after it with anything read. */
   previousDay?: string;

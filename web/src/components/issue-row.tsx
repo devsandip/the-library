@@ -28,18 +28,21 @@ export function IssueRow({
   openedAt,
   onOpen,
   onSave,
+  onChange,
   found,
 }: {
   issue: IssueListItem;
   showPublication?: boolean;
   /** Showing in the reading pane. */
   selected?: boolean;
-  /** In read history (#42): when it was opened, shown instead of when it arrived. */
+  /** In read history (#42): when it was read (opened, or peeked at, #56), not when it arrived. */
   openedAt?: string;
   /** Open in the reading pane instead of on its own page. */
   onOpen?: (id: string) => void;
   /** Save for later (#43): the row gets a bookmark. */
   onSave?: (issue: IssueListItem) => void;
+  /** Tells the list what a peek changed (#56), so the row keeps up. */
+  onChange?: (id: string, change: Partial<IssueListItem>) => void;
   /** A search result (#53): the words to mark, and the story inside a digest that matched. */
   found?: Found;
 }) {
@@ -93,7 +96,7 @@ export function IssueRow({
               </span>
             )}
             {openedAt ? (
-              <time dateTime={openedAt} title="Opened">
+              <time dateTime={openedAt} title="Read">
                 {clockTime(openedAt)}
               </time>
             ) : (
@@ -116,7 +119,9 @@ export function IssueRow({
         )}
       </a>
       {onSave && <SaveButton issue={issue} onSave={onSave} />}
-      {peeking && !onOpen && <StoryPeek issue={issue} id={peekId} onOpen={open} />}
+      {peeking && !onOpen && (
+        <StoryPeek issue={issue} id={peekId} onOpen={open} onChange={onChange} />
+      )}
     </li>
   );
 }

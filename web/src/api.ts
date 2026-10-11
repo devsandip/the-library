@@ -51,6 +51,8 @@ export interface LibraryApi {
   history(day?: string): Promise<HistoryResponse>;
   rate(id: string, value: Rating | 0): Promise<IssueListItem>;
   logOpen(id: string): Promise<void>;
+  /** A peek left open (#56): read history lists the issue. */
+  logPeek(id: string): Promise<void>;
   /** The issue to come back to (#44), if there is one. */
   nowReading(): Promise<NowReadingResponse>;
   /**
@@ -156,6 +158,9 @@ export class HttpLibraryApi implements LibraryApi {
   }
   logOpen(id: string) {
     return this.request<void>("POST", `/issues/${encodeURIComponent(id)}/events`, { type: "open" });
+  }
+  logPeek(id: string) {
+    return this.request<void>("POST", `/issues/${encodeURIComponent(id)}/events`, { type: "peek" });
   }
   nowReading() {
     return this.request<NowReadingResponse>("GET", "/now-reading");

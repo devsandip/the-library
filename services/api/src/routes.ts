@@ -160,8 +160,9 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     pattern: new RegExp(`^/issues/${ISSUE_ID}/events$`),
     handler: async (svc, req, p) => {
       const { type } = json<{ type?: unknown }>(req);
-      if (type !== "open") throw badRequest("type must be open");
-      await svc.repo.logOpen(param(p, 0));
+      if (type !== "open" && type !== "peek") throw badRequest("type must be open or peek");
+      const id = param(p, 0);
+      await (type === "open" ? svc.repo.logOpen(id) : svc.repo.logPeek(id));
       return { status: 204 };
     },
   },

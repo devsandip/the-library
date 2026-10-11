@@ -536,7 +536,7 @@ describe("API on dev", () => {
     expect([...muted.body.earlier, ...muted.body.since]).toEqual([]);
     await call("PATCH", `/senders/${LENNY}`, { body: { muted: false } });
   });
-  it("history: issues opened on a day, latest first and once each, with the days around it", async () => {
+  it("history: issues read on a day, latest first and once each, with the days around it", async () => {
     for (const id of ["fx-lenny", "fx-tldr", "fx-lenny"]) {
       expect((await call("POST", `/issues/${id}/events`, { body: { type: "open" } })).status).toBe(
         204,
@@ -554,6 +554,22 @@ describe("API on dev", () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(r.body.items[0]?.openedAt).toMatch(/^\d{4}-/);
     expect(r.body.nextDay).toBeUndefined();
+
+    // A peek left open is a read too (#56): the issue joins the day, and Now reading stays put.
+    const reading = (await call<NowReadingResponse>("GET", "/now-reading")).body;
+    const peek = (id: string) => call("POST", `/issues/${id}/events`, { body: { type: "peek" } });
+    expect((await peek("fx-bytebytego")).status).toBe(204);
+    const peeked = await eventually(
+      () => call<HistoryResponse>("GET", "/history"),
+      (x) => x.body.items[0]?.id === "fx-bytebytego",
+    );
+    expect(peeked.body.items.map((i) => i.id).slice(0, 3)).toEqual([
+      "fx-bytebytego",
+      "fx-lenny",
+      "fx-tldr",
+    ]);
+    expect((await call<NowReadingResponse>("GET", "/now-reading")).body).toEqual(reading);
+    expect((await peek("does-not-exist")).status).toBe(404);
 
     // An open two days ago, stored the way the API stores one, makes that day the previous one.
     const at = new Date(Date.now() - 2 * 86_400_000).toISOString();

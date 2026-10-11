@@ -2,10 +2,14 @@ import { useEffect, useRef } from "preact/hooks";
 import type { IssueListItem, IssueStoriesResponse } from "@library/core/types";
 import { useApp } from "../context.js";
 import { useAsync } from "../hooks.js";
+import { useLibrary } from "../library.js";
 import { ExternalIcon } from "./icons.js";
 
 /** A second tap within this long opens the issue instead of peeking (#41). */
 export const DOUBLE_TAP_MS = 250;
+
+/** A peek left open this long reads the issue (#56); one folded away sooner was only a glance. */
+export const PEEK_READ_MS = 2000;
 
 /** Stories are read once per issue a page load: they change only when an issue is split again. */
 const cache = new Map<string, Promise<IssueStoriesResponse>>();
@@ -57,19 +61,38 @@ export function useTapToPeek(actions: { toggle: () => void; open: () => void }) 
 /**
  * What is inside an issue, under its row (#41): a digest's stories, each with its headline, a line
  * and its source; for a single story, what it says. All from the story index, so no new Claude
- * call.
+ * call. Left open for a moment, it reads the issue (#56): read history lists it, and an unread
+ * issue is marked read, as opening it would.
  */
 export function StoryPeek({
   issue,
   id,
   onOpen,
+  onChange,
 }: {
   issue: IssueListItem;
   /** The element id the row's link points at with aria-controls. */
   id: string;
   onOpen: () => void;
+  /** Tells the list a peek marked the issue read, so its row keeps up. */
+  onChange?: (id: string, change: Partial<IssueListItem>) => void;
 }) {
   const { api } = useApp();
+  const { counts } = useLibrary();
+  const latest = useRef({ issue, onChange });
+  latest.current = { issue, onChange };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const { issue: i, onChange: changed } = latest.current;
+      void api.logPeek(i.id).catch(() => undefined);
+      if (i.state !== "unread") return;
+      changed?.(i.id, { state: "read" });
+      void api.setState(i.id, "read").then(counts.reload, () => undefined);
+    }, PEEK_READ_MS);
+    return () => clearTimeout(timer);
+  }, [issue.id]);
+
   const read = useAsync(() => {
     let stories = cache.get(issue.id);
     if (!stories) {

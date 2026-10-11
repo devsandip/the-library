@@ -99,13 +99,20 @@ export function Saved() {
                 selected={i.id === open}
                 onOpen={panes ? openHere : undefined}
                 onSave={save}
+                onChange={patch}
               />
             ))}
           </ul>
         ) : (
           <ul class="cards">
             {items.map((i) => (
-              <IssueCard key={i.id} issue={i} swipe={rating.actions(i)} onSave={save} />
+              <IssueCard
+                key={i.id}
+                issue={i}
+                swipe={rating.actions(i)}
+                onSave={save}
+                onChange={patch}
+              />
             ))}
           </ul>
         ))}

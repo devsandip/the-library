@@ -94,6 +94,7 @@ export function Search() {
             selected={i.id === open}
             onOpen={panes ? openHere : undefined}
             onSave={save}
+            onChange={patch}
           />
         ))}
       </ul>
@@ -106,6 +107,7 @@ export function Search() {
             found={found(i)}
             swipe={rating.actions(i)}
             onSave={save}
+            onChange={patch}
           />
         ))}
       </ul>
