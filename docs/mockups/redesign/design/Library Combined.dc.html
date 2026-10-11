@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&amp;display=swap">
+<style>
+html,body{margin:0;background:#E8E6E0}
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}
+a:hover{text-decoration:underline;text-underline-offset:3px}
+@keyframes libPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.75)}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+<section id="combined" style="padding:56px 64px 80px;font-family:system-ui,-apple-system,sans-serif;color:#1A1A1A">
+<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+<span style="font:600 11px/1 ui-monospace,Menlo,monospace;padding:5px 8px;background:#1A1A1A;color:#fff;border-radius:5px">3</span>
+<span style="font:600 30px/1.1 system-ui,sans-serif;letter-spacing:-.01em">The Library, combined</span>
+<span style="font:400 17px/1.4 system-ui,sans-serif;color:#555">Handoff samples for the build. One identity on phone and Mac.</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,380px));gap:32px;margin-top:22px;font:400 14px/1.55 system-ui,sans-serif;color:#333">
+<div style="text-wrap:pretty"><b style="font-weight:600;color:#111">Taken from your picks.</b> Today is the deck of 1c-1. Browse is the list, peek and swipe of 1a-2, with the filter sentence of 2b on top. Reading raises the story sheet of 1a-3; going deeper uses the dossier and job line of 1b-3. The Mac is the 1b console.</div>
+<div style="text-wrap:pretty"><b style="font-weight:600;color:#111">One look.</b> Newsreader for everything you read. IBM Plex Sans for controls and body. IBM Plex Mono for ranks, counts, keys, costs and status. Yellow is only ever the Machine's box. Light and dark share every layout.</div>
+<div style="text-wrap:pretty"><b style="font-weight:600;color:#111">Where things live.</b> Phone tabs: Today, Browse, Saved, Library. Continue reading is a pill in every header. Topics, senders and Unread/All/Archived are words in one sentence. History, Search, Newsletters, Status and the planned places sit in Library.</div>
+</div>
+
+<div style="margin-top:56px;font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:#777">Phone · 375 × 812</div>
+<div style="display:flex;gap:48px;align-items:flex-start;margin-top:16px">
+
+<div style="width:375px;flex:none;display:flex;flex-direction:column;gap:12px">
+<div style="min-height:58px;font:400 13px/1.45 system-ui,sans-serif;color:#444;text-wrap:pretty"><b style="font-weight:600;color:#111">P1 · Today, dark.</b> Opens here. The deck of the day's 20, best first; the brief is the first card. Card 3 is one of the five, mid-swipe to Relevant. One tap opens.</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="375px" height="812px" dark="{{ true }}" hint-size="375px,812px">
+<div style="position:absolute;inset:0;overflow:hidden;background:#0C0D0E;color:#E9E7E2;font-family:'IBM Plex Sans',system-ui,sans-serif">
+<div style="padding:54px 16px 0">
+<div style="display:flex;align-items:center;justify-content:space-between;height:44px">
+<span style="font:500 32px/1 'Newsreader',serif;letter-spacing:-.02em">Today</span>
+<span style="height:40px;padding:0 14px;display:flex;align-items:center;gap:8px;border-radius:20px;background:#1B1E21;border:1px solid #2E3236;font:500 12px/1 'IBM Plex Mono',monospace">↩ Linear <span style="color:#7D8185">42%</span></span>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;height:36px;font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#7D8185"><span>CARD 3 OF 20 · ~2 MIN LEFT</span><span style="height:36px;display:flex;align-items:center;font-weight:600;color:#E9E7E2">LIST VIEW</span></div>
+<div style="display:flex;gap:3px"><sc-for list="{{ ticks }}" as="t" hint-placeholder-count="20"><span style="flex:1;height:3px;border-radius:2px;background:{{ t.c }}"></span></sc-for></div>
+<div style="position:relative;height:486px;margin-top:16px">
+<div style="position:absolute;left:20px;right:20px;top:18px;height:452px;border-radius:16px;background:#101113;border:1px solid #24282B"></div>
+<div style="position:absolute;left:10px;right:10px;top:9px;height:462px;border-radius:16px;background:#121416;border:1px solid #24282B"></div>
+<div style="position:absolute;left:0;right:0;top:0;height:472px;border-radius:16px;background:#16181B;border:1px solid #2E3236;box-shadow:0 14px 34px rgba(0,0,0,.35);padding:20px 20px 18px;display:flex;flex-direction:column;transform:translateX(30px) rotate(3.5deg);transform-origin:50% 100%">
+<span style="position:absolute;inset:-9px;pointer-events:none;background:linear-gradient(#FFD21F,#FFD21F) left top/22px 2.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) left top/2.5px 22px no-repeat,linear-gradient(#FFD21F,#FFD21F) right top/22px 2.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) right top/2.5px 22px no-repeat,linear-gradient(#FFD21F,#FFD21F) left bottom/22px 2.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) left bottom/2.5px 22px no-repeat,linear-gradient(#FFD21F,#FFD21F) right bottom/22px 2.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) right bottom/2.5px 22px no-repeat"></span>
+<span style="position:absolute;top:16px;right:16px;padding:7px 10px;border-radius:4px;background:#5CC98A;color:#0C0D0E;font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em">✓ RELEVANT</span>
+<div style="font:600 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#FFD21F">02 OF TODAY'S FIVE</div>
+<div style="margin-top:12px;font:500 10.5px/1.2 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#7D8185">TLDR AI · 3H · 5 MIN · 12 STORIES</div>
+<div style="margin-top:8px;font:600 24px/1.15 'Newsreader',serif;letter-spacing:-.01em;text-wrap:pretty">OpenAI agents book travel, Mistral goes small</div>
+<div style="margin-top:8px;font:400 14.5px/1.45 'IBM Plex Sans',sans-serif;color:#A3A6A9;text-wrap:pretty">Twelve stories, led by OpenAI opening its travel agents to every paid user and a Mistral model small enough for phones.</div>
+<div style="margin-top:14px;padding-top:12px;border-top:1px solid #24282B">
+<div style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#7D8185">INSIDE</div>
+<sc-for list="{{ storiesTop2 }}" as="s" hint-placeholder-count="2"><div style="display:flex;gap:10px;padding:7px 0"><span style="font:600 11.5px/1.5 'IBM Plex Mono',monospace;color:#7D8185;min-width:12px">{{ s.n }}</span><span style="font:500 15px/1.3 'Newsreader',serif">{{ s.h }}</span></div></sc-for>
+<div style="padding:2px 0 0 22px;font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#A3A6A9">+ 10 MORE</div>
+</div>
+<div style="margin-top:auto;padding-top:12px">
+<div style="font:400 14px/1.35 'IBM Plex Sans',sans-serif"><span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#7D8185">WHY </span>Close to your interest in AI</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+<span style="height:44px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid #2E3236;font:600 14px/1 'IBM Plex Sans',sans-serif">Later</span>
+<span style="height:44px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:#E9E7E2;color:#0C0D0E;font:600 14px/1 'IBM Plex Sans',sans-serif">Open</span>
+</div>
+</div>
+</div>
+</div>
+<div style="display:flex;justify-content:space-between;margin-top:12px;font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.06em"><span style="color:#FF6B57">← IRRELEVANT</span><span style="color:#7D8185">TAP TO OPEN</span><span style="color:#5CC98A">RELEVANT →</span></div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:83px;padding:0 8px 34px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#0C0D0E;border-top:1px solid #24282B;font:600 10.5px/1 'IBM Plex Sans',sans-serif;color:#7D8185">
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#E9E7E2"><svg width="24" height="24" viewBox="0 0 24 24" style="fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round"><rect x="4.5" y="7.5" width="15" height="13" rx="2.5"></rect><path d="M7 4.5h10"></path></svg>Today</div>
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px"><svg width="24" height="24" viewBox="0 0 24 24" style="fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><rect x="4" y="5" width="16" height="14" rx="2"></rect><path d="M8 9h8M8 12.5h8M8 16h5"></path></svg>Browse</div>
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px"><svg width="24" height="24" viewBox="0 0 24 24" style="fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round"><path d="M7 4h10v16l-5-3.6L7 20z"></path></svg>Saved</div>
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px"><svg width="24" height="24" viewBox="0 0 24 24" style="fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><path d="M4 8.5V4h4.5M15.5 4H20v4.5M20 15.5V20h-4.5M8.5 20H4v-4.5"></path><path d="M10 8v8h5"></path></svg>Library</div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div style="width:375px;flex:none;display:flex;flex-direction:column;gap:12px">
+<div style="min-height:58px;font:400 13px/1.45 system-ui,sans-serif;color:#444;text-wrap:pretty"><b style="font-weight:600;color:#111">P2 · Browse, dark.</b> Every unread issue, Must Read first. The sentence is the filter bar. One tap peeks inside TLDR; the row below is mid-swipe to Relevant.</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="375px" height="812px" dark="{{ true }}" hint-size="375px,812px">
+<div style="position:absolute;inset:0;overflow:hidden;background:#0C0D0E;color:#E9E7E2;font-family:'IBM Plex Sans',system-ui,sans-serif">
+<div style="padding-top:54px">
+<div style="display:flex;align-items:center;justify-content:space-between;height:44px;padding:0 8px 0 20px">
+<span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#7D8185">SUN 11 OCT · CHECKED 12:30</span>
+<span style="display:flex;align-items:center;gap:2px"><span style="height:34px;padding:0 10px;display:flex;align-items:center;border-radius:17px;background:#1B1E21;border:1px solid #2E3236;font:500 11px/1 'IBM Plex Mono',monospace">↩ 42%</span><span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" style="fill:none;stroke:#E9E7E2;stroke-width:2;stroke-linecap:round"><circle cx="11" cy="11" r="6"></circle><path d="M20 20l-4.5-4.5"></path></svg></span></span>
+</div>
+<div style="padding:2px 20px 18px;border-bottom:1px solid #24282B;font:500 28px/1.26 'Newsreader',serif;letter-spacing:-.01em;color:#7D8185;text-wrap:pretty"><span style="color:#E9E7E2">23</span> <span style="color:#E9E7E2;text-decoration:underline;text-decoration-color:#FFD21F;text-decoration-thickness:2px;text-underline-offset:6px">unread</span> in <span style="color:#E9E7E2;text-decoration:underline;text-decoration-color:#FFD21F;text-decoration-thickness:2px;text-underline-offset:6px">News</span>, <span style="color:#E9E7E2;text-decoration:underline;text-decoration-color:#FFD21F;text-decoration-thickness:2px;text-underline-offset:6px">all topics</span>, <span style="color:#E9E7E2;text-decoration:underline;text-decoration-color:#FFD21F;text-decoration-thickness:2px;text-underline-offset:6px">all senders</span>.</div>
+<div style="padding:14px 20px 14px;border-bottom:1px solid #24282B;background:#101113">
+<div style="display:flex;justify-content:space-between;font:500 10.5px/1.2 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#A3A6A9"><span>TLDR</span><span style="color:#7D8185">7H · 5 MIN</span></div>
+<div style="margin-top:6px;font:500 18px/1.28 'Newsreader',serif">Meta's display glasses, Uber's robotaxi pilot</div>
+<div style="margin-top:10px;border:1px solid #24282B;border-radius:8px;background:#141618">
+<div style="display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #24282B;font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#7D8185"><span>INSIDE · 10 STORIES</span><span>DOUBLE TAP OPENS</span></div>
+<div style="display:flex;gap:10px;align-items:center;padding:6px 0 6px 12px;border-bottom:1px solid #24282B"><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#7D8185;width:12px;flex:none">1</span><div style="flex:1;min-width:0"><div style="font:500 15px/1.25 'Newsreader',serif">Meta's display glasses go on sale</div><div style="margin-top:2px;font:400 13px/1.35 'IBM Plex Sans',sans-serif;color:#A3A6A9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Texts, maps and live captions on a small in-lens display.</div></div><span style="width:44px;height:44px;flex:none;display:flex;align-items:center;justify-content:center;color:#A3A6A9">↗</span></div>
+<div style="display:flex;gap:10px;align-items:center;padding:6px 0 6px 12px;border-bottom:1px solid #24282B"><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#7D8185;width:12px;flex:none">2</span><div style="flex:1;min-width:0"><div style="font:500 15px/1.25 'Newsreader',serif">Uber starts a robotaxi pilot in two cities</div><div style="margin-top:2px;font:400 13px/1.35 'IBM Plex Sans',sans-serif;color:#A3A6A9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Riders can opt in to driverless trips in a small zone.</div></div><span style="width:44px;height:44px;flex:none;display:flex;align-items:center;justify-content:center;color:#A3A6A9">↗</span></div>
+<div style="display:flex;gap:10px;align-items:center;padding:6px 0 6px 12px;border-bottom:1px solid #24282B"><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#7D8185;width:12px;flex:none">3</span><div style="flex:1;min-width:0"><div style="font:500 15px/1.25 'Newsreader',serif">Figma turns prompts into slide decks</div><div style="margin-top:2px;font:400 13px/1.35 'IBM Plex Sans',sans-serif;color:#A3A6A9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Decks are built from your team's own components.</div></div><span style="width:44px;height:44px;flex:none;display:flex;align-items:center;justify-content:center;color:#A3A6A9">↗</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 6px 6px 12px"><span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#7D8185">7 MORE</span><span style="height:38px;padding:0 14px;display:flex;align-items:center;border-radius:6px;background:#E9E7E2;color:#0C0D0E;font:600 13px/1 'IBM Plex Sans',sans-serif">Open issue</span></div>
+</div>
+</div>
+<div style="position:relative;overflow:hidden;border-bottom:1px solid #24282B">
+<div style="position:absolute;inset:0;background:#15301F;display:flex;align-items:center;padding-left:20px;font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#5CC98A">✓ RELEVANT</div>
+<div style="position:relative;transform:translateX(118px);background:#0C0D0E;padding:15px 20px;box-shadow:-1px 0 0 #2F5E43">
+<div style="font:500 10.5px/1.2 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#A3A6A9">THE BATCH</div>
+<div style="margin-top:6px;font:500 18px/1.28 'Newsreader',serif">Small models, big margins</div>
+<div style="margin-top:4px;font:400 14px/1.42 'IBM Plex Sans',sans-serif;color:#A3A6A9">Why labs are racing to ship 1–4B models: cheaper inference and on-device privacy.</div>
+</div>
+</div>
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="2">
+<div style="padding:15px 20px;border-bottom:1px solid #24282B">
+<div style="display:flex;justify-content:space-between;font:500 10.5px/1.2 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#A3A6A9"><span>{{ r.meta }}</span><span style="color:#7D8185">{{ r.right }}</span></div>
+<div style="margin-top:6px;font:500 18px/1.28 'Newsreader',serif;text-wrap:pretty">{{ r.subj }}</div>
+<div style="margin-top:4px;font:400 14px/1.42 'IBM Plex Sans',sans-serif;color:#A3A6A9;text-wrap:pretty">{{ r.line }}</div>
+</div>
+</sc-for>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:83px;padding:0 8px 34px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#0C0D0E;border-top:1px solid #24282B;font:600 10.5px/1 'IBM Plex Sans',sans-serif;color:#7D8185">
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px"><svg width="24" height="24" viewBox="0 0 24 24" style="fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round"><rect x="4.5" y="7.5" width="15" height="13" rx="2.5"></rect><path d="M7 4.5h10"></path></svg>Today</div>
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#E9E7E2"><svg width="24" height="24" viewBox="0 0 24 24" style="fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><rect x="4" y="5" width="16" height="14" rx="2"></rect><path d="M8 9h8M8 12.5h8M8 16h5"></path></svg>Browse</div>
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px"><svg width="24" height="24" viewBox="0 0 24 24" style="fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round"><path d="M7 4h10v16l-5-3.6L7 20z"></path></svg>Saved</div>
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px"><svg width="24" height="24" viewBox="0 0 24 24" style="fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><path d="M4 8.5V4h4.5M15.5 4H20v4.5M20 15.5V20h-4.5M8.5 20H4v-4.5"></path><path d="M10 8v8h5"></path></svg>Library</div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div style="width:375px;flex:none;display:flex;flex-direction:column;gap:12px">
+<div style="min-height:58px;font:400 13px/1.45 system-ui,sans-serif;color:#444;text-wrap:pretty"><b style="font-weight:600;color:#111">P3 · Browse, light, after tapping "all topics".</b> A short sheet picks topics with counts; the sentence rewrites itself as you choose.</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="375px" height="812px" hint-size="375px,812px">
+<div style="position:absolute;inset:0;overflow:hidden;background:#F2F1EC;color:#111213;font-family:'IBM Plex Sans',system-ui,sans-serif">
+<div style="padding-top:54px">
+<div style="display:flex;align-items:center;justify-content:space-between;height:44px;padding:0 8px 0 20px">
+<span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#6B6F73">SUN 11 OCT · CHECKED 12:30</span>
+<span style="display:flex;align-items:center;gap:2px"><span style="height:34px;padding:0 10px;display:flex;align-items:center;border-radius:17px;background:#FFFFFF;border:1px solid #D3D2CB;font:500 11px/1 'IBM Plex Mono',monospace">↩ 42%</span><span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" style="fill:none;stroke:#111213;stroke-width:2;stroke-linecap:round"><circle cx="11" cy="11" r="6"></circle><path d="M20 20l-4.5-4.5"></path></svg></span></span>
+</div>
+<div style="padding:2px 20px 18px;border-bottom:1px solid #E1E0DA;font:500 28px/1.26 'Newsreader',serif;letter-spacing:-.01em;color:#6B6F73;text-wrap:pretty"><span style="color:#111213">10</span> <span style="color:#111213;text-decoration:underline;text-decoration-color:#E3B600;text-decoration-thickness:2px;text-underline-offset:6px">unread</span> in <span style="color:#111213;text-decoration:underline;text-decoration-color:#E3B600;text-decoration-thickness:2px;text-underline-offset:6px">News</span>, <span style="color:#111213;text-decoration:underline;text-decoration-color:#E3B600;text-decoration-thickness:2px;text-underline-offset:6px">about AI and Startups</span>, <span style="color:#111213;text-decoration:underline;text-decoration-color:#E3B600;text-decoration-thickness:2px;text-underline-offset:6px">all senders</span>.</div>
+<div style="padding:15px 20px;opacity:.5"><div style="font:500 10.5px/1.2 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#8A6D00">★ PLATFORMER</div><div style="margin-top:6px;font:500 18px/1.28 'Newsreader',serif">The agents are here, and they're bad at checkout</div></div>
+</div>
+<div style="position:absolute;inset:0;background:rgba(17,18,19,.28)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:420px;background:#FFFFFF;border-radius:16px 16px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.15);padding:8px 20px 0">
+<div style="width:36px;height:5px;border-radius:3px;background:#D3D2CB;margin:0 auto"></div>
+<div style="display:flex;align-items:center;justify-content:space-between;height:44px;margin-top:4px;font:600 15px/1 'IBM Plex Sans',sans-serif"><span style="color:#4A4D50">Clear</span><span style="font:600 17px/1 'Newsreader',serif">Topics</span><span style="color:#111213">Done</span></div>
+<div style="font:500 10.5px/1.4 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#6B6F73">PICK ANY · COUNTS ARE UNREAD NEWS</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
+<sc-for list="{{ topics }}" as="tp" hint-placeholder-count="9">
+<sc-if value="{{ tp.on }}" hint-placeholder-val="{{ false }}"><span style="height:40px;padding:0 14px;display:flex;align-items:center;gap:7px;border-radius:20px;background:#111213;color:#FFFFFF;font:600 13.5px/1 'IBM Plex Sans',sans-serif">{{ tp.t }}<span style="font-weight:500;opacity:.65">{{ tp.c }}</span></span></sc-if>
+<sc-if value="{{ tp.off }}" hint-placeholder-val="{{ true }}"><span style="height:40px;padding:0 14px;display:flex;align-items:center;gap:7px;border-radius:20px;background:#F2F1EC;border:1px solid #E1E0DA;font:600 13.5px/1 'IBM Plex Sans',sans-serif">{{ tp.t }}<span style="font-weight:500;color:#6B6F73">{{ tp.c }}</span></span></sc-if>
+</sc-for>
+</div>
+</div>
+</div>
+</x-import>
+</div>
+
+</div>
+<div style="display:flex;gap:48px;align-items:flex-start;margin-top:40px">
+
+<div style="width:375px;flex:none;display:flex;flex-direction:column;gap:12px">
+<div style="min-height:58px;font:400 13px/1.45 system-ui,sans-serif;color:#444;text-wrap:pretty"><b style="font-weight:600;color:#111">P4 · Reading a digest, light.</b> Story 1 raised as a sheet over the newsletter. Its timeline is done; the backstory is still researching and fills in place.</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="375px" height="812px" hint-size="375px,812px">
+<div style="position:absolute;inset:0;overflow:hidden;background:#F2F1EC;color:#111213;font-family:'IBM Plex Sans',system-ui,sans-serif">
+<div style="padding-top:50px">
+<div style="display:flex;align-items:center;justify-content:space-between;height:44px;padding:0 8px">
+<span style="height:44px;padding:0 12px;display:flex;align-items:center;font:600 15px/1 'IBM Plex Sans',sans-serif">‹ Today</span>
+<span style="height:44px;padding:0 12px;display:flex;align-items:center;font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#4A4D50">ORIGINAL ↗</span>
+</div>
+<div style="padding:4px 20px 12px">
+<div style="font:500 10.5px/1.4 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#6B6F73">TLDR AI · 06:14 · 5 MIN · NEWS · AI &amp; LLMS</div>
+<div style="margin-top:7px;font:600 23px/1.18 'Newsreader',serif;letter-spacing:-.01em;text-wrap:pretty">OpenAI agents book travel, Mistral goes small</div>
+</div>
+<div style="margin:0 12px;background:#FFFFFF;border-radius:3px;box-shadow:0 1px 2px rgba(0,0,0,.1),0 0 0 1px rgba(0,0,0,.07);padding:16px 18px;font-family:Helvetica,Arial,sans-serif;color:#111">
+<div style="text-align:center;font-weight:700;font-size:20px">TLDR AI</div>
+<div style="text-align:center;font-size:11px;color:#777;margin-top:3px">October 11, 2026</div>
+<div style="font-weight:700;font-size:14px;margin-top:14px">OpenAI opens booking agents to all paid users (3 minute read)</div>
+</div>
+</div>
+<div style="position:absolute;inset:0;background:rgba(17,18,19,.18)"></div>
+<div style="position:absolute;left:0;right:0;top:236px;bottom:0;background:#FFFFFF;border-radius:16px 16px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.14);padding:6px 18px 34px">
+<div style="width:36px;height:5px;border-radius:3px;background:#D3D2CB;margin:0 auto"></div>
+<div style="display:flex;align-items:center;justify-content:space-between;height:40px;margin-top:2px"><span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6F73">STORY 1 OF 12</span><span style="display:flex"><span style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;font:500 20px/1 'IBM Plex Sans',sans-serif;color:#D3D2CB">‹</span><span style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;font:500 20px/1 'IBM Plex Sans',sans-serif">›</span></span></div>
+<div style="font:600 21px/1.2 'Newsreader',serif;letter-spacing:-.01em;text-wrap:pretty">OpenAI opens booking agents to all paid users</div>
+<div style="margin-top:6px;font:400 14.5px/1.45 'IBM Plex Sans',sans-serif;color:#4A4D50;text-wrap:pretty">Flights and hotels in the US and India, with a confirmation step before any payment.</div>
+<div style="margin-top:7px;font:500 10.5px/1.4 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#6B6F73">OPENAI · INDIGO · MARRIOTT · ALSO IN PLATFORMER, THE KEN</div>
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:12px;font:600 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.04em">
+<span style="height:40px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid #D3D2CB">SOURCE ↗</span>
+<span style="height:40px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid #D3D2CB">RELATED 2</span>
+<span style="height:40px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid #D3D2CB">FOLLOW</span>
+<span style="height:40px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid #D3D2CB">ASK</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-top:12px;border-bottom:1px solid #E1E0DA;font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#6B6F73">
+<span style="height:40px;display:flex;align-items:center;justify-content:center;gap:4px">TIMELINE <span style="color:#1F8A4C">✓</span></span>
+<span style="height:40px;display:flex;align-items:center;justify-content:center;gap:4px;color:#111213;box-shadow:inset 0 -2px 0 #111213">BACKSTORY <span style="color:#8A6D00">●</span></span>
+<span style="height:40px;display:flex;align-items:center;justify-content:center">TAKES</span>
+<span style="height:40px;display:flex;align-items:center;justify-content:center">SOURCE</span>
+</div>
+<div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between"><span style="font:600 17px/1.2 'Newsreader',serif">How we got here</span><span style="display:flex;align-items:center;gap:7px;font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#8A6D00">{{ pulseL }}RESEARCHING · 0:34</span></div>
+<div style="margin-top:4px;font:500 10.5px/1.4 'IBM Plex Mono',monospace;letter-spacing:.04em;color:#6B6F73">YOUR ARCHIVE AND THE WEB · ~20¢ · UP TO 90 S</div>
+<div style="margin-top:12px">
+<div style="position:relative;margin-left:4px;padding:0 0 11px 16px;border-left:1px solid #D3D2CB"><span style="position:absolute;left:-4px;top:3px;width:7px;height:7px;border-radius:50%;background:#111213"></span><div style="font:500 10px/1.2 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#6B6F73">2025 · WEB</div><div style="margin-top:3px;font:500 15px/1.3 'Newsreader',serif">Labs preview agents that can drive a browser</div></div>
+<div style="position:relative;margin-left:4px;padding:0 0 11px 16px;border-left:1px solid #D3D2CB"><span style="position:absolute;left:-4px;top:3px;width:7px;height:7px;border-radius:50%;background:#111213"></span><div style="font:500 10px/1.2 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#6B6F73">MAR 2026 · PLATFORMER</div><div style="margin-top:3px;font:500 15px/1.3 'Newsreader',serif">Airlines start blocking automated checkouts</div></div>
+<div style="position:relative;margin-left:4px;padding:0 0 11px 16px;border-left:1px solid #D3D2CB"><span style="position:absolute;left:-4px;top:3px;width:7px;height:7px;border-radius:50%;background:#111213"></span><div style="font:500 10px/1.2 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#6B6F73">6 OCT · THE KEN</div><div style="margin-top:3px;font:500 15px/1.3 'Newsreader',serif">IndiGo and two hotel chains sign on in India</div></div>
+<div style="position:relative;margin-left:4px;padding:0 0 4px 16px;border-left:1px dashed #D3D2CB"><span style="position:absolute;left:-4px;top:3px;width:7px;height:7px;border-radius:50%;border:1px solid #6B6F73;background:#FFFFFF"></span><div style="width:70px;height:8px;border-radius:2px;background:#ECEBE6"></div><div style="margin-top:7px;width:220px;height:11px;border-radius:2px;background:#ECEBE6"></div></div>
+</div>
+<div style="margin-top:10px;font:400 13px/1.45 'IBM Plex Sans',sans-serif;color:#6B6F73">Keep reading; it fills in here and stays on this story. A second look is free.</div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div style="width:375px;flex:none;display:flex;flex-direction:column;gap:12px">
+<div style="min-height:58px;font:400 13px/1.45 system-ui,sans-serif;color:#444;text-wrap:pretty"><b style="font-weight:600;color:#111">P5 · The sheet at full height, dark.</b> Story 2's source check has come back. The backstory on story 1 is still running, so its job line follows you.</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="375px" height="812px" dark="{{ true }}" hint-size="375px,812px">
+<div style="position:absolute;inset:0;overflow:hidden;background:#000;color:#E9E7E2;font-family:'IBM Plex Sans',system-ui,sans-serif">
+<div style="position:absolute;left:0;right:0;top:54px;bottom:0;background:#141618;border-radius:16px 16px 0 0;padding:6px 18px 0">
+<div style="width:36px;height:5px;border-radius:3px;background:#2E3236;margin:0 auto"></div>
+<div style="display:flex;align-items:center;justify-content:space-between;height:40px;margin-top:2px"><span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#7D8185">TLDR AI · STORY 2 OF 12</span><span style="display:flex"><span style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;font:500 20px/1 'IBM Plex Sans',sans-serif">‹</span><span style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;font:500 20px/1 'IBM Plex Sans',sans-serif">›</span></span></div>
+<div style="font:600 21px/1.2 'Newsreader',serif;letter-spacing:-.01em;text-wrap:pretty">Mistral releases a 3B model that runs on phones</div>
+<div style="margin-top:6px;font:400 14.5px/1.45 'IBM Plex Sans',sans-serif;color:#A3A6A9;text-wrap:pretty">Open weights and, Mistral says, coding scores close to models twenty times its size.</div>
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-top:12px;border-bottom:1px solid #24282B;font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#7D8185">
+<span style="height:40px;display:flex;align-items:center;justify-content:center">TIMELINE</span>
+<span style="height:40px;display:flex;align-items:center;justify-content:center">BACKSTORY</span>
+<span style="height:40px;display:flex;align-items:center;justify-content:center">TAKES</span>
+<span style="height:40px;display:flex;align-items:center;justify-content:center;gap:4px;color:#E9E7E2;box-shadow:inset 0 -2px 0 #E9E7E2">SOURCE <span style="color:#5CC98A">✓</span></span>
+</div>
+<div style="margin-top:16px;padding:12px 14px;border:1px solid #6B4E1E;background:rgba(255,181,71,.07);border-radius:6px">
+<div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#A3A6A9">VERDICT</div>
+<div style="margin-top:7px;font:600 13px/1.2 'IBM Plex Mono',monospace;letter-spacing:.04em;color:#FFB547">GOES FURTHER THAN THE SOURCE</div>
+<div style="margin-top:6px;font:400 14px/1.45 'IBM Plex Sans',sans-serif;color:#C9CBCC;text-wrap:pretty">The release claims parity on one coding benchmark, not on coding in general.</div>
+</div>
+<div style="margin-top:16px;font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#7D8185">TLDR AI SAID</div>
+<div style="margin-top:7px;padding-left:12px;border-left:2px solid #2E3236;font:italic 400 16px/1.45 'Newsreader',serif">“coding scores close to models twenty times its size”</div>
+<div style="margin-top:16px;font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#7D8185">THE SOURCE SAYS</div>
+<div style="margin-top:7px;padding-left:12px;border-left:2px solid #E9E7E2;font:italic 400 16px/1.45 'Newsreader',serif;text-wrap:pretty">“within 4 points of a 70B model on HumanEval, and 11 points behind it on MBPP”</div>
+<div style="margin-top:6px;padding-left:14px;font:500 11px/1 'IBM Plex Mono',monospace;color:#A3A6A9;text-decoration:underline;text-underline-offset:3px">mistral.ai · release notes, 11 Oct ↗</div>
+<div style="margin-top:16px;font:500 10px/1.5 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#7D8185">CHECKED 07:58 · 52 S · 14¢ · KEPT FOR THIS EVENT, FREE TO REOPEN</div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;padding:10px 12px 34px;background:#141618;border-top:1px solid #24282B">
+<div style="height:44px;display:flex;align-items:center;gap:10px;padding:0 6px 0 12px;border-radius:6px;background:#1B1E21;border:1px solid #2E3236">{{ pulse }}<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#A3A6A9">BACKSTORY · STORY 1 · 0:41 OF ~1:30</span><span style="height:36px;padding:0 10px;display:flex;align-items:center;font:600 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.06em">VIEW</span></div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div style="width:375px;flex:none;display:flex;flex-direction:column;gap:12px">
+<div style="min-height:58px;font:400 13px/1.45 system-ui,sans-serif;color:#444;text-wrap:pretty"><b style="font-weight:600;color:#111">P6 · Library, dark.</b> Search on top, then History, Newsletters, Status and Settings. The planned places arrive here, so the tab bar never grows.</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="375px" height="812px" dark="{{ true }}" hint-size="375px,812px">
+<div style="position:absolute;inset:0;overflow:hidden;background:#0C0D0E;color:#E9E7E2;font-family:'IBM Plex Sans',system-ui,sans-serif">
+<div style="padding:54px 16px 0">
+<div style="display:flex;align-items:center;justify-content:space-between;height:44px;padding:0 4px"><span style="font:500 32px/1 'Newsreader',serif;letter-spacing:-.02em">Library</span><span style="height:34px;padding:0 10px;display:flex;align-items:center;border-radius:17px;background:#1B1E21;border:1px solid #2E3236;font:500 11px/1 'IBM Plex Mono',monospace">↩ 42%</span></div>
+<div style="margin-top:10px;height:46px;display:flex;align-items:center;gap:10px;padding:0 14px;border-radius:8px;background:#1B1E21;border:1px solid #2E3236;font:400 15px/1 'IBM Plex Sans',sans-serif;color:#7D8185"><svg width="18" height="18" viewBox="0 0 24 24" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round"><circle cx="11" cy="11" r="6"></circle><path d="M20 20l-4.5-4.5"></path></svg>Search everything you received</div>
+<div style="margin-top:18px;border-radius:10px;background:#141618;border:1px solid #24282B;overflow:hidden">
+<div style="display:flex;align-items:center;gap:12px;min-height:56px;padding:0 14px;border-bottom:1px solid #24282B"><span style="flex:1;font:600 16px/1 'IBM Plex Sans',sans-serif">History</span><span style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.04em;color:#7D8185">4 TODAY</span><span style="color:#7D8185">›</span></div>
+<div style="display:flex;align-items:center;gap:12px;min-height:56px;padding:0 14px;border-bottom:1px solid #24282B"><span style="flex:1;font:600 16px/1 'IBM Plex Sans',sans-serif">Newsletters</span><span style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.04em;color:#7D8185">32 · 11 ★</span><span style="color:#7D8185">›</span></div>
+<div style="display:flex;align-items:center;gap:12px;min-height:56px;padding:0 14px;border-bottom:1px solid #24282B"><span style="flex:1;font:600 16px/1 'IBM Plex Sans',sans-serif">Status</span><span style="display:flex;align-items:center;gap:6px;font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.04em;color:#7D8185"><span style="width:6px;height:6px;border-radius:50%;background:#5CC98A"></span>HEALTHY · 12:30</span><span style="color:#7D8185">›</span></div>
+<div style="display:flex;align-items:center;gap:12px;min-height:56px;padding:0 14px"><span style="flex:1;font:600 16px/1 'IBM Plex Sans',sans-serif">Settings</span><span style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.04em;color:#7D8185">THEME: SYSTEM</span><span style="color:#7D8185">›</span></div>
+</div>
+<div style="margin:22px 4px 0;font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#7D8185">COMING LATER</div>
+<div style="margin-top:10px;border-radius:10px;border:1px dashed #2E3236;overflow:hidden;color:#A3A6A9">
+<div style="display:flex;align-items:center;min-height:50px;padding:0 14px;border-bottom:1px solid #1E2124"><span style="flex:1;font:600 15px/1 'IBM Plex Sans',sans-serif">Following</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace;color:#7D8185">STORIES YOU TRACK</span></div>
+<div style="display:flex;align-items:center;min-height:50px;padding:0 14px;border-bottom:1px solid #1E2124"><span style="flex:1;font:600 15px/1 'IBM Plex Sans',sans-serif">Ask the Library</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace;color:#7D8185">5–20¢ A QUESTION</span></div>
+<div style="display:flex;align-items:center;min-height:50px;padding:0 14px;border-bottom:1px solid #1E2124"><span style="flex:1;font:600 15px/1 'IBM Plex Sans',sans-serif">Predictions</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace;color:#7D8185">WHO CALLED IT</span></div>
+<div style="display:flex;align-items:center;min-height:50px;padding:0 14px"><span style="flex:1;font:600 15px/1 'IBM Plex Sans',sans-serif">Watch</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace;color:#7D8185">THE DAILY VIDEO</span></div>
+</div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:83px;padding:0 8px 34px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#0C0D0E;border-top:1px solid #24282B;font:600 10.5px/1 'IBM Plex Sans',sans-serif;color:#7D8185">
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px"><svg width="24" height="24" viewBox="0 0 24 24" style="fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round"><rect x="4.5" y="7.5" width="15" height="13" rx="2.5"></rect><path d="M7 4.5h10"></path></svg>Today</div>
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px"><svg width="24" height="24" viewBox="0 0 24 24" style="fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><rect x="4" y="5" width="16" height="14" rx="2"></rect><path d="M8 9h8M8 12.5h8M8 16h5"></path></svg>Browse</div>
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px"><svg width="24" height="24" viewBox="0 0 24 24" style="fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round"><path d="M7 4h10v16l-5-3.6L7 20z"></path></svg>Saved</div>
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#E9E7E2"><svg width="24" height="24" viewBox="0 0 24 24" style="fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><path d="M4 8.5V4h4.5M15.5 4H20v4.5M20 15.5V20h-4.5M8.5 20H4v-4.5"></path><path d="M10 8v8h5"></path></svg>Library</div>
+</div>
+</div>
+</x-import>
+</div>
+
+</div>
+<div style="margin-top:56px;font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:#777">Mac · 1240 × 800</div>
+<div style="max-width:1000px;margin-top:12px;font:400 13px/1.45 system-ui,sans-serif;color:#444;text-wrap:pretty"><b style="font-weight:600;color:#111">M1 · The console, dark.</b> Queue, reader and story index, driven from the keyboard. The yellow frame holds the Machine's five; the ink box marks where you are. Story 1 is open in the index with its timeline filed and the backstory running. Same layout in light.</div>
+<div style="margin-top:14px">
+<x-import component-from-global-scope="ChromeWindow" from="./browser-window.jsx" width="1240px" height="800px" url="sandip.dev/thelibrary/news/tldr-ai-2026-10-11/story/1" tabs="{{ chromeTabs }}" hint-size="1240px,800px">
+<div style="height:716px;display:flex;flex-direction:column;background:#0C0D0E;color:#E9E7E2;font-family:'IBM Plex Sans',system-ui,sans-serif;overflow:hidden">
+<div style="height:48px;flex:none;display:flex;align-items:center;gap:18px;padding:0 16px;border-bottom:1px solid #24282B">
+<div style="display:flex;align-items:center;gap:10px"><span style="position:relative;width:24px;height:24px;border-radius:5px;box-shadow:inset 0 0 0 1px #2E3236;display:flex;align-items:center;justify-content:center"><span style="position:absolute;inset:4px;background:linear-gradient(#FFD21F,#FFD21F) left top/5px 1.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) left top/1.5px 5px no-repeat,linear-gradient(#FFD21F,#FFD21F) right top/5px 1.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) right top/1.5px 5px no-repeat,linear-gradient(#FFD21F,#FFD21F) left bottom/5px 1.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) left bottom/1.5px 5px no-repeat,linear-gradient(#FFD21F,#FFD21F) right bottom/5px 1.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) right bottom/1.5px 5px no-repeat"></span><span style="font:700 13px/1 'Courier Prime',monospace">L</span></span><span style="font:italic 500 18px/1 'Newsreader',serif">The Library</span></div>
+<div style="display:flex;gap:4px;font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.08em">
+<span style="height:30px;padding:0 12px;display:flex;align-items:center;gap:8px;background:#E9E7E2;color:#0C0D0E;border-radius:4px">NEWS <span style="font-weight:500">23</span></span>
+<span style="height:30px;padding:0 12px;display:flex;align-items:center;gap:8px;color:#A3A6A9">LEARNING <span style="font-weight:500">9</span></span>
+<span style="height:30px;padding:0 12px;display:flex;align-items:center;gap:8px;color:#A3A6A9">SAVED <span style="font-weight:500">6</span></span>
+</div>
+<div style="flex:1"></div>
+<div style="width:380px;height:32px;display:flex;align-items:center;gap:10px;padding:0 10px;background:#141618;border:1px solid #2E3236;border-radius:6px"><span style="font:600 10.5px/1 'IBM Plex Mono',monospace;padding:3px 6px;border:1px solid #2E3236;border-radius:3px;color:#A3A6A9">⌘K</span><span style="font:400 13.5px/1 'IBM Plex Sans',sans-serif;color:#7D8185">Search, ask, or go to History, Newsletters, Status…</span></div>
+<div style="display:flex;align-items:center;gap:7px;font:500 11px/1 'IBM Plex Mono',monospace;color:#7D8185"><span style="width:6px;height:6px;border-radius:50%;background:#5CC98A"></span>12:30</div>
+</div>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:392px minmax(0,1fr) 312px">
+<div style="border-right:1px solid #24282B;padding:0 12px;overflow:hidden">
+<div style="height:40px;font:500 15px/40px 'Newsreader',serif;color:#7D8185;white-space:nowrap"><span style="color:#E9E7E2">23</span> <span style="color:#E9E7E2;text-decoration:underline;text-decoration-color:#FFD21F;text-underline-offset:4px">unread</span> in News, <span style="color:#E9E7E2;text-decoration:underline;text-decoration-color:#FFD21F;text-underline-offset:4px">best first</span>, <span style="color:#E9E7E2;text-decoration:underline;text-decoration-color:#FFD21F;text-underline-offset:4px">all topics</span></div>
+<div style="position:relative;padding:10px 4px 2px">
+<span style="position:absolute;inset:0;pointer-events:none;background:linear-gradient(#FFD21F,#FFD21F) left top/14px 1.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) left top/1.5px 14px no-repeat,linear-gradient(#FFD21F,#FFD21F) right top/14px 1.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) right top/1.5px 14px no-repeat,linear-gradient(#FFD21F,#FFD21F) left bottom/14px 1.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) left bottom/1.5px 14px no-repeat,linear-gradient(#FFD21F,#FFD21F) right bottom/14px 1.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) right bottom/1.5px 14px no-repeat"></span>
+<div style="display:flex;justify-content:space-between;padding:0 8px 8px;font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#FFD21F"><span>TODAY'S FIVE</span><span style="color:#7D8185;font-weight:500">FIXED 07:52 · 64% HIT / 14D</span></div>
+<sc-for list="{{ five }}" as="it" hint-placeholder-count="5">
+<div style="display:grid;grid-template-columns:30px minmax(0,1fr);padding:9px 8px;border-top:1px solid #1E2124">
+<div style="font:600 13px/1.3 'IBM Plex Mono',monospace;color:#FFD21F">{{ it.n }}</div>
+<div style="min-width:0"><div style="font:500 10px/1.2 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#7D8185">{{ it.meta }}</div><div style="margin-top:4px;font:500 16px/1.3 'Newsreader',serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ it.subj }}</div><div style="margin-top:3px;font:500 10px/1.2 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#7D8185">↳ {{ it.code }}</div></div>
+</div>
+</sc-for>
+</div>
+<sc-for list="{{ more }}" as="it" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:30px minmax(0,1fr);padding:9px 12px;border-bottom:1px solid #1E2124">
+<div style="font:600 13px/1.3 'IBM Plex Mono',monospace;color:#7D8185">{{ it.n }}</div>
+<div style="min-width:0"><div style="font:500 10px/1.2 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#7D8185">{{ it.meta }}</div><div style="margin-top:4px;font:500 16px/1.3 'Newsreader',serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ it.subj }}</div><div style="margin-top:3px;font:500 10px/1.2 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#7D8185">↳ {{ it.code }}</div></div>
+</div>
+</sc-for>
+</div>
+<div style="padding:20px 26px 0;overflow:hidden">
+<div style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#7D8185">02 OF TODAY'S FIVE · TLDR AI · 06:14 · 5 MIN · NEWS · AI &amp; LLMS</div>
+<div style="margin-top:9px;font:600 27px/1.2 'Newsreader',serif;letter-spacing:-.01em">OpenAI agents book travel, Mistral goes small</div>
+<div style="margin-top:12px;padding:10px 12px;background:#141618;border:1px solid #24282B;border-radius:6px"><div style="font:500 9.5px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#7D8185">SUMMARY · WHY: CLOSE TO YOUR INTEREST IN AI</div><div style="margin-top:6px;font:400 14px/1.5 'IBM Plex Sans',sans-serif;color:#C9CBCC">Twelve stories, led by OpenAI opening its travel agents to every paid user and a Mistral model small enough for phones.</div></div>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;font:600 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.06em">
+<span style="height:30px;padding:0 10px;display:flex;align-items:center;gap:7px;border:1px solid #2F5E43;color:#5CC98A;border-radius:4px"><span style="opacity:.7">R</span>RELEVANT</span>
+<span style="height:30px;padding:0 10px;display:flex;align-items:center;gap:7px;border:1px solid #6A2F27;color:#FF6B57;border-radius:4px"><span style="opacity:.7">X</span>IRRELEVANT</span>
+<span style="height:30px;padding:0 10px;display:flex;align-items:center;gap:7px;border:1px solid #2E3236;color:#A3A6A9;border-radius:4px"><span style="opacity:.7">S</span>SAVE</span>
+<span style="height:30px;padding:0 10px;display:flex;align-items:center;gap:7px;border:1px solid #2E3236;color:#A3A6A9;border-radius:4px"><span style="opacity:.7">E</span>ARCHIVE</span>
+<span style="height:30px;padding:0 10px;display:flex;align-items:center;gap:7px;border:1px solid #2E3236;color:#A3A6A9;border-radius:4px"><span style="opacity:.7">M</span>TO LEARNING</span>
+<span style="height:30px;padding:0 10px;display:flex;align-items:center;gap:7px;border:1px solid #2E3236;color:#A3A6A9;border-radius:4px"><span style="opacity:.7">O</span>ORIGINAL ↗</span>
+</div>
+<div style="margin-top:18px;font:500 9.5px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#7D8185">THE NEWSLETTER'S OWN PAGE · SANDBOXED · DIMMED 6% AT NIGHT</div>
+<div style="margin-top:8px;background:#FFFFFF;border-radius:3px;padding:22px 26px;font-family:Helvetica,Arial,sans-serif;color:#111;filter:brightness(.94)">
+<div style="text-align:center;font-weight:700;font-size:22px">TLDR AI</div>
+<div style="text-align:center;font-size:11.5px;color:#777;margin-top:4px">October 11, 2026</div>
+<div style="text-align:center;font-weight:700;font-size:13px;margin-top:18px;letter-spacing:.04em">HEADLINES &amp; LAUNCHES</div>
+<div style="font-weight:700;font-size:15px;margin-top:12px">OpenAI opens booking agents to all paid users (3 minute read)</div>
+<div style="font-size:14px;line-height:1.5;margin-top:5px;color:#333">OpenAI's agents can now plan and book flights and hotels for paid users in the US and India. Every booking stops for a confirmation before payment.</div>
+<div style="font-weight:700;font-size:15px;margin-top:14px">Mistral releases a 3B model that runs on phones (2 minute read)</div>
+<div style="font-size:14px;line-height:1.5;margin-top:5px;color:#333">The open-weights model scores close to much larger models on coding, according to Mistral.</div>
+</div>
+</div>
+<div style="border-left:1px solid #24282B;padding:0 12px;overflow:hidden">
+<div style="display:flex;align-items:center;justify-content:space-between;height:40px;font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#7D8185"><span>IN THIS ISSUE · 12</span><span style="font-weight:500">[ / ]</span></div>
+<div style="position:relative;padding:11px 12px 12px;background:#141618;border-radius:4px">
+<span style="position:absolute;inset:0;pointer-events:none;background:linear-gradient(#E9E7E2,#E9E7E2) left top/8px 1.5px no-repeat,linear-gradient(#E9E7E2,#E9E7E2) left top/1.5px 8px no-repeat,linear-gradient(#E9E7E2,#E9E7E2) right top/8px 1.5px no-repeat,linear-gradient(#E9E7E2,#E9E7E2) right top/1.5px 8px no-repeat,linear-gradient(#E9E7E2,#E9E7E2) left bottom/8px 1.5px no-repeat,linear-gradient(#E9E7E2,#E9E7E2) left bottom/1.5px 8px no-repeat,linear-gradient(#E9E7E2,#E9E7E2) right bottom/8px 1.5px no-repeat,linear-gradient(#E9E7E2,#E9E7E2) right bottom/1.5px 8px no-repeat"></span>
+<div style="display:flex;gap:8px"><span style="font:600 11.5px/1.4 'IBM Plex Mono',monospace;color:#A3A6A9">1</span><span style="font:600 15px/1.3 'Newsreader',serif">OpenAI opens booking agents to all paid users</span></div>
+<div style="margin-top:5px;padding-left:18px;font:400 12.5px/1.45 'IBM Plex Sans',sans-serif;color:#A3A6A9">Also in Platformer and The Ken · 2 related</div>
+<div style="margin-top:10px;padding-left:18px;display:grid;grid-template-columns:auto 1fr auto;gap:7px 8px;align-items:center;font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.04em;color:#C9CBCC">
+<span style="padding:3px 5px;border:1px solid #2E3236;border-radius:3px">O</span><span>SOURCE ↗</span><span></span>
+<span style="padding:3px 5px;border:1px solid #2E3236;border-radius:3px">F</span><span>FOLLOW</span><span></span>
+<span style="padding:3px 5px;border:1px solid #2E3236;border-radius:3px">A</span><span>ASK</span><span style="color:#7D8185">5–20¢</span>
+<span style="padding:3px 5px;border:1px solid #2E3236;border-radius:3px">L</span><span>TIMELINE</span><span style="color:#5CC98A">✓ FILED</span>
+<span style="padding:3px 5px;border:1px solid #2E3236;border-radius:3px">B</span><span style="display:flex;align-items:center;gap:6px">BACKSTORY {{ pulse }}</span><span style="color:#FFD21F">0:41</span>
+<span style="padding:3px 5px;border:1px solid #2E3236;border-radius:3px">T</span><span>TAKES</span><span style="color:#7D8185">20¢–$1</span>
+<span style="padding:3px 5px;border:1px solid #2E3236;border-radius:3px">C</span><span>CHECK SOURCE</span><span style="color:#7D8185">~10¢</span>
+</div>
+<div style="margin:12px 0 0 18px;padding-top:10px;border-top:1px solid #24282B">
+<div style="display:flex;justify-content:space-between;font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#7D8185"><span>HOW THIS EVOLVED</span><span style="font-weight:500">4 ISSUES · 1¢</span></div>
+<div style="margin-top:8px;display:grid;grid-template-columns:44px minmax(0,1fr);gap:6px 8px;font:400 12.5px/1.35 'IBM Plex Sans',sans-serif;color:#C9CBCC">
+<span style="font:500 10px/1.5 'IBM Plex Mono',monospace;color:#7D8185">18 SEP</span><span>OpenAI hires a travel partnerships lead · Platformer</span>
+<span style="font:500 10px/1.5 'IBM Plex Mono',monospace;color:#7D8185">29 SEP</span><span>Agents spotted in a test build · TLDR AI</span>
+<span style="font:500 10px/1.5 'IBM Plex Mono',monospace;color:#7D8185">6 OCT</span><span>IndiGo and hotels sign on · The Ken</span>
+<span style="font:500 10px/1.5 'IBM Plex Mono',monospace;color:#7D8185">TODAY</span><span>Open to all paid users · TLDR AI</span>
+</div>
+</div>
+</div>
+<sc-for list="{{ storiesRest }}" as="s" hint-placeholder-count="6">
+<div style="display:flex;gap:8px;align-items:baseline;padding:9px 12px;border-bottom:1px solid #1E2124">
+<span style="font:600 11.5px/1.35 'IBM Plex Mono',monospace;color:#7D8185;min-width:16px">{{ s.n }}</span>
+<span style="flex:1;min-width:0;font:400 13px/1.35 'IBM Plex Sans',sans-serif;color:#C9CBCC;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.h }}</span>
+<sc-if value="{{ s.tag }}" hint-placeholder-val="{{ false }}"><span style="font:600 9px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;padding:3px 4px;border:1px solid #6B4E1E;color:#FFB547;border-radius:3px">{{ s.tag }}</span></sc-if>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="height:30px;flex:none;display:flex;align-items:center;gap:16px;padding:0 16px;border-top:1px solid #24282B;font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.04em;color:#7D8185;white-space:nowrap;overflow:hidden">
+<span>J/K ISSUES</span><span>[ ] STORIES</span><span>SPACE PEEK</span><span>R RELEVANT</span><span>X IRRELEVANT</span><span>S SAVE</span><span>E ARCHIVE</span><span>U UNDO</span><span>L B T C GO DEEPER</span><span>/ SEARCH</span><span style="flex:1"></span><span style="color:#FFD21F">● BACKSTORY 0:41</span><span>↩ HOW LINEAR BUILDS PRODUCT · 42%</span>
+</div>
+</div>
+</x-import>
+</div>
+
+<div style="margin-top:64px;font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:#777">System</div>
+<div style="margin-top:16px;display:grid;grid-template-columns:repeat(2,minmax(0,620px));gap:24px">
+
+<div style="background:#0C0D0E;color:#E9E7E2;border-radius:12px;padding:24px;font-family:'IBM Plex Sans',sans-serif">
+<div style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#7D8185">DARK (DEFAULT)</div>
+<div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-top:14px;font:500 10px/1.35 'IBM Plex Mono',monospace;color:#A3A6A9">
+<div><div style="height:40px;border-radius:6px;background:#0C0D0E;box-shadow:inset 0 0 0 1px #2E3236"></div>bg<br>#0C0D0E</div>
+<div><div style="height:40px;border-radius:6px;background:#141618"></div>panel<br>#141618</div>
+<div><div style="height:40px;border-radius:6px;background:#1B1E21"></div>raised<br>#1B1E21</div>
+<div><div style="height:40px;border-radius:6px;background:#16181B;box-shadow:inset 0 0 0 1px #2E3236"></div>card<br>#16181B</div>
+<div><div style="height:40px;border-radius:6px;background:#24282B"></div>line<br>#24282B</div>
+<div><div style="height:40px;border-radius:6px;background:#2E3236"></div>line-2<br>#2E3236</div>
+<div><div style="height:40px;border-radius:6px;background:#E9E7E2"></div>ink<br>#E9E7E2</div>
+<div><div style="height:40px;border-radius:6px;background:#A3A6A9"></div>ink-2<br>#A3A6A9</div>
+<div><div style="height:40px;border-radius:6px;background:#7D8185"></div>ink-3<br>#7D8185</div>
+<div><div style="height:40px;border-radius:6px;background:#FFD21F"></div>box<br>#FFD21F</div>
+<div><div style="height:40px;border-radius:6px;background:#5CC98A"></div>relevant<br>#5CC98A</div>
+<div><div style="height:40px;border-radius:6px;background:#FF6B57"></div>irrelevant<br>#FF6B57</div>
+</div>
+<div style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#7D8185;margin-top:22px">LIGHT</div>
+<div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-top:14px;font:500 10px/1.35 'IBM Plex Mono',monospace;color:#A3A6A9">
+<div><div style="height:40px;border-radius:6px;background:#F2F1EC"></div>bg<br>#F2F1EC</div>
+<div><div style="height:40px;border-radius:6px;background:#FFFFFF"></div>panel<br>#FFFFFF</div>
+<div><div style="height:40px;border-radius:6px;background:#E1E0DA"></div>line<br>#E1E0DA</div>
+<div><div style="height:40px;border-radius:6px;background:#111213;box-shadow:inset 0 0 0 1px #2E3236"></div>ink<br>#111213</div>
+<div><div style="height:40px;border-radius:6px;background:#4A4D50"></div>ink-2<br>#4A4D50</div>
+<div><div style="height:40px;border-radius:6px;background:#6B6F73"></div>ink-3<br>#6B6F73</div>
+<div><div style="height:40px;border-radius:6px;background:#E3B600"></div>box<br>#E3B600</div>
+<div><div style="height:40px;border-radius:6px;background:#8A6D00"></div>box text<br>#8A6D00</div>
+<div><div style="height:40px;border-radius:6px;background:#1F8A4C"></div>relevant<br>#1F8A4C</div>
+<div><div style="height:40px;border-radius:6px;background:#C8361F"></div>irrelevant<br>#C8361F</div>
+<div><div style="height:40px;border-radius:6px;background:#9A5B00"></div>verdict<br>#9A5B00</div>
+<div><div style="height:40px;border-radius:6px;background:#FFFFFF;box-shadow:inset 0 0 0 1px #D3D2CB"></div>email page<br>#FFFFFF</div>
+</div>
+</div>
+
+<div style="background:#0C0D0E;color:#E9E7E2;border-radius:12px;padding:24px;font-family:'IBM Plex Sans',sans-serif">
+<div style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#7D8185">TYPE</div>
+<div style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px 16px;align-items:baseline;margin-top:14px">
+<span style="font:500 10px/1.3 'IBM Plex Mono',monospace;color:#7D8185">SCREEN TITLE<br>Newsreader 500 32/1</span><span style="font:500 32px/1 'Newsreader',serif;letter-spacing:-.02em">Today</span>
+<span style="font:500 10px/1.3 'IBM Plex Mono',monospace;color:#7D8185">CARD / ISSUE TITLE<br>Newsreader 600 24/1.15</span><span style="font:600 24px/1.15 'Newsreader',serif;letter-spacing:-.01em">Zepto's IPO math</span>
+<span style="font:500 10px/1.3 'IBM Plex Mono',monospace;color:#7D8185">FILTER SENTENCE<br>Newsreader 500 28/1.26</span><span style="font:500 28px/1.26 'Newsreader',serif;color:#7D8185"><span style="color:#E9E7E2">23</span> <span style="color:#E9E7E2;text-decoration:underline;text-decoration-color:#FFD21F;text-decoration-thickness:2px;text-underline-offset:6px">unread</span> in <span style="color:#E9E7E2;text-decoration:underline;text-decoration-color:#FFD21F;text-decoration-thickness:2px;text-underline-offset:6px">News</span></span>
+<span style="font:500 10px/1.3 'IBM Plex Mono',monospace;color:#7D8185">ROW TITLE<br>Newsreader 500 18/1.28</span><span style="font:500 18px/1.28 'Newsreader',serif">Postgres 19 adds native vector search</span>
+<span style="font:500 10px/1.3 'IBM Plex Mono',monospace;color:#7D8185">BODY<br>Plex Sans 400 14.5/1.45</span><span style="font:400 14.5px/1.45 'IBM Plex Sans',sans-serif;color:#A3A6A9">Claude's line, summaries, descriptions.</span>
+<span style="font:500 10px/1.3 'IBM Plex Mono',monospace;color:#7D8185">CONTROL<br>Plex Sans 600 14/1</span><span style="font:600 14px/1 'IBM Plex Sans',sans-serif">Open issue</span>
+<span style="font:500 10px/1.3 'IBM Plex Mono',monospace;color:#7D8185">LABEL<br>Plex Mono 500 10.5, +.08em, caps</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#7D8185">TLDR AI · 3H · 5 MIN · 12 STORIES</span>
+</div>
+</div>
+
+<div style="background:#0C0D0E;color:#E9E7E2;border-radius:12px;padding:24px;font-family:'IBM Plex Sans',sans-serif">
+<div style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#7D8185">THE YELLOW BOX · ONE CSS RULE, THREE SIZES</div>
+<div style="display:flex;gap:28px;align-items:center;margin-top:18px">
+<div style="position:relative;width:88px;height:88px;border-radius:20px;background:#0C0D0E;box-shadow:inset 0 0 0 1px #2E3236;display:flex;align-items:center;justify-content:center;flex:none"><span style="position:absolute;inset:16px;background:linear-gradient(#FFD21F,#FFD21F) left top/14px 3px no-repeat,linear-gradient(#FFD21F,#FFD21F) left top/3px 14px no-repeat,linear-gradient(#FFD21F,#FFD21F) right top/14px 3px no-repeat,linear-gradient(#FFD21F,#FFD21F) right top/3px 14px no-repeat,linear-gradient(#FFD21F,#FFD21F) left bottom/14px 3px no-repeat,linear-gradient(#FFD21F,#FFD21F) left bottom/3px 14px no-repeat,linear-gradient(#FFD21F,#FFD21F) right bottom/14px 3px no-repeat,linear-gradient(#FFD21F,#FFD21F) right bottom/3px 14px no-repeat"></span><span style="font:700 46px/1 'Courier Prime',monospace">L</span></div>
+<div style="position:relative;flex:1;padding:14px 16px;border-radius:12px;background:#16181B"><span style="position:absolute;inset:-7px;pointer-events:none;background:linear-gradient(#FFD21F,#FFD21F) left top/22px 2.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) left top/2.5px 22px no-repeat,linear-gradient(#FFD21F,#FFD21F) right top/22px 2.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) right top/2.5px 22px no-repeat,linear-gradient(#FFD21F,#FFD21F) left bottom/22px 2.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) left bottom/2.5px 22px no-repeat,linear-gradient(#FFD21F,#FFD21F) right bottom/22px 2.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) right bottom/2.5px 22px no-repeat"></span><div style="font:600 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#FFD21F">02 OF TODAY'S FIVE</div><div style="margin-top:7px;font:600 17px/1.2 'Newsreader',serif">Card frame: 22 px arms, 2.5 px</div></div>
+<div style="position:relative;flex:1;padding:12px 14px"><span style="position:absolute;inset:0;pointer-events:none;background:linear-gradient(#FFD21F,#FFD21F) left top/14px 1.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) left top/1.5px 14px no-repeat,linear-gradient(#FFD21F,#FFD21F) right top/14px 1.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) right top/1.5px 14px no-repeat,linear-gradient(#FFD21F,#FFD21F) left bottom/14px 1.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) left bottom/1.5px 14px no-repeat,linear-gradient(#FFD21F,#FFD21F) right bottom/14px 1.5px no-repeat,linear-gradient(#FFD21F,#FFD21F) right bottom/1.5px 14px no-repeat"></span><div style="font:600 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#FFD21F">TODAY'S FIVE</div><div style="margin-top:7px;font:400 13px/1.35 'IBM Plex Sans',sans-serif;color:#A3A6A9">Group frame on the Mac: 14 px arms, 1.5 px. The white version marks focus.</div></div>
+</div>
+</div>
+
+<div style="background:#0C0D0E;color:#E9E7E2;border-radius:12px;padding:24px;font-family:'IBM Plex Sans',sans-serif">
+<div style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#7D8185">COMPONENTS</div>
+<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px">
+<span style="height:44px;padding:0 18px;display:flex;align-items:center;border-radius:6px;background:#E9E7E2;color:#0C0D0E;font:600 14px/1 'IBM Plex Sans',sans-serif">Open</span>
+<span style="height:44px;padding:0 18px;display:flex;align-items:center;border-radius:6px;border:1px solid #2E3236;font:600 14px/1 'IBM Plex Sans',sans-serif">Later</span>
+<span style="height:44px;padding:0 14px;display:flex;align-items:center;border-radius:6px;border:1px solid #5CC98A;color:#5CC98A;font:600 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.06em">✓ RELEVANT</span>
+<span style="height:44px;padding:0 14px;display:flex;align-items:center;border-radius:6px;border:1px solid #FF6B57;color:#FF6B57;font:600 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.06em">✕ IRRELEVANT</span>
+<span style="height:36px;padding:0 13px;display:flex;align-items:center;gap:7px;border-radius:18px;background:#E9E7E2;color:#0C0D0E;font:600 13px/1 'IBM Plex Sans',sans-serif">AI &amp; LLMs <span style="font-weight:500;opacity:.6">16</span></span>
+<span style="height:36px;padding:0 13px;display:flex;align-items:center;gap:7px;border-radius:18px;background:#1B1E21;font:600 13px/1 'IBM Plex Sans',sans-serif">System Design <span style="font-weight:500;color:#7D8185">4</span></span>
+</div>
+<div style="display:flex;gap:10px;margin-top:12px">
+<div style="flex:1;height:44px;display:flex;align-items:center;gap:10px;padding:0 6px 0 12px;border-radius:6px;background:#1B1E21;border:1px solid #2E3236">{{ pulse }}<span style="flex:1;font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#A3A6A9">BACKSTORY · STORY 1 · 0:41</span><span style="font:600 10.5px/1 'IBM Plex Mono',monospace;padding:0 8px">VIEW</span></div>
+<div style="flex:1;height:44px;display:flex;align-items:center;gap:10px;padding:0 6px 0 14px;border-radius:8px;background:#1B1E21;border:1px solid #2E3236"><span style="flex:1;font:500 13.5px/1 'IBM Plex Sans',sans-serif">Irrelevant · archived</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#FFD21F;padding:0 8px">UNDO</span></div>
+</div>
+<div style="display:flex;gap:10px;margin-top:12px;align-items:stretch">
+<div style="flex:1;padding:10px 12px;border:1px solid #6B4E1E;background:rgba(255,181,71,.07);border-radius:6px"><div style="font:500 9.5px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#A3A6A9">VERDICT</div><div style="margin-top:6px;font:600 12px/1.2 'IBM Plex Mono',monospace;color:#FFB547">GOES FURTHER THAN THE SOURCE</div></div>
+<div style="flex:1;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1px dashed #2E3236;font:italic 400 22px/1 'Newsreader',serif">No new numbers.</div>
+</div>
+</div>
+
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const five = [
+      { n: '01', nl: 'PLATFORMER ★', meta: 'PLATFORMER ★ · 9 MIN · 2H', subj: "The agents are here, and they're bad at checkout", line: "A week with OpenAI's booking agents: good at planning a trip, still stuck at payment pages and airline logins.", why: 'From a Must Read newsletter', code: 'MUST READ · AI' },
+      { n: '02', nl: 'TLDR AI', meta: 'TLDR AI · 5 MIN · 3H · 12 STORIES', subj: 'OpenAI agents book travel, Mistral goes small', line: 'Twelve stories, led by OpenAI opening its travel agents to every paid user and a Mistral model small enough for phones.', why: 'Close to your interest in AI', code: 'INTEREST · AI' },
+      { n: '03', nl: 'THE KEN ★', meta: 'THE KEN ★ · 11 MIN · 5H', subj: "Zepto's IPO math", line: "Zepto's draft filing shows dark stores in profit in nine cities. The Ken asks whether that lasts once the discounts stop.", why: 'You rated The Ken Relevant 4 times', code: '4× RELEVANT' },
+      { n: '04', nl: 'TLDR DEV', meta: 'TLDR DEV · 4 MIN · 4H', subj: 'Postgres 19 adds native vector search', line: 'Built-in vector indexes; Bun 2.0 and a GitHub Actions price change round out nine stories.', why: 'Close to your interest in system design', code: 'INTEREST · SYSTEM DESIGN' },
+      { n: '05', nl: "WSJ WHAT'S NEWS", meta: "WSJ WHAT'S NEWS · 4 MIN · 6H", subj: 'Chip export limits widen to 12 more countries', line: "Washington widens limits on AI-chip exports, Boeing's strike ends and the Fed holds rates.", why: "Trying a newsletter you haven't rated yet", code: 'EXPLORING · NOT RATED YET' },
+    ];
+    const more = [
+      { n: '06', meta: 'TLDR · 5 MIN · 7H', subj: "Meta's display glasses, Uber's robotaxi pilot", code: 'MATCHES · TECH' },
+      { n: '07', meta: 'THE BATCH · 6 MIN · 1D', subj: 'Small models, big margins', code: 'INTEREST · AI' },
+      { n: '08', meta: 'INC42 · 5 MIN · 9H', subj: "Quick commerce's quiet consolidation", code: 'MATCHES · STARTUPS' },
+      { n: '09', meta: 'EXPONENTIAL VIEW · 8 MIN · 1D', subj: 'The price of a token, falling', code: 'EXPLORING · RARELY RATED' },
+    ];
+    const stories = [
+      { n: '1', h: 'OpenAI opens booking agents to all paid users', s: 'Flights and hotels in the US and India, with a confirmation step before any payment.' },
+      { n: '2', h: 'Mistral releases a 3B model that runs on phones', s: 'Open weights and, Mistral says, coding scores close to models twenty times its size.', tag: 'GOES FURTHER' },
+      { n: '3', h: 'Apple lets its on-device model call app functions', s: 'Developers can expose actions to the model; nothing leaves the phone.' },
+      { n: '4', h: 'An eval startup raises $60M as labs buy in', s: 'Gauge scores agents on scripted tasks; three of its customers are labs it ranks.' },
+      { n: '5', h: 'Google brings deep research to Workspace', s: 'Docs and Gmail can now produce a sourced report that runs in the background.' },
+      { n: '6', h: 'Hugging Face open-sources a browser-agent benchmark', s: '400 tasks across shopping, travel and forms.' },
+      { n: '7', h: 'Perplexity tests checkout inside answers in India', s: 'Shoppers can pay without leaving the answer.' },
+      { n: '8', h: 'Paper: long context beats retrieval for code edits', s: 'Whole-file context fixed more bugs than snippets.' },
+      { n: '9', h: 'Cohere halves prices on its embedding model', s: 'The cut matches rivals.' },
+      { n: '10', h: 'Runway adds camera controls to its video model', s: 'Pan, dolly and orbit per shot.' },
+      { n: '11', h: 'A practical guide to prompt caching', s: 'Where caching saves money.' },
+      { n: '12', h: "Nvidia's inference chip arrives on three clouds", s: 'About a third cheaper than the last generation.' },
+    ].map((x) => Object.assign(x, { tag: x.tag || '' }));
+    const rows = [
+      { meta: '★ THE KEN', right: '5H · 11 MIN', must: true, subj: "Zepto's IPO math", line: "Zepto's draft filing shows dark stores in profit in nine cities; The Ken asks whether that lasts.", topic: 'STARTUPS & BUSINESS' },
+      { meta: 'TLDR DEV', right: '4H · 4 MIN', subj: 'Postgres 19 adds native vector search', line: 'Built-in vector indexes; Bun 2.0 and a GitHub Actions price change round out nine stories.', topic: 'SOFTWARE ENGINEERING' },
+      { meta: 'INC42', right: '9H · 5 MIN', subj: "Quick commerce's quiet consolidation", line: "Two smaller apps merge ahead of Zepto's listing, as investors push for profit over growth.", topic: 'STARTUPS & BUSINESS' },
+    ];
+    const topics = [
+      { t: 'AI & LLMs', c: '6', on: true }, { t: 'Startups & Business', c: '4', on: true }, { t: 'Tech Industry', c: '5' },
+      { t: 'Software Engineering', c: '3' }, { t: 'General Interest', c: '2' }, { t: 'AI Infrastructure', c: '1' },
+      { t: 'Product Management', c: '1' }, { t: 'System Design', c: '1' }, { t: 'Data & Analytics', c: '1' },
+    ].map((x) => Object.assign(x, { on: !!x.on, off: !x.on }));
+    const brief = [
+      { t: "OpenAI's travel agents go on sale", src: 'TLDR AI · PLATFORMER · THE KEN' },
+      { t: 'Small models are having a moment', src: 'TLDR AI · THE BATCH' },
+      { t: "Zepto's filing tests quick commerce", src: 'THE KEN · INC42' },
+      { t: 'Chip export limits widen again', src: "WSJ WHAT'S NEWS · TLDR" },
+      { t: 'Postgres gets native vector search', src: 'TLDR DEV · SYSTEM DESIGN NEWSLETTER' },
+    ];
+    const ticks = Array.from({ length: 20 }, (_, i) => ({ c: i < 2 ? '#E9E7E2' : i === 2 ? '#7D8185' : '#2E3236' }));
+    const pulse = (c) => React.createElement('span', { style: { display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: c, flex: 'none', animation: 'libPulse 1.4s ease-in-out infinite' } });
+    return {
+      five, more, stories, rows, topics, brief, ticks,
+      storiesTop2: stories.slice(0, 2),
+      storiesTop3: stories.slice(0, 3),
+      storiesRest: stories.slice(1),
+      chromeTabs: [{ title: 'The Library' }],
+      pulse: pulse('#FFD21F'),
+      pulseL: pulse('#8A6D00'),
+    };
+  }
+}
+</script>
+</body>
+</html>

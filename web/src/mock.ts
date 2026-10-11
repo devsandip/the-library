@@ -56,6 +56,12 @@ const SENDERS: [string, boolean][] = [
   ["TLDR Data", false],
   ["The Verge", false],
   ["Example Weekly", false],
+  ["TLDR AI", false],
+  ["TLDR", false],
+  ["The Batch", false],
+  ["Inc42", false],
+  ["Exponential View", false],
+  ["Stratechery", false],
 ];
 
 const senders: SenderListItem[] = SENDERS.map(([publication, mustRead], i) => {
@@ -299,6 +305,87 @@ const ROWS: Row[] = [
     6,
     "archived",
   ],
+  // More News, so the Today deck and the five have a day's worth (the redesign).
+  [
+    "TLDR AI",
+    "news",
+    "AI & LLMs",
+    "OpenAI agents book travel, Mistral goes small",
+    "OpenAI opens booking agents to all paid users; Mistral releases a 3B model that runs on phones; Apple lets its on-device model call apps; an eval startup raises $60M as labs buy in; Google brings deep research to Workspace.",
+    3,
+    5,
+    "unread",
+  ],
+  [
+    "TLDR",
+    "news",
+    "Tech Industry",
+    "Meta's display glasses, Uber's robotaxi pilot",
+    "Meta's display glasses go on sale; Uber starts a robotaxi pilot in two cities; Figma turns prompts into slide decks; Stripe adds stablecoin payouts.",
+    7,
+    5,
+    "unread",
+  ],
+  [
+    "The Batch",
+    "news",
+    "AI & LLMs",
+    "Small models, big margins",
+    "Why labs are racing to ship 1 to 4B models: cheaper inference and on-device privacy.",
+    24,
+    6,
+    "unread",
+  ],
+  [
+    "Inc42",
+    "news",
+    "Startups & Business",
+    "Quick commerce's quiet consolidation",
+    "Two of India's quick-commerce apps are merging dark stores as the discounts dry up.",
+    9,
+    5,
+    "unread",
+  ],
+  [
+    "Exponential View",
+    "news",
+    "Tech Industry",
+    "The price of a token, falling",
+    "Token prices fell tenfold in a year. What that does to the margins of software built on them.",
+    22,
+    8,
+    "unread",
+  ],
+  [
+    "Platformer",
+    "news",
+    "AI & LLMs",
+    "The agents are here, and they're bad at checkout",
+    "A week with the new booking agents: good at planning a trip, still stuck at payment pages and airline logins.",
+    2,
+    9,
+    "unread",
+  ],
+  [
+    "The Ken",
+    "news",
+    "Startups & Business",
+    "Zepto's IPO math",
+    "Zepto's draft filing shows dark stores in profit in nine cities. The Ken asks whether that lasts once the discounts stop.",
+    5,
+    11,
+    "unread",
+  ],
+  [
+    "Stratechery",
+    "news",
+    "Tech Industry",
+    "Aggregators and agents",
+    "If agents do the shopping, who owns the customer? A look at what changes for the aggregators.",
+    12,
+    14,
+    "unread",
+  ],
 ];
 
 /** Offline placeholder image, so mock mode makes no network requests. */
@@ -381,8 +468,9 @@ for (const [id, hours] of [
   if (i && i.state !== "archived") i.savedAt = new Date(now - hours * HOUR).toISOString();
 }
 
-/** Today's top 5 as first shown, like the API's digest log. */
+/** Today's top 5 as first shown, like the API's digest log, and when. */
 let mockDigest: string[] | undefined;
+let mockDigestAt: string | undefined;
 
 /** Now reading (#44): starts a third of the way into an issue, as if read on another device. */
 let mockPlace: { issueId: string; position: number; since: string; at: string } | undefined = {
@@ -433,7 +521,12 @@ function mockHistory(day: string): HistoryResponse {
     day,
     items: opens
       .filter((o) => o.day === day)
-      .map((o) => ({ ...withStar(strip(o.issue)), openedAt: o.at }))
+      // Every third read a peek left open (#56), as History tells them apart.
+      .map((o, n) => ({
+        ...withStar(strip(o.issue)),
+        openedAt: o.at,
+        via: n % 3 === 2 ? ("peek" as const) : ("open" as const),
+      }))
       .sort((a, b) => b.openedAt.localeCompare(a.openedAt)),
     ...(earlier ? { previousDay: earlier } : {}),
     ...(later ? { nextDay: later } : {}),
@@ -498,8 +591,18 @@ function mockStories(i: IssueListItem): IssueStoriesResponse {
           : (i.summary ?? i.snippet) +
             " A second sentence from the story index says a little more than the line above.",
       ...(parts.length > 1 ? { link: `https://example.test/${i.id}/story-${k + 1}` } : {}),
+      ...namesIn(part),
     })),
   };
+}
+
+/** A stand-in for the story index's names: the capitalised words after the first. */
+function namesIn(text: string): { names?: string[] } {
+  const names = [...new Set(text.split(/\s+/).slice(1))]
+    .map((w) => w.replace(/[^\p{L}\p{N}]+$/u, "").replace(/'s$/, ""))
+    .filter((w) => /^\p{Lu}/u.test(w) && w.length > 2)
+    .slice(0, 3);
+  return names.length ? { names } : {};
 }
 
 export class MockLibraryApi implements LibraryApi {
@@ -697,14 +800,17 @@ export class MockLibraryApi implements LibraryApi {
       const fresh = 0.5 ** ((now - Date.parse(i.receivedAt)) / HOUR / 48);
       const sender = must.has(i.senderId) ? 0.75 : 0.5;
       const topic = i.topic?.startsWith("AI") ? 0.8 : 0.5;
+      const up = senders.find((x) => x.senderId === i.senderId)?.up ?? 0;
       const reason =
-        sender > 0.5
-          ? "From a Must Read newsletter"
-          : topic > 0.5
-            ? "Close to your interest in AI"
-            : fresh > 0.9
-              ? "Just in"
-              : "Among the newest";
+        up > 0
+          ? `You rated this newsletter Relevant ${up === 1 ? "once" : up === 2 ? "twice" : `${up} times`}`
+          : sender > 0.5
+            ? "From a Must Read newsletter"
+            : topic > 0.5
+              ? "Close to your interest in AI"
+              : fresh > 0.9
+                ? "Just in"
+                : "Trying a newsletter you haven't rated yet";
       return { i, score: 0.4 * sender + 0.4 * topic + 0.2 * fresh, reason };
     });
     scored.sort((a, b) => b.score - a.score);
@@ -712,6 +818,7 @@ export class MockLibraryApi implements LibraryApi {
       items: scored.slice(0, 20).map((s) => ({ ...withStar(strip(s.i)), scoreReason: s.reason })),
       candidates: news.length,
       digest: (mockDigest ??= scored.slice(0, 5).map((s) => s.i.id)),
+      digestAt: (mockDigestAt ??= new Date().toISOString()),
       digestStats: digestStats(),
       narrative: mockNarrative(scored.map((s) => s.i)),
     };

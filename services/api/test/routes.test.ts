@@ -62,7 +62,7 @@ function setup(overrides: Partial<RepoPort> = {}) {
     })),
     history: vi.fn(async (day: string) => ({
       day,
-      items: [{ ...issue, openedAt: "2026-10-10T03:00:00.000Z" }],
+      items: [{ ...issue, openedAt: "2026-10-10T03:00:00.000Z", via: "open" as const }],
       previousDay: "2026-10-08",
     })),
     status: vi.fn(async () => ({ stage: "test", lastError: null })),

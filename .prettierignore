@@ -7,3 +7,5 @@ scratch
 **/fixtures/**
 # Prose docs are formatted by hand
 *.md
+# Design handoffs, kept as delivered
+docs/mockups

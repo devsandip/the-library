@@ -114,6 +114,8 @@ export interface IssueStory {
   summary: string;
   /** The story's own source: one of the issue's links. */
   link?: string;
+  /** The people, companies and places it names, as the story index found them; absent when none. */
+  names?: string[];
 }
 
 /** GET /issues/{id}/stories: in the order they appear; empty until the issue is split. */
@@ -212,6 +214,8 @@ export interface SummaryResponse {
   candidates: number;
   /** Today's digest: the top 5 as first shown today. They carry the yellow box. */
   digest?: string[];
+  /** When today's digest was fixed: the first time the Summary was shown today. */
+  digestAt?: string;
   digestStats?: DigestStats;
   /** The latest narrative, if it was written in the last 24 hours. */
   narrative?: Narrative;
@@ -220,6 +224,8 @@ export interface SummaryResponse {
 /** An issue in read history (#42): when it was last read that day, opened or peeked at (#56). */
 export interface HistoryItem extends IssueListItem {
   openedAt: string;
+  /** How that latest read happened: the issue opened, or a peek left open (#56). */
+  via: "open" | "peek";
 }
 
 export interface HistoryResponse {

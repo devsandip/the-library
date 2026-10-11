@@ -105,14 +105,14 @@ Then set `INGEST_SCHEDULE_ENABLED = true` in `infra/lib/config.ts` and deploy. T
 
 ## Runbook
 
-- **"ingest failed" alarm email.** Open https://sandip.dev/thelibrary/status for the last error. `invalid_grant` means the Gmail token was revoked (password change, removed access, or the app was left in Testing): rerun `pnpm gmail:auth`. Anything else: CloudWatch logs for the ingest Lambda. Failed messages retry on the next run automatically.
+- **"ingest failed" alarm email.** Open https://sandip.dev/thelibrary/library/status for the last error. `invalid_grant` means the Gmail token was revoked (password change, removed access, or the app was left in Testing): rerun `pnpm gmail:auth`. Anything else: CloudWatch logs for the ingest Lambda. Failed messages retry on the next run automatically.
 - **A newsletter is missing or noise is getting through.** Edit `packages/core/src/sources.ts` (labels, sender allowlist, noise rules, sender aliases), add a fixture test, merge (merging deploys).
 - **A newsletter shows the wrong name, or two newsletters are merged into one sender.** Add an alias or a split-by-name rule in `packages/core/src/sources.ts`, add a test, merge, then once it is deployed `AWS_PROFILE=admin pnpm rebuild-senders` to see the plan and `pnpm rebuild-senders --apply` to re-key stored issues. Read state, ratings and mutes are kept.
 - **An issue renders badly.** Fix the sanitizer or extractor in `packages/core`, add a fixture test, merge, then once it is deployed `AWS_PROFILE=admin pnpm reprocess` to rebuild the last 30 days (raw messages are kept 30 days; state and ratings are untouched).
 - **Remove the app from sandip.dev.** `AWS_PROFILE=admin pnpm amplify-proxy --remove`.
 - **The distribution was replaced** (rare). Rerun `pnpm amplify-proxy --apply`; the rule points at the distribution domain.
 - **Changing the HTTP API.** Avoid replacing it (keep its construct ID): a new API took about 16 minutes to get a DNS record, during which the API returns 502s.
-- **Summaries or tabs missing.** `/status` shows Claude's last run. "Waiting for the topic list": run `pnpm topics --apply`. `AccessDeniedException ... not available for this account`: the AWS account has not completed Anthropic's one-time use-case form (Bedrock console, Model catalog), or the model in `MODELS.classify` (`services/ingest/src/bedrock.ts`) is not enabled for the account. Haiku 5.5 was not, as of 2026-10-09; Haiku 4.5 is. Then `pnpm enrich --days 30` catches up.
+- **Summaries or tabs missing.** Library > Status (`/library/status`) shows Claude's last run. "Waiting for the topic list": run `pnpm topics --apply`. `AccessDeniedException ... not available for this account`: the AWS account has not completed Anthropic's one-time use-case form (Bedrock console, Model catalog), or the model in `MODELS.classify` (`services/ingest/src/bedrock.ts`) is not enabled for the account. Haiku 5.5 was not, as of 2026-10-09; Haiku 4.5 is. Then `pnpm enrich --days 30` catches up.
 - **Cost.** About $0.20/month in Phase 1. Every resource is tagged `project=thelibrary`.
 
 ## Backlog
