@@ -33,6 +33,7 @@ One identity on the phone and the Mac, from the Claude Design handoff (`docs/moc
 ## Open
 
 - Nothing here has been tried on a real iPhone: safe areas, pull to refresh inside the home-screen app, the sheet's drag between heights, and VoiceOver.
+- Links to paid sources from the home-screen app: does a link in The Ken open signed in? If the in-app browser does not share Safari's sign-ins, open those links in Safari. Meco's users complain links open signed out of WSJ and NYT (the newsletter-reader research, 2026-10-11).
 - The deep dives and the job line (#19 first), then Follow and Ask.
 - Pull to refresh waits a fixed 8 seconds for the Gmail check, as the old refresh button did.
 - Retake the handoff's screens from mock mode for a before and after.
