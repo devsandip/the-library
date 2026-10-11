@@ -184,7 +184,7 @@ Append-only session log. Newest entry at the bottom.
 
 - Monday 2026-10-12: the weekly journal summary for 2026-W41 (the entries from 2026-10-10 and 2026-10-11).
 - Then #20's second version (related stories inside a digest), then #19 (how a story evolved).
-- Still open from search: the first search after a cold start (`search corpus read` in the prod API logs), and the result count wrapping at 375 px.
+- Still open from search: the result count wrapping at 375 px. The first search after a cold start took 3.3 s (2.8 s reading the corpus); the ones after it 40 to 210 ms.
 
 **Decisions:**
 

@@ -43,7 +43,7 @@ The issue's defaults held: filtered mail, promos and muted newsletters out, arch
 
 ## Open
 
-- How long the first search after a cold start takes on prod: the API logs `search corpus read` with the time it took.
+- The first search after a cold start, on 2026-10-11, read the corpus in 2.8 s (366 issues, 2,261 stories) and answered in 3.3 s; the searches after it took 40 to 210 ms. Worth rereading as the archive grows: the API logs `search corpus read` with the time it took.
 - When the full read gets slow (about 5 MB now, growing about 55 MB a year), an S3 Vectors index written by the ingest run beside the story items, as the story index doc planned.
 - An issue not yet split into stories is found by its subject, newsletter and Claude's line only.
 - No sender or date filters yet; they can follow, the way Home has them.

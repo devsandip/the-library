@@ -41,7 +41,6 @@ None yet. The first, 2026-W41, is due on Monday 2026-10-12.
 - Will ranking hit the 60% aim once ratings exist (#5)?
 - How do the day in brief's threads and cost hold up on a weekday, with about 90 news stories?
 - Will Claude be able to merge its own pull requests, as I asked, or does auto mode keep treating it as self-approval?
-- How fast is the first search after a cold start on prod (`search corpus read` in the API logs)?
 - Which decision model for the bounded calls: Claude, Jev or OpenAI Decisions (#27)?
 - What to do about `robots.txt` on `sandip.dev` (#7)?
 - When does the AWS account get Haiku 5.5?
