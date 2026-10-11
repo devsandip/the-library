@@ -1,7 +1,7 @@
 # The Library: Journal
 
-Last refreshed: 2026-10-11 13:53
-Latest entry: [2026-10-11-1353-ux-redesign-brief.md](entries/2026-10-11-1353-ux-redesign-brief.md)
+Last refreshed: 2026-10-11 14:44
+Latest entry: [2026-10-11-1444-today-browse-and-the-console.md](entries/2026-10-11-1444-today-browse-and-the-console.md)
 
 A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Live at https://sandip.dev/thelibrary/.
 
@@ -9,16 +9,17 @@ A private newsletter reader for one person: my Gmail newsletters in, one ranked 
 
 The reader is live on both devices and does what the brief asked of Phase 1: ingest every two hours, clean reading, and Relevant and Irrelevant ratings by thumb or by swipe. Claude sorts every issue into News or Learning and a topic; rules archive promos and week-old news, and since 2026-10-11 keep account mail, like sign-in codes, out of the list.
 
-Ranking runs when the Summary opens, and the Summary leads with the day in brief, written from the stories every issue is split into. Since 2026-10-11 search finds any issue or story in the archive, by its words or by what it means, and under every newsletter Related lists the closest stories from before and since; a digest lists them for each of its stories. Spend is about $5.50 a month, mostly Claude.
+Ranking runs when Today opens, and Today leads with the day in brief, written from the stories every issue is split into. Since 2026-10-11 search finds any issue or story in the archive, by its words or by what it means, and under every newsletter Related lists the closest stories from before and since; a digest lists them for each of its stories. Spend is about $5.50 a month, mostly Claude.
 
-Three ways back to an issue: Now reading, Saved, and a peek inside before opening it. History lists what I read, a day at a time, and since 2026-10-11 a peek left open two seconds counts too; the five digests I peeked at on 2026-10-10 were added to it. None of this has been tried on a real iPhone yet.
+Three ways back to an issue: Continue, Saved, and a peek inside before opening it. History lists what I read, a day at a time, and since 2026-10-11 a peek left open two seconds counts too; the five digests I peeked at on 2026-10-10 were added to it. None of this has been tried on a real iPhone yet.
 
 How changes ship changed on 2026-10-11. Main is protected: every change is a pull request whose CI check passes, and merging deploys it through dev and the integration tests to prod in about 5 to 10 minutes. Nothing deploys prod by hand any more. The first run failed on how GitHub names this repository to AWS, and the second deployed everything. Next: how a story evolved (#19).
 
-I don't like the UX on either device, so on 2026-10-11 I handed the redesign to Claude Design, from first principles. The brief is a product overview and 185 user stories, in two packs: one with 123 screenshots of today's UI, and one with none, so the design doesn't anchor on it. Neither pack is in the repo yet.
+Since 2026-10-11 both devices have one look, from a Claude Design redesign briefed without the old screens (`docs/features/redesign.md`). The phone has four tabs: Today is the Summary as a deck of cards, Browse is everything else under a filter sentence, then Saved and Library. The Mac is a keyboard console of queue, reader and stories. It was tested in mock mode only. The design's deep dives, Follow and Ask wait for their backends, starting with how a story evolved (#19).
 
 ## Recent entries
 
+- [2026-10-11 14:44: Today, Browse and the console](entries/2026-10-11-1444-today-browse-and-the-console.md)
 - [2026-10-11 13:53: A redesign, briefed without the old screens](entries/2026-10-11-1353-ux-redesign-brief.md)
 - [2026-10-11 13:37: Related stories inside a digest](entries/2026-10-11-1337-related-stories-inside-a-digest.md)
 - [2026-10-11 11:18: Search, and one way to prod](entries/2026-10-11-1118-search-and-one-way-to-prod.md)
@@ -47,8 +48,6 @@ None yet. The first, 2026-W41, is due on Monday 2026-10-12.
 - Will Claude be able to merge its own pull requests, as I asked, or does auto mode keep treating it as self-approval?
 - Which decision model for the bounded calls: Claude, Jev or OpenAI Decisions (#27)?
 - What to do about `robots.txt` on `sandip.dev` (#7)?
-- One visual identity for the phone and the Mac, or two on purpose?
-- Does new UI, starting with #19, wait for the redesign?
 - When does the AWS account get Haiku 5.5?
 
 ## Things ruled out
@@ -71,3 +70,5 @@ None yet. The first, 2026-W41, is due on Monday 2026-10-12.
 - Taking house style out of story embeddings for Related: Claude wrote every story, so stories of one newsletter average 0.10 against 0.07 across (2026-10-11).
 - A lower Related cutoff for stories that share a name: from 0.40 to 0.45 they were related about as often without one (2026-10-11).
 - Polishing the current UI: the redesign starts from the requirements, not today's screens (2026-10-11).
+- A look per device (dark cards on the phone, two panes on the Mac): one identity on both (2026-10-11).
+- Showing the design's deep dives, Follow and Ask before their backends exist: no dead controls (2026-10-11).
