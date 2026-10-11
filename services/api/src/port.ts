@@ -49,8 +49,6 @@ export interface RepoPort {
   nowReading(): Promise<NowReadingResponse>;
   /** Saves how far down an issue the reader is, 0 to 1, where 1 means finished (#44). */
   savePosition(id: string, position: number): Promise<void>;
-  /** Issues close to this one, from before and since (#20). */
-  related(id: string): Promise<RelatedResponse>;
   /** The issue's stories from the story index (#15), in order (#41). */
   stories(id: string): Promise<IssueStoriesResponse>;
   listSenders(): Promise<SenderListItem[]>;
@@ -70,9 +68,15 @@ export interface SearchPort {
   search(q: string, sort: SearchSort): Promise<SearchResponse>;
 }
 
+/** Stories close to this issue's, from before and since (#20). */
+export interface RelatedPort {
+  related(id: string): Promise<RelatedResponse>;
+}
+
 export interface Services {
   repo: RepoPort;
   search: SearchPort;
+  related: RelatedPort;
   /** Fire-and-forget ingest run ("refresh now"). */
   startIngest(): Promise<void>;
 }

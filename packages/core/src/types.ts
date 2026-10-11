@@ -123,14 +123,33 @@ export interface IssueStoriesResponse {
 
 /** An issue shown as related to the open one (#20). */
 export interface RelatedItem extends IssueListItem {
-  /** Cosine between the two embeddings once newsletter style is taken out, to 3 decimals. */
+  /**
+   * Cosine between the two stories' embeddings, or for an issue not split into stories, between
+   * the two issues' once newsletter style is taken out; to 3 decimals.
+   */
   similarity: number;
+  /** The story inside a digest that matched, shown on its row. */
+  story?: { n: number; headline: string };
 }
 
-/** GET /issues/{id}/related: the closest issues from before and since, above a cutoff. */
+/** One of a digest's stories, and the closest stories to it from other issues (#20). */
+export interface RelatedStory {
+  n: number;
+  headline: string;
+  earlier: RelatedItem[];
+  since: RelatedItem[];
+}
+
+/**
+ * GET /issues/{id}/related: the closest stories from before and since, above a cutoff. An issue
+ * with one story, or not split yet, has them in `earlier` and `since`; a digest has them for
+ * each of its stories, in `stories`.
+ */
 export interface RelatedResponse {
   earlier: RelatedItem[];
   since: RelatedItem[];
+  /** A digest's stories that have relatives, in the order they appear. */
+  stories?: RelatedStory[];
 }
 
 /** Search's order (#53): best match first, or newest first. */

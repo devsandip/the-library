@@ -44,7 +44,6 @@ function setup(overrides: Partial<RepoPort> = {}) {
       nowReading: { issue, position: 0.4, at: "2026-10-10T03:00:00.000Z" },
     })),
     savePosition: vi.fn(async () => undefined),
-    related: vi.fn(async () => ({ earlier: [{ ...issue, similarity: 0.41 }], since: [] })),
     stories: vi.fn(async () => ({
       stories: [
         { n: 1, headline: "A model ships", summary: "It is small.", link: "https://x.test" },
@@ -78,6 +77,9 @@ function setup(overrides: Partial<RepoPort> = {}) {
         items: [{ ...issue, match: "words" as const }],
         byMeaning: true,
       })),
+    },
+    related: {
+      related: vi.fn(async () => ({ earlier: [{ ...issue, similarity: 0.41 }], since: [] })),
     },
     startIngest: vi.fn(async () => undefined),
   };
@@ -186,11 +188,11 @@ describe("routing and validation", () => {
   });
 
   it("serves related issues", async () => {
-    const { call, repo } = setup();
+    const { call, svc } = setup();
     const r = await call("GET", "/issues/abc123/related");
     expect(r.status).toBe(200);
     expect(r.body).toEqual({ earlier: [{ ...issue, similarity: 0.41 }], since: [] });
-    expect(repo.related).toHaveBeenCalledWith("abc123");
+    expect(svc.related.related).toHaveBeenCalledWith("abc123");
     expect((await call("GET", "/issues/a.b/related")).status).toBe(404);
   });
 
