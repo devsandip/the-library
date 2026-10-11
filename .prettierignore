@@ -1,5 +1,7 @@
 pnpm-lock.yaml
 scratch
+# Claude Code's local session files
+.claude
 **/cdk.out
 **/dist
 **/fixtures/**

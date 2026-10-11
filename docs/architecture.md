@@ -250,7 +250,9 @@ HTTP API, one route `ANY /thelibrary/api/{proxy+}` behind the Cognito JWT author
 
 ## 9. Infrastructure
 
-One CDK app, one stack per stage, selected with `-c stage=dev|prod`. Tags `project=thelibrary`, `stage=<stage>` on everything.
+One CDK app, one stack per stage, selected with `-c stage=dev|prod`. Tags `project=thelibrary`, `stage=<stage>` on everything. A third, `-c stage=ci` (`TheLibrary-ci`), holds only the role GitHub Actions deploys with.
+
+Deploys (`docs/features/pipeline.md`): only GitHub Actions deploys prod, from main. Every pull request runs CI (`check`: typecheck, lint, unit tests, web build; no AWS). Every push to main runs CI, deploys dev, runs the integration tests there, deploys prod and runs the hosting checks, one run at a time; pushes that change only Markdown, `docs/` or `journal/` skip it. The jobs sign in through the account's GitHub OIDC provider as `TheLibrary-github-deploy`, which trusts only this repository's `dev` and `prod` environments (GitHub lets only `main` deploy to them) and can assume only CDK's bootstrap roles, plus the dev-stack and Bedrock access the integration tests need. Main is protected: pull requests only, `check` required, squash merges, merged branches deleted. `pnpm run deploy` from a laptop is the fallback for when GitHub Actions is down.
 
 | | prod (`TheLibrary-prod`) | dev (`TheLibrary-dev`) |
 |---|---|---|
@@ -269,7 +271,8 @@ Gmail credentials: SSM SecureString `/thelibrary/prod/gmail/oauth`, created by `
 
 - **Unit (`pnpm test`, local, no AWS):** core parsing/sanitizing/classification against synthetic fixtures (with per-fixture asserts on view-online and unsubscribe links); ingest loop with fakes; API router against an in-memory repo (status codes, validation); frontend auth/API helpers; CDK assertions on key resources.
 - **Integration (`pnpm test:int`, serial, needs AWS credentials and a deployed dev stack):** refuses to run unless the target stack is `TheLibrary-dev` (checked via stack outputs and tags); wipes and seeds dev from fixtures through the real `Store`; invokes the api Lambda directly with crafted JWT claims for every route; checks pagination, view transitions across indexes, rating counters, mute filtering; polls until GSIs catch up.
-- **Hosting (`scripts/check-hosting.sh`):** the section 4 checks, rerun after every web or API deploy.
+- **Hosting (`scripts/check-hosting.sh`):** the section 4 checks, rerun after every web or API deploy (the Deploy workflow's last step).
+- **CI:** unit tests, typecheck, lint and the web build on every pull request; all of that plus the integration tests on dev before every prod deploy (section 9).
 - **UI:** built-in browser against mock mode at 390px and desktop widths, light and dark.
 - **Acceptance:** Sandip on iPhone and Mac against prod (Claude cannot sign in through Cognito on Sandip's behalf).
 
