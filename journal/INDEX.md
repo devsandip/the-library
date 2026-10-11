@@ -1,7 +1,7 @@
 # The Library: Journal
 
-Last refreshed: 2026-10-11 12:09
-Latest entry: [2026-10-11-1118-search-and-one-way-to-prod.md](entries/2026-10-11-1118-search-and-one-way-to-prod.md)
+Last refreshed: 2026-10-11 13:37
+Latest entry: [2026-10-11-1337-related-stories-inside-a-digest.md](entries/2026-10-11-1337-related-stories-inside-a-digest.md)
 
 A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Live at https://sandip.dev/thelibrary/.
 
@@ -9,14 +9,15 @@ A private newsletter reader for one person: my Gmail newsletters in, one ranked 
 
 The reader is live on both devices and does what the brief asked of Phase 1: ingest every two hours, clean reading, and Relevant and Irrelevant ratings by thumb or by swipe. Claude sorts every issue into News or Learning and a topic; rules archive promos and week-old news, and since 2026-10-11 keep account mail, like sign-in codes, out of the list.
 
-Ranking runs when the Summary opens, and the Summary leads with the day in brief, written from the stories every issue is split into. Since 2026-10-11 search finds any issue or story in the archive, by its words or by what it means. Spend is about $5.50 a month, mostly Claude.
+Ranking runs when the Summary opens, and the Summary leads with the day in brief, written from the stories every issue is split into. Since 2026-10-11 search finds any issue or story in the archive, by its words or by what it means, and under every newsletter Related lists the closest stories from before and since; a digest lists them for each of its stories. Spend is about $5.50 a month, mostly Claude.
 
 Three ways back to an issue: Now reading, Saved, and a peek inside before opening it. History lists what I read, a day at a time, and since 2026-10-11 a peek left open two seconds counts too; the five digests I peeked at on 2026-10-10 were added to it. None of this has been tried on a real iPhone yet.
 
-How changes ship changed on 2026-10-11. Main is protected: every change is a pull request whose CI check passes, and merging deploys it through dev and the integration tests to prod in about 5 to 10 minutes. Nothing deploys prod by hand any more. The first run failed on how GitHub names this repository to AWS, and the second deployed everything. Next: related stories inside a digest (#20, second version) and how a story evolved (#19).
+How changes ship changed on 2026-10-11. Main is protected: every change is a pull request whose CI check passes, and merging deploys it through dev and the integration tests to prod in about 5 to 10 minutes. Nothing deploys prod by hand any more. The first run failed on how GitHub names this repository to AWS, and the second deployed everything. Next: how a story evolved (#19).
 
 ## Recent entries
 
+- [2026-10-11 13:37: Related stories inside a digest](entries/2026-10-11-1337-related-stories-inside-a-digest.md)
 - [2026-10-11 11:18: Search, and one way to prod](entries/2026-10-11-1118-search-and-one-way-to-prod.md)
 - [2026-10-10 21:11: Now reading, Saved, and a peek inside](entries/2026-10-10-2111-now-reading-saved-and-a-peek.md)
 - [2026-10-10 19:49: Read history, and four more ideas](entries/2026-10-10-1949-read-history.md)
@@ -62,3 +63,5 @@ None yet. The first, 2026-W41, is due on Monday 2026-10-12.
 - Requiring every search word, or allowing any one to be missing: the first found nothing for "how Discord stores messages", the second let in noise (2026-10-11).
 - Deploying prod from a laptop: prod now deploys only from main, through GitHub Actions (2026-10-11).
 - Rebase merges: squash merges leave one commit per pull request and no branch behind to diverge (2026-10-11).
+- Taking house style out of story embeddings for Related: Claude wrote every story, so stories of one newsletter average 0.10 against 0.07 across (2026-10-11).
+- A lower Related cutoff for stories that share a name: from 0.40 to 0.45 they were related about as often without one (2026-10-11).

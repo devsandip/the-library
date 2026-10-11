@@ -44,6 +44,6 @@ What it shows on the latest issues:
 
 ## Open
 
-- The first issue opened after a cold start waits for the corpus read (2.8 s for search on 2026-10-11) before Related shows; the newsletter does not wait for it.
+- The first issue opened after a cold start waits for the corpus read before Related shows: 3.0 s on prod on 2026-10-11 (2.5 s of it reading the corpus), then 163 ms warm. The newsletter does not wait for it.
 - Whether digests want fewer stories listed, or folded, once I have read a few on the phone.
 - "How this evolved" (#19) starts from the same matches: the FlyDubai thread above is one.
