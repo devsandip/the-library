@@ -29,8 +29,10 @@ pnpm install
 |---|---|
 | `pnpm test` | Unit tests (no AWS) |
 | `pnpm lint` / `pnpm typecheck` | eslint + prettier, TypeScript |
-| `AWS_PROFILE=admin pnpm deploy` | Build the web app and deploy prod |
-| `AWS_PROFILE=admin pnpm cdk deploy -c stage=dev` | Deploy the disposable dev stack |
+| Merge a pull request | GitHub Actions deploys it: dev, the integration tests, then prod and the hosting checks |
+| `pnpm sync-main` | Fast-forward the main checkout after a merge (only when it is on main and clean) |
+| `AWS_PROFILE=admin pnpm cdk deploy -c stage=dev` | Deploy the disposable dev stack, to try a branch before its pull request |
+| `AWS_PROFILE=admin pnpm deploy` | Fallback only, when GitHub Actions is down: build the web app and deploy prod from this folder |
 | `AWS_PROFILE=admin pnpm seed-dev` | Reset dev to the fixture inbox |
 | `AWS_PROFILE=admin pnpm test:int` | Integration tests against dev (wipes and reseeds it) |
 | `pnpm check-hosting` | Hosting and auth checks through https://sandip.dev/thelibrary |
@@ -40,6 +42,15 @@ pnpm install
 | `AWS_PROFILE=admin pnpm rebuild-senders` | Re-key issues after a sender-rule change (dry run; `--apply`) |
 | `AWS_PROFILE=admin pnpm reprocess` | Re-run the mail rules and cleaning on the last 30 days of raw mail after a change to `packages/core`; files as filtered what a new noise rule catches (`--days`) |
 
+## Shipping a change
+
+Prod runs what main holds, and only GitHub Actions deploys it ([docs/features/pipeline.md](docs/features/pipeline.md)).
+
+1. Cut a branch from a fresh main (`git fetch`, then branch from `origin/main`). One change per branch; merge it before starting the next.
+2. Open a pull request. CI (`check`: typecheck, lint, unit tests, the web build) must pass before it can merge.
+3. Squash and merge. The Deploy workflow deploys dev, runs the integration tests there, deploys prod and runs the hosting checks, one run at a time. Its progress is on the Actions tab.
+4. `pnpm sync-main` brings the main checkout up to date.
+
 ## First-time setup
 
 These steps were done once in October 2026; they are here for a rebuild or a new account.
@@ -48,6 +59,7 @@ These steps were done once in October 2026; they are here for a rebuild or a new
 2. **Expose it on sandip.dev.** `AWS_PROFILE=admin pnpm amplify-proxy` shows the change; add `--apply` to make it. It only touches the `/thelibrary/<*>` rule and backs up the rest to `scratch/`.
 3. **Create your login.** `AWS_PROFILE=admin pnpm create-user`. Cognito emails a temporary password; sign in at https://sandip.dev/thelibrary/, choose a password, and scan the QR code with an authenticator app. The app is single-user (every account has full control), so the script refuses to create a second account; rerun it to resend your own unused invite.
 4. **Connect Gmail** (below).
+5. **Let GitHub deploy.** `AWS_PROFILE=admin pnpm cdk deploy -c stage=ci` creates the role GitHub Actions deploys with; set the repository variable `AWS_ROLE_ARN` to the ARN it prints, and create the `dev` and `prod` environments with only `main` allowed to deploy.
 5. **Backfill and turn on the schedule** (below).
 
 ### Connect Gmail
@@ -94,9 +106,9 @@ Then set `INGEST_SCHEDULE_ENABLED = true` in `infra/lib/config.ts` and deploy. T
 ## Runbook
 
 - **"ingest failed" alarm email.** Open https://sandip.dev/thelibrary/status for the last error. `invalid_grant` means the Gmail token was revoked (password change, removed access, or the app was left in Testing): rerun `pnpm gmail:auth`. Anything else: CloudWatch logs for the ingest Lambda. Failed messages retry on the next run automatically.
-- **A newsletter is missing or noise is getting through.** Edit `packages/core/src/sources.ts` (labels, sender allowlist, noise rules, sender aliases), add a fixture test, deploy.
-- **A newsletter shows the wrong name, or two newsletters are merged into one sender.** Add an alias or a split-by-name rule in `packages/core/src/sources.ts`, add a test, deploy, then `AWS_PROFILE=admin pnpm rebuild-senders` to see the plan and `pnpm rebuild-senders --apply` to re-key stored issues. Read state, ratings and mutes are kept.
-- **An issue renders badly.** Fix the sanitizer or extractor in `packages/core`, add a fixture test, deploy, then `AWS_PROFILE=admin pnpm reprocess` to rebuild the last 30 days (raw messages are kept 30 days; state and ratings are untouched).
+- **A newsletter is missing or noise is getting through.** Edit `packages/core/src/sources.ts` (labels, sender allowlist, noise rules, sender aliases), add a fixture test, merge (merging deploys).
+- **A newsletter shows the wrong name, or two newsletters are merged into one sender.** Add an alias or a split-by-name rule in `packages/core/src/sources.ts`, add a test, merge, then once it is deployed `AWS_PROFILE=admin pnpm rebuild-senders` to see the plan and `pnpm rebuild-senders --apply` to re-key stored issues. Read state, ratings and mutes are kept.
+- **An issue renders badly.** Fix the sanitizer or extractor in `packages/core`, add a fixture test, merge, then once it is deployed `AWS_PROFILE=admin pnpm reprocess` to rebuild the last 30 days (raw messages are kept 30 days; state and ratings are untouched).
 - **Remove the app from sandip.dev.** `AWS_PROFILE=admin pnpm amplify-proxy --remove`.
 - **The distribution was replaced** (rare). Rerun `pnpm amplify-proxy --apply`; the rule points at the distribution domain.
 - **Changing the HTTP API.** Avoid replacing it (keep its construct ID): a new API took about 16 minutes to get a DNS record, during which the API returns 502s.
@@ -119,6 +131,7 @@ packages/core/     classification, sanitizing, extraction, keys, shared API type
 services/ingest/   Gmail client, ingest loop, Lambda handler
 services/api/      reader API: routes, DynamoDB repository, Lambda handler
 web/               Preact app (base path /thelibrary/)
-infra/             CDK app: one stack per stage
-scripts/           amplify-proxy, check-hosting, create-user, gmail-auth, gmail-check, backfill, reprocess, rebuild-senders, seed-dev
+infra/             CDK app: one stack per stage, and the role GitHub Actions deploys with
+.github/workflows/ ci (every pull request), deploy (every push to main)
+scripts/           amplify-proxy, check-hosting, create-user, gmail-auth, gmail-check, backfill, reprocess, rebuild-senders, seed-dev, sync-main
 ```
