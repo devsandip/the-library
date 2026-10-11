@@ -134,3 +134,33 @@ Append-only session log. Newest entry at the bottom.
 - Now reading: one `STATE/NOW_READING` item; the place is the share of the newsletter above the top of the screen, saved at most every 5 seconds and as the page goes away (`keepalive`). A place saved in an older window moves Now reading back to that issue. Rating after opening, archiving or finishing hides it.
 - Save for later: saved issues move from `UNREAD` to a `SAVED` partition of `gsi2`, so Unread, the counts, the Summary and the 7-day rule leave them out unchanged; `autoArchive` skips them outright. Archiving unsaves; an archived issue cannot be saved. On the phone, Save sits at the top of the issue page because the bottom bar is full.
 - Tap for a summary: `GET /issues/{id}/stories` from the story index, no new Claude call. A 250 ms double-tap window; Enter opens, Space peeks. The reading pane keeps its click, and the Must Read row's lead cards open on a tap.
+
+## 2026-10-11: Account mail and search live, the peek fix, and a pipeline
+
+**Did:**
+
+- Merged #54 (account mail, #50) and #55 (search, #53) on Sandip's word, deployed main (934c6d2) to prod by hand, the last laptop deploy: hosting checks pass. `pnpm reprocess` filed exactly the stored verification code (`1a1261e7cc130a34`, now 404). Search checked against prod ("kafka" by words and meaning, "AI assistants that arrange vacations" by meaning).
+- Filed #56 at Sandip's request (history should hold what I read): the five digests peeked at on 2026-10-10 21:30 to 21:40 IST were missing from history and still unread. Fixed in PR #57: a peek left open 2 s logs a `peek` event (indexed under `OPENS`, like an open) and marks the issue read; Now reading is untouched; history rows say "Read". 45 of 45 integration tests on dev.
+- Explained to Sandip why main, prod and the main checkout drifted (no CI, prod deployed from the worktree, the main checkout outside the flow, rebase merges rewriting commits) and built the pipeline Sandip approved, PR #58: CI on every pull request; Deploy on every push to main (CI, dev and `pnpm test:int`, prod and `pnpm check-hosting`); the `TheLibrary-ci` stack with the role `TheLibrary-github-deploy` (deployed); `pnpm sync-main`; a repo `CLAUDE.md` with the shipping rules.
+- On GitHub: environments `dev` and `prod`, deployable only from `main`; variable `AWS_ROLE_ARN`; squash merges only, merged branches deleted. The repository was already private.
+
+**State now:**
+
+- Prod runs main at 934c6d2. Open and waiting for Sandip to merge: #57 (peek fix), #58 (pipeline), and this worklog's pull request. Auto mode refused my merge of #57 as self-approval.
+- #58's CI passed on GitHub (`check`, 70 s). The Deploy workflow has never run: only main can use the environments, so its first run is the first real test of the role.
+- Main's branch protection is not on yet, on purpose: #57 predates CI and would need an update and a fresh run before it could merge.
+- Sandip's main checkout is at 934c6d2, even with `origin/main`.
+
+**Next:**
+
+- Once #58 and #57 are merged (that order is best: a pipeline problem then shows without an app change riding on it): check the Deploy runs with `gh run list --workflow Deploy`; if a step lacks permissions, widen `infra/lib/ci-stack.ts` in a pull request and `pnpm cdk deploy -c stage=ci` by hand.
+- Turn on main's branch protection: required check `check` (GitHub Actions), pull requests only, admins included, linear history, no force pushes or deletion (the command is in the resume).
+- After #57 is deployed: put the five peeks from 2026-10-10 into history and mark them read (ids and times in the resume), then `pnpm sync-main`.
+- Monday 2026-10-12: the weekly journal summary for 2026-W41.
+
+**Decisions:**
+
+- A peek left open 2 s counts as reading the issue; one folded away sooner was a glance.
+- Prod deploys only from main through GitHub Actions; dev and the integration tests gate prod; one branch per change from a fresh main; squash merges. `pnpm run deploy` is the fallback when GitHub Actions is down.
+- The deploy role trusts the GitHub environments, not branches, and the environments allow only main. The role's stack is deployed by hand, but CDK's bootstrap roles can change anything, so main's protection is the real gate.
+- Third-party actions are pinned to commit SHAs, since the deploy jobs hold AWS credentials.

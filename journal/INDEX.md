@@ -1,24 +1,23 @@
 # The Library: Journal
 
-Last refreshed: 2026-10-10 21:11
-Latest entry: [2026-10-10-2111-now-reading-saved-and-a-peek.md](entries/2026-10-10-2111-now-reading-saved-and-a-peek.md)
+Last refreshed: 2026-10-11 11:18
+Latest entry: [2026-10-11-1118-search-and-one-way-to-prod.md](entries/2026-10-11-1118-search-and-one-way-to-prod.md)
 
 A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Live at https://sandip.dev/thelibrary/.
 
 ## Where we are now
 
-The reader is live on both devices and does what the brief asked of Phase 1: ingest every two hours, clean reading, and Relevant and Irrelevant ratings by thumb or by swipe. Claude sorts every issue into News or Learning and a topic, and rules archive promos and week-old news.
+The reader is live on both devices and does what the brief asked of Phase 1: ingest every two hours, clean reading, and Relevant and Irrelevant ratings by thumb or by swipe. Claude sorts every issue into News or Learning and a topic; rules archive promos and week-old news, and since 2026-10-11 keep account mail, like sign-in codes, out of the list.
 
-Ranking runs when the Summary opens: the 20 most relevant unread News issues, at most three per newsletter, the day's top 5 in the yellow box, and a line that tracks the success measure. The stored score and "Best first" inside the tabs wait for a week of ratings.
+Ranking runs when the Summary opens, and the Summary leads with the day in brief, written from the stories every issue is split into. Since 2026-10-11 search finds any issue or story in the archive, by its words or by what it means. Spend is about $5.50 a month, mostly Claude.
 
-Since 2026-10-10 every issue is split into stories, linked into events across newsletters, and the Summary opens with the day in brief: three to six threads written from the last day's news. A History page lists what I opened, a day at a time, back to 2026-10-09. Spend is about $5.50 a month, mostly Claude.
+Three ways back to an issue: Now reading, Saved, and a peek inside before opening it. History lists what I read, a day at a time; once #57 is merged, a peek left open two seconds counts too. None of this has been tried on a real iPhone yet.
 
-Three ways back to an issue went live on the evening of 2026-10-10. Now reading takes me back to the last issue at the place I stopped, on either device. A bookmark keeps an issue on the Saved list, out of Unread and away from the archive rules. One tap on a row shows what is inside the issue, from the story index, and a double tap opens it. None of it has been tried on a real iPhone yet.
-
-Next: keep account mail, like a Substack verification code, out of the list (#50), then related stories inside a digest (#20, second version) and how a story evolved (#19).
+How changes ship changed on 2026-10-11. Pull requests run CI, and once the pipeline (#58) is merged, every merge to main deploys through dev and the integration tests to prod. Nothing deploys prod by hand any more. Next: related stories inside a digest (#20, second version) and how a story evolved (#19).
 
 ## Recent entries
 
+- [2026-10-11 11:18: Search, and one way to prod](entries/2026-10-11-1118-search-and-one-way-to-prod.md)
 - [2026-10-10 21:11: Now reading, Saved, and a peek inside](entries/2026-10-10-2111-now-reading-saved-and-a-peek.md)
 - [2026-10-10 19:49: Read history, and four more ideas](entries/2026-10-10-1949-read-history.md)
 - [2026-10-10 19:30: Stories, and the day in brief](entries/2026-10-10-1930-stories-and-the-day-in-brief.md)
@@ -35,12 +34,14 @@ None yet. The first, 2026-W41, is due on Monday 2026-10-12.
 - The story, not the issue, is the right unit for following news across newsletters (#15).
 - Haiku is good enough for sorting, story splitting and the brief at about a cent an issue (`docs/architecture.md`, sections 11 and 12).
 - Brute-force similarity is enough at this volume for years; a vector index waits until a feature needs to search everything at once (`docs/features/story-index.md`).
+- Search can read every story's vector into the API's memory for a while: about 5 MB now, growing about 55 MB a year (`docs/features/search.md`).
 
 ## Open questions
 
 - Will ranking hit the 60% aim once ratings exist (#5)?
 - How do the day in brief's threads and cost hold up on a weekday, with about 90 news stories?
-- How to keep account mail out: a subject rule, a fourth answer to Claude's promo question, or Jev (#50)?
+- Will Claude be able to merge its own pull requests, as I asked, or does auto mode keep treating it as self-approval?
+- How fast is the first search after a cold start on prod (`search corpus read` in the API logs)?
 - Which decision model for the bounded calls: Claude, Jev or OpenAI Decisions (#27)?
 - What to do about `robots.txt` on `sandip.dev` (#7)?
 - When does the AWS account get Haiku 5.5?
@@ -58,3 +59,7 @@ None yet. The first, 2026-W41, is due on Monday 2026-10-12.
 - A Save button in the phone's bottom bar: a sixth control cut off the Relevant and Irrelevant labels, so it sits at the top of the issue page (2026-10-10).
 - Peeking in the Must Read row: one card that grew would stretch the whole sideways row, so those cards open on a tap (2026-10-10).
 - A reading place in pixels: the phone's narrower frame is taller, so the place is a share of the newsletter (2026-10-10).
+- Search as one merged list: a story just over the meaning cutoff ranked beside exact matches, so words come first and meaning follows under its own heading (2026-10-11).
+- Requiring every search word, or allowing any one to be missing: the first found nothing for "how Discord stores messages", the second let in noise (2026-10-11).
+- Deploying prod from a laptop: prod now deploys only from main, through GitHub Actions (2026-10-11).
+- Rebase merges: squash merges leave one commit per pull request and no branch behind to diverge (2026-10-11).
