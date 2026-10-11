@@ -244,3 +244,38 @@ Append-only session log. Newest entry at the bottom.
 - Redesign from first principles, not a polish: one pack without screens so the design doesn't anchor, one with screens for reference.
 - Interactions are named in the stories only where Sandip asked for them; a better pattern comes as a proposal, not a silent swap.
 - Screenshots from mock mode, since Claude does not sign in for Sandip.
+
+## 2026-10-11: The redesign, built from the Claude Design handoff (#66)
+
+**Did:**
+
+- Built the Claude Design handoff (`docs/mockups/redesign/README.md`, with its HTML as the visual reference) in PR #66:
+  - the phone has four tabs (Today as a deck, Browse under the filter sentence, Saved, Library) and a reader with a story sheet;
+  - the Mac is a keyboard console of queue, reader and story index, with a ⌘K palette;
+  - new tokens, dark by default; self-hosted Newsreader, IBM Plex Sans and Mono, and Courier Prime; the yellow-box rule; the icon redrawn from Courier Prime's own L.
+- Replaced `web/src/routes/` and most of `web/src/components/` with `web/src/phone/`, `web/src/mac/` and `web/src/pages/`. URLs are parsed in `web/src/paths.ts`, and old URLs redirect.
+- Added three API fields: each story's `names`, the Summary's `digestAt`, and History's `via` (open or peek). The integration tests assert all three.
+- 355 unit tests pass; typecheck and lint clean. Checked in mock mode at phone and Mac widths, light and dark: the deck's swipes, spring-back, fold and Undo; Browse's sheets, peek, and Back restoring rows; the reader and story sheet; the console's keys, palette and slide-over. The first story starts at 10 to 17% of the screen height.
+- Merged #66 on Sandip's word; Deploy run 38127624439 passed. Wrote the journal entry (#67, merged) and the 2026-W41 weekly summary (this pull request).
+
+**State now:**
+
+- Prod runs e5f277c (#66). Main is at c8d14fa plus this docs pull request; the main checkout is synced.
+- The redesign was tested in mock mode only. Nobody has used it on a real iPhone.
+- Not built, by decision: the deep dives (Timeline, Backstory, Takes, Source), the job line, verdicts, Follow and Ask (#19, #16, #17, #23, #22, #21). `docs/features/redesign.md` has the reasons.
+- The handoff download sits untracked at `claude-design/` in the main checkout. Its content is committed under `docs/mockups/redesign/`.
+
+**Next:**
+
+- Open the home-screen app on the iPhone and work through `docs/features/redesign.md`, Open: safe areas, pull to refresh inside the standalone app, the story sheet's drag between heights, VoiceOver, and the deck's swipes. File what breaks as issues.
+- Monday 2026-10-12: read a weekday's day in brief and its cost (`narrative done` in the ingest logs).
+- Then #19 (how a story evolved), the first deep dive, as the Timeline tab where the handoff draws it. Start from `closestStories` in `packages/core/src/related.ts`. Take #19's `needs-decision` label off first: the redesign it was waiting for has shipped.
+
+**Decisions:**
+
+- No controls for features without a backend. Each deep dive arrives with its issue, in the place the design gives it.
+- One tap opens a card in Today's deck (the handoff's proposed alternative); Browse keeps tap to peek and double tap to open.
+- Irrelevant always archives, from every place it appears.
+- Rows read or saved stay in place, faded, until the view changes (RET-10).
+- A newsletter wider than the column is scaled down with CSS `zoom`, so its layout survives.
+- On the Mac, `/library` lands on the News queue; Library's pages open from ⌘K.
