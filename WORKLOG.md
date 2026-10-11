@@ -164,3 +164,29 @@ Append-only session log. Newest entry at the bottom.
 - Prod deploys only from main through GitHub Actions; dev and the integration tests gate prod; one branch per change from a fresh main; squash merges. `pnpm run deploy` is the fallback when GitHub Actions is down.
 - The deploy role trusts the GitHub environments, not branches, and the environments allow only main. The role's stack is deployed by hand, but CDK's bootstrap roles can change anything, so main's protection is the real gate.
 - Third-party actions are pinned to commit SHAs, since the deploy jobs hold AWS credentials.
+
+## 2026-10-11: The pipeline's first runs
+
+**Did:**
+
+- Found #57, #58 and #59 still open after Sandip's merge (GitHub had no merge on record), and merged them once Sandip switched off auto mode. Turned on main's branch protection: the `check` job from GitHub Actions required, pull requests only, admins included, linear history, no force pushes or deletion. `pnpm sync-main` moved the main checkout from 934c6d2 to 774afeb, then to 0f2597e.
+- The first Deploy run failed before touching AWS: GitHub could not assume `TheLibrary-github-deploy`. This repository has GitHub's immutable subjects on, so its tokens say `repo:devsandip@19489947/the-library@1411266741:environment:dev`, and the role expected the name-only form; CloudTrail's refused `AssumeRoleWithWebIdentity` calls showed the real subject. Cancelled #57's queued run, fixed the trust policy in PR #60 (the first pull request through the protected main: blocked until its `check` passed), and deployed `TheLibrary-ci` from main by hand.
+- The next run, from main at 0f2597e (#58, #57, #60), passed end to end in about 5 minutes: CI 69 s, dev 102 s (deploy, then 45 of 45 integration tests), prod 121 s (deploy, then every hosting check). Prod answers peek events.
+- Put the five peeks from 2026-10-10 into prod's history, at the times in the API's request log, and marked the five issues read. History for 2026-10-10 lists 16 issues.
+
+**State now:**
+
+- Prod runs main at 0f2597e, deployed by the pipeline; nothing deploys prod by hand any more. #56 is closed.
+- Every change now goes through a pull request whose `check` passes. Merging deploys within about 5 to 10 minutes; docs-only pushes skip the deploy.
+- Sandip's main checkout is even with main.
+
+**Next:**
+
+- Monday 2026-10-12: the weekly journal summary for 2026-W41 (the entries from 2026-10-10 and 2026-10-11).
+- Then #20's second version (related stories inside a digest), then #19 (how a story evolved).
+- Still open from search: the first search after a cold start (`search corpus read` in the prod API logs), and the result count wrapping at 375 px.
+
+**Decisions:**
+
+- The deploy role trusts GitHub's immutable subject (owner and repository IDs), not the name-only one, so a renamed or recreated repository cannot match.
+- The role's stack stays a hand deploy, from main, after `cdk diff -c stage=ci`.
