@@ -190,3 +190,30 @@ Append-only session log. Newest entry at the bottom.
 
 - The deploy role trusts GitHub's immutable subject (owner and repository IDs), not the name-only one, so a renamed or recreated repository cannot match.
 - The role's stack stays a hand deploy, from main, after `cdk diff -c stage=ci`.
+
+## 2026-10-11: Related stories inside a digest (#20, second version)
+
+**Did:**
+
+- Calibrated story-to-story similarity on prod's 2,264 stories (read-only dump, `scratch/related2-*`, gitignored): house style barely shows (0.10 within a newsletter, 0.07 across), so no centring; pairs read by band set the cutoff at 0.45; same-newsletter pairs at 0.80 and up are reruns (The Ken, Fortune's Altman interview about ten times).
+- Built it in PR #62: `closestStories` and `relatedStories` in `packages/core/src/related.ts`; `services/api/src/related.ts`; search's corpus cache moved to `services/api/src/corpus.ts` and shared; the Related component lists a digest's stories with up to three relatives each. Issues without embedded stories fall back to the first version.
+- Tests: 332 unit (10 new); the branch deployed to dev, 46 integration tests (one new, with Titan embeddings). Mock UI checked at 375 px and in the Mac's reading pane.
+- Merged #62 on Sandip's ship (auto mode off). Deploy run 38123331070 passed in 5.5 minutes; prod runs b00373b. Prod's answer for WSJ What's News of 2026-10-09 matched the offline run exactly; the API logged 2,978 ms cold (2,524 ms reading the corpus) and 163 ms warm.
+
+**State now:**
+
+- Related stories live on prod. Main at b00373b plus this docs pull request; the main checkout synced.
+- `docs/features/related.md` holds the decisions and calibration; `docs/architecture.md` section 11 and the API table updated.
+
+**Next:**
+
+- Monday 2026-10-12: the weekly journal summary for 2026-W41 (entries from 2026-10-10 and 2026-10-11) before other work.
+- Then #19 (how a story evolved). Start from `closestStories` in `packages/core/src/related.ts`: the FlyDubai thread in `docs/features/related.md` is the shape #19 wants, before any Claude call.
+- Read a long digest's Related on the phone (TLDR Dev, The Ken) and decide whether it wants fewer stories or folding.
+
+**Decisions:**
+
+- Related matches stories at a raw cosine of 0.45, one relative per issue, up to three per digest story or three each side for a one-story issue.
+- The same newsletter's story at 0.80 or more is a rerun and left out; another newsletter's near copy stays.
+- Earlier and Since headings only once something arrived after the open issue.
+- `RelatedResponse` keeps `earlier` and `since` and adds `stories`, so an old web build shows nothing for a digest instead of breaking.
