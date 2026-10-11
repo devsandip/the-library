@@ -1,6 +1,6 @@
 # The Library: Journal
 
-Last refreshed: 2026-10-11 11:18
+Last refreshed: 2026-10-11 12:09
 Latest entry: [2026-10-11-1118-search-and-one-way-to-prod.md](entries/2026-10-11-1118-search-and-one-way-to-prod.md)
 
 A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Live at https://sandip.dev/thelibrary/.
@@ -11,9 +11,9 @@ The reader is live on both devices and does what the brief asked of Phase 1: ing
 
 Ranking runs when the Summary opens, and the Summary leads with the day in brief, written from the stories every issue is split into. Since 2026-10-11 search finds any issue or story in the archive, by its words or by what it means. Spend is about $5.50 a month, mostly Claude.
 
-Three ways back to an issue: Now reading, Saved, and a peek inside before opening it. History lists what I read, a day at a time; once #57 is merged, a peek left open two seconds counts too. None of this has been tried on a real iPhone yet.
+Three ways back to an issue: Now reading, Saved, and a peek inside before opening it. History lists what I read, a day at a time, and since 2026-10-11 a peek left open two seconds counts too; the five digests I peeked at on 2026-10-10 were added to it. None of this has been tried on a real iPhone yet.
 
-How changes ship changed on 2026-10-11. Pull requests run CI, and once the pipeline (#58) is merged, every merge to main deploys through dev and the integration tests to prod. Nothing deploys prod by hand any more. Next: related stories inside a digest (#20, second version) and how a story evolved (#19).
+How changes ship changed on 2026-10-11. Main is protected: every change is a pull request whose CI check passes, and merging deploys it through dev and the integration tests to prod in about 5 to 10 minutes. Nothing deploys prod by hand any more. The first run failed on how GitHub names this repository to AWS, and the second deployed everything. Next: related stories inside a digest (#20, second version) and how a story evolved (#19).
 
 ## Recent entries
 
@@ -41,7 +41,6 @@ None yet. The first, 2026-W41, is due on Monday 2026-10-12.
 - Will ranking hit the 60% aim once ratings exist (#5)?
 - How do the day in brief's threads and cost hold up on a weekday, with about 90 news stories?
 - Will Claude be able to merge its own pull requests, as I asked, or does auto mode keep treating it as self-approval?
-- How fast is the first search after a cold start on prod (`search corpus read` in the API logs)?
 - Which decision model for the bounded calls: Claude, Jev or OpenAI Decisions (#27)?
 - What to do about `robots.txt` on `sandip.dev` (#7)?
 - When does the AWS account get Haiku 5.5?
