@@ -1,5 +1,5 @@
 import { READER_TIME_ZONE } from "@library/core/days";
-import type { DigestStats, Narrative } from "@library/core/types";
+import type { Narrative } from "@library/core/types";
 
 /** "3h ago", "yesterday", "Oct 2". */
 export function relativeTime(iso: string, now = Date.now()): string {
@@ -19,27 +19,64 @@ export function relativeTime(iso: string, now = Date.now()): string {
   });
 }
 
-/** "Saturday 10 October", for the phone's header and the Summary. */
-export function todayLine(now = new Date()): string {
-  return now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
-}
-
 /**
- * The success measure in a line (#5): of the boxed top 5s over the last 14 days, how many were
- * rated Relevant. The PRD's aim is 3 in 5.
+ * How old an issue is, for the mono meta lines: "now", "45m", "5h", "2d", then the date
+ * ("2 Oct"). Labels are set in capitals by the stylesheet.
  */
-export function digestLine(s: DigestStats): string {
-  const pct = Math.round((100 * s.relevant) / s.shown);
-  return (
-    `Boxed top 5s, last 14 days: ${s.relevant} of ${s.shown} rated Relevant (${pct}%), ` +
-    `${s.irrelevant} Irrelevant. The aim is 60%.`
-  );
+export function age(iso: string, now = Date.now()): string {
+  const min = Math.floor((now - Date.parse(iso)) / 60_000);
+  if (min < 1) return "now";
+  if (min < 60) return `${min}m`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d`;
+  return new Date(iso).toLocaleDateString("en-GB", {
+    timeZone: READER_TIME_ZONE,
+    day: "numeric",
+    month: "short",
+  });
 }
 
-/** Under the narrative's heading (#18): what it was written from, and when. */
+/** "Today", "6 Oct", or "Mar 2025" from another year: the dates on a timeline. */
+export function shortDate(iso: string, now = Date.now()): string {
+  const day = (t: number) =>
+    new Date(t).toLocaleDateString("en-CA", { timeZone: READER_TIME_ZONE });
+  if (day(Date.parse(iso)) === day(now)) return "Today";
+  const d = new Date(iso);
+  const sameYear = day(Date.parse(iso)).slice(0, 4) === day(now).slice(0, 4);
+  return d.toLocaleDateString("en-GB", {
+    timeZone: READER_TIME_ZONE,
+    ...(sameYear ? { day: "numeric", month: "short" } : { month: "short", year: "numeric" }),
+  });
+}
+
+/** "06:14", in the reader's time zone, 24-hour: the mono meta lines and "Checked 12:30". */
+export function clock(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-GB", {
+    timeZone: READER_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+}
+
+/** "Sun 11 Oct", for Browse's date line. */
+export function dateShort(now = new Date()): string {
+  return now
+    .toLocaleDateString("en-GB", {
+      timeZone: READER_TIME_ZONE,
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    })
+    .replace(",", "");
+}
+
+/** Under the brief's heading (#18): what it was written from, and when. */
 export function narrativeLine(n: Narrative, now = Date.now()): string {
   const papers = n.newsletters === 1 ? "1 newsletter" : `${n.newsletters} newsletters`;
-  return `From ${n.stories} stories in ${papers}, updated ${relativeTime(n.at, now)}.`;
+  return `${n.stories} stories from ${papers}, updated ${relativeTime(n.at, now)}.`;
 }
 
 /** Noon of a reader's day, safe to format in the reader's time zone. */
@@ -72,4 +109,40 @@ export function clockTime(iso: string): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+/** Skimming one-line summaries runs at about 200 words a minute. */
+export function skimMinutes(lines: string[]): number {
+  const words = lines.join(" ").split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 200));
+}
+
+/** A share read as a whole percentage: 0.35 -> 35. */
+export const percent = (share: number) => Math.round(share * 100);
+
+/**
+ * Why an issue ranks where it does, in plain words with the newsletter named: the ranking says
+ * "You rated this newsletter Relevant 4 times"; the card says "You rated The Ken Relevant 4 times".
+ */
+export function reasonLine(reason: string, publication: string): string {
+  return reason.replace("this newsletter", publication);
+}
+
+/**
+ * The Mac queue's short form of a ranking reason ("↳ Interest · AI"), set in capitals by the
+ * stylesheet. Reasons the ranking does not tie to a topic get the issue's topic.
+ */
+export function reasonCode(reason: string | undefined, topic: string | undefined): string {
+  const withTopic = (code: string) => (topic ? `${code} · ${topic}` : code);
+  if (!reason) return topic ?? "";
+  if (reason === "From a Must Read newsletter") return withTopic("Must Read");
+  const rated = /^You rated this newsletter Relevant (once|twice|(\d+) times)$/.exec(reason);
+  if (rated) return `${rated[1] === "once" ? 1 : rated[1] === "twice" ? 2 : rated[2]}× Relevant`;
+  if (reason === "Trying a newsletter you haven't rated yet") return "Exploring · not rated yet";
+  const interest = /^Close to your interest in (.+)$/.exec(reason);
+  if (interest) return `Interest · ${interest[1]}`;
+  if (/^Like ".*", which you rated Relevant$/.test(reason)) return withTopic("Matches");
+  if (reason === "Just in") return withTopic("Just in");
+  if (reason === "Among the newest") return withTopic("Newest");
+  return reason;
 }

@@ -464,7 +464,10 @@ describe("API on dev", () => {
     const digest = r.body.digest ?? [];
     expect(digest.length).toBeGreaterThan(0);
     expect(digest.length).toBeLessThanOrEqual(5);
-    expect((await call<SummaryResponse>("GET", "/summary")).body.digest).toEqual(digest);
+    expect(r.body.digestAt).toMatch(/^\d{4}-/);
+    const again = (await call<SummaryResponse>("GET", "/summary")).body;
+    expect(again.digest).toEqual(digest);
+    expect(again.digestAt).toBe(r.body.digestAt);
     await call("POST", `/issues/${digest[0]}/rating`, { body: { value: 1 } });
     const status = await call<StatusResponse>("GET", "/status");
     expect(status.body.digestStats).toEqual({
@@ -553,6 +556,7 @@ describe("API on dev", () => {
     expect(ids.slice(0, 2)).toEqual(["fx-lenny", "fx-tldr"]);
     expect(new Set(ids).size).toBe(ids.length);
     expect(r.body.items[0]?.openedAt).toMatch(/^\d{4}-/);
+    expect(r.body.items[0]?.via).toBe("open");
     expect(r.body.nextDay).toBeUndefined();
 
     // A peek left open is a read too (#56): the issue joins the day, and Now reading stays put.
@@ -568,6 +572,8 @@ describe("API on dev", () => {
       "fx-lenny",
       "fx-tldr",
     ]);
+    // History tells a peek from an open (the redesign's "Read" and "Opened").
+    expect(peeked.body.items[0]?.via).toBe("peek");
     expect((await call<NowReadingResponse>("GET", "/now-reading")).body).toEqual(reading);
     expect((await peek("does-not-exist")).status).toBe(404);
 
@@ -845,7 +851,7 @@ describe("API on dev", () => {
   });
 
   it("stories: an issue's stories in order, without their embeddings; none before a split", async () => {
-    const put = (n: number, headline: string, link?: string) =>
+    const put = (n: number, headline: string, link?: string, names: string[] = []) =>
       ddb.send(
         new PutCommand({
           TableName: stack.tableName,
@@ -854,20 +860,27 @@ describe("API on dev", () => {
             n,
             headline,
             summary: `What story ${n} says.`,
-            names: [],
+            names,
             ...(link ? { link } : {}),
             vector: new Uint8Array(8),
             eventId: `int${n}`,
           },
         }),
       );
-    await put(2, "Second", "https://example.test/two");
+    await put(2, "Second", "https://example.test/two", ["OpenAI", "IndiGo"]);
     await put(1, "First");
     const r = await call<IssueStoriesResponse>("GET", "/issues/fx-tldr/stories");
     expect(r.status).toBe(200);
+    // Names come along when the story has any (the story sheet's names line).
     expect(r.body.stories).toEqual([
       { n: 1, headline: "First", summary: "What story 1 says." },
-      { n: 2, headline: "Second", summary: "What story 2 says.", link: "https://example.test/two" },
+      {
+        n: 2,
+        headline: "Second",
+        summary: "What story 2 says.",
+        link: "https://example.test/two",
+        names: ["OpenAI", "IndiGo"],
+      },
     ]);
     expect((await call<IssueStoriesResponse>("GET", "/issues/fx-lenny/stories")).body).toEqual({
       stories: [],

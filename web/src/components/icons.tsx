@@ -1,11 +1,10 @@
-/** Inline SVG icons (no emoji, no icon font). 20px, currentColor. */
-interface IconProps {
-  filled?: boolean;
-}
-
+/**
+ * Inline SVG icons (no icon font, no emoji): 24 px, stroke 1.8, round joins (the redesign).
+ * Everything else is a typeset mark in the label's own font: ↩ ↗ ‹ › ★ ✓ ✕.
+ */
 const base = {
-  width: 20,
-  height: 20,
+  width: 24,
+  height: 24,
   viewBox: "0 0 24 24",
   "aria-hidden": "true",
   fill: "none",
@@ -15,151 +14,47 @@ const base = {
   "stroke-linejoin": "round",
 } as const;
 
-export function ThumbUp({ filled }: IconProps) {
-  return (
-    <svg {...base} fill={filled ? "currentColor" : "none"}>
-      <path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h3Z" />
-      <path d="M7 10l4.2-7.1A1.9 1.9 0 0 1 14.7 4l-.9 5h5.4a2 2 0 0 1 2 2.3l-1.3 8A2 2 0 0 1 17.9 21H7" />
-    </svg>
-  );
-}
-
-export function ThumbDown({ filled }: IconProps) {
-  return (
-    <svg {...base} fill={filled ? "currentColor" : "none"}>
-      <path d="M17 14V3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-3Z" />
-      <path d="M17 14l-4.2 7.1A1.9 1.9 0 0 1 9.3 20l.9-5H4.8a2 2 0 0 1-2-2.3l1.3-8A2 2 0 0 1 6.1 3H17" />
-    </svg>
-  );
-}
-
-export function StarIcon({ filled }: IconProps) {
-  return (
-    <svg {...base} fill={filled ? "currentColor" : "none"}>
-      <path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z" />
-    </svg>
-  );
-}
-
-export function ArchiveIcon() {
+export function TodayIcon() {
   return (
     <svg {...base}>
-      <rect x="3" y="4" width="18" height="4" rx="1" />
-      <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4" />
+      <rect x="4.5" y="7.5" width="15" height="13" rx="2.5" />
+      <path d="M7 4.5h10" />
     </svg>
   );
 }
 
-export function UnreadIcon() {
+export function BrowseIcon() {
   return (
     <svg {...base}>
-      <rect x="3" y="5" width="18" height="14" rx="2" />
-      <path d="m3 7 9 6 9-6" />
+      <rect x="4" y="5" width="16" height="14" rx="2" />
+      <path d="M8 9h8M8 12.5h8M8 16h5" />
     </svg>
   );
 }
 
-export function ExternalIcon() {
+export function SavedIcon() {
   return (
     <svg {...base}>
-      <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+      <path d="M7 4h10v16l-5-3.6L7 20z" />
     </svg>
   );
 }
 
-export function BackIcon() {
+/** The corner brackets of the Machine's box around an L. */
+export function LibraryIcon() {
   return (
     <svg {...base}>
-      <path d="M15 18l-6-6 6-6" />
+      <path d="M4 8.5V4h4.5M15.5 4H20v4.5M20 15.5V20h-4.5M8.5 20H4v-4.5" />
+      <path d="M10 8v8h5" />
     </svg>
   );
 }
 
-/** Points down; turned to point right when a section is folded. */
-export function ChevronIcon() {
+export function SearchIcon({ size = 20 }: { size?: number }) {
   return (
-    <svg {...base}>
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
-}
-
-/** A clock: read history. */
-export function HistoryIcon() {
-  return (
-    <svg {...base}>
-      <circle cx="12" cy="12" r="8" />
-      <path d="M12 8v4l2.5 2.5" />
-    </svg>
-  );
-}
-
-export function BookmarkIcon({ filled }: IconProps) {
-  return (
-    <svg {...base} fill={filled ? "currentColor" : "none"}>
-      <path d="M6.5 3.5h11a1 1 0 0 1 1 1v16l-6.5-4.2-6.5 4.2v-16a1 1 0 0 1 1-1Z" />
-    </svg>
-  );
-}
-
-export function BookIcon() {
-  return (
-    <svg {...base}>
-      <path d="M12 6.5C10.3 5.2 7.9 4.5 4 4.5v13c3.9 0 6.3.7 8 2 1.7-1.3 4.1-2 8-2v-13c-3.9 0-6.3.7-8 2Z" />
-      <path d="M12 6.5v13" />
-    </svg>
-  );
-}
-
-export function SearchIcon() {
-  return (
-    <svg {...base}>
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5" />
-    </svg>
-  );
-}
-
-/** Three narrowing lines: the sender filter. */
-export function FilterIcon() {
-  return (
-    <svg {...base}>
-      <path d="M4 6h16M7 12h10M10 18h4" />
-    </svg>
-  );
-}
-
-/** Three left-aligned lines: the Summary page. */
-export function SummaryIcon() {
-  return (
-    <svg {...base}>
-      <path d="M4 6h16M4 12h10M4 18h13" />
-    </svg>
-  );
-}
-
-/** A small sun of spokes: the Status page (settings and sign out). */
-export function SettingsIcon() {
-  return (
-    <svg {...base}>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4" />
-    </svg>
-  );
-}
-
-export function CloseIcon() {
-  return (
-    <svg {...base} stroke-width={2.2}>
-      <path d="M6 6l12 12M18 6 6 18" />
-    </svg>
-  );
-}
-
-export function RefreshIcon() {
-  return (
-    <svg {...base}>
-      <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
+    <svg {...base} width={size} height={size} stroke-width={2}>
+      <circle cx="11" cy="11" r="6" />
+      <path d="M20 20l-4.5-4.5" />
     </svg>
   );
 }

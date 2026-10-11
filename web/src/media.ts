@@ -1,8 +1,8 @@
 import { useEffect, useState } from "preact/hooks";
 
-/** The look changes here (#12): briefing cards below, the sidebar and list layout above. */
-export const WIDE = "(min-width: 760px)";
-/** Room for a reading pane beside the list. */
+/** Up to 760 px the phone's four tabs; above, the Mac's console (the redesign). */
+export const WIDE = "(min-width: 761px)";
+/** From here the console shows all three panes; below, the story index slides over. */
 export const PANES = "(min-width: 1100px)";
 
 export function useMedia(query: string): boolean {

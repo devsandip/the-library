@@ -67,11 +67,11 @@ A private, single-user web reader that ingests my newsletters daily, ranks them 
 - Ranking must be explainable in the UI in one line ("Because you liked 4 Platformer issues", "Matches: AI, startups")
 
 ### 3. Read
-- Home view: ranked list of unread issues with publication, subject, one-line summary, reason-for-rank, date
+- Today: the ranked unread News with publication, subject, one-line summary, reason-for-rank, date. On the phone a deck of cards (the day in brief first, the top 5 in the yellow box); on the Mac the top of the News queue. Everything else unread is in Browse (redesign, 2026-10-11, `docs/features/redesign.md`)
 - Issue view: clean, readable rendering of the newsletter; fast on mobile
 - Actions per issue: Relevant (thumbs up), Irrelevant (thumbs down), mark read, archive, open original
 - Filters: unread / all, by sender, by topic
-- News and Learning: Home has two tabs. Claude decides per issue with one test, "would this still be worth reading in three months?", and I can move any issue or set a newsletter to always land in one tab. Claude also tags one topic per issue (tap it to filter), archives promos, and unread news archives itself after a week (except Must Read).
+- News and Learning: two shelves (a word in Browse's filter sentence on the phone, two queues on the Mac). Claude decides per issue with one test, "would this still be worth reading in three months?", and I can move any issue or set a newsletter to always land in one tab. Claude also tags one topic per issue (tap it to filter), archives promos, and unread news archives itself after a week (except Must Read).
 - Per-sender view with a "mute sender" action and a visible unsubscribe link
 - Must Read: I star the newsletters I never want to miss; their unread issues come first
 

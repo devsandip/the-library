@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useRef } from "preact/hooks";
-import { useLocation } from "preact-iso";
-import { BASE } from "../config.js";
-import { homeHref, issueHref, readFilters } from "../filters.js";
+import { percent } from "../format.js";
 import { useLibrary } from "../library.js";
-import { PANES, useMedia } from "../media.js";
+import { issueHref, queueHref } from "../paths.js";
 import { atEnd, placeIn, scrollFor, type FrameView } from "../place.js";
-import { BookIcon } from "./icons.js";
 
 /** Saved at most this often while reading; the last place also goes when the reader leaves. */
 const SAVE_EVERY_MS = 5000;
@@ -157,41 +154,37 @@ export function useReadingPlace(
 }
 
 /**
- * The way back to the issue Now reading points at (#44): a card under the phone's header and in
- * the Mac's sidebar, with how far in. On a Mac wide enough for the reading pane it opens there.
+ * Continue reading (#44): a pill at the right of every phone header, "↩ Linear 42%" on Today and
+ * "↩ 42%" elsewhere. One tap goes back to the issue at its place. Hidden when there is nothing to
+ * continue (business rule 19).
  */
-export function NowReadingLink({ wide }: { wide: boolean }) {
+export function ContinuePill({ long = false }: { long?: boolean }) {
   const { nowReading } = useLibrary();
-  const { path, query } = useLocation();
-  const panes = useMedia(PANES);
   const n = nowReading.data?.nowReading;
   if (!n) return null;
-
-  const id = n.issue.id;
-  // preact-iso drops the trailing slash: Home's path is "/thelibrary".
-  const home = path === (BASE || "/");
-  const href =
-    wide && panes ? homeHref({ ...readFilters(home ? query : {}), issue: id }) : issueHref(id);
-  const open = query.issue === id || path === issueHref(id);
-  const pct = Math.round(n.position * 100);
+  const pct = percent(n.position);
   return (
     <a
-      class={`now-reading${open ? " on" : ""}`}
-      href={href}
-      aria-current={open ? "page" : undefined}
+      class={`continue${long ? " long" : ""}`}
+      href={issueHref(n.issue.id)}
+      aria-label={`Continue reading ${n.issue.subject}, ${pct}% read`}
     >
-      <span class="now-label">
-        <BookIcon />
-        Now reading
-      </span>
-      <span class="now-title">{n.issue.subject}</span>
-      <span class="now-meta">
-        {n.issue.publication}
-        {pct > 0 && ` · ${pct}% read`}
-      </span>
-      <span class="now-bar" aria-hidden="true">
-        <span style={{ width: `${Math.max(pct, 2)}%` }} />
-      </span>
+      <span aria-hidden="true">↩</span>
+      {long && <span class="continue-title">{n.issue.subject}</span>}
+      <span class={long ? "continue-pct" : undefined}>{pct}%</span>
+    </a>
+  );
+}
+
+/** The Mac's status line: "↩ How Linear builds product · 42%", opening it in the console. */
+export function ContinueItem() {
+  const { nowReading } = useLibrary();
+  const n = nowReading.data?.nowReading;
+  if (!n) return null;
+  const shelf = n.issue.shelf === "learning" ? "learning" : "news";
+  return (
+    <a class="status-continue" href={queueHref(shelf, undefined, n.issue.id)}>
+      ↩ {n.issue.subject} · {percent(n.position)}%
     </a>
   );
 }

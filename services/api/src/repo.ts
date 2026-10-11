@@ -780,9 +780,9 @@ export class DynamoRepo implements RepoPort, CorpusSource, SearchSource, Related
       this.nearestOpen(to, "after"),
       this.listSenders(),
     ]);
-    const latest = new Map<string, string>();
+    const latest = new Map<string, { at: string; via: HistoryItem["via"] }>();
     for (const o of opens) {
-      if ((latest.get(o.id) ?? "") < o.at) latest.set(o.id, o.at);
+      if ((latest.get(o.id)?.at ?? "") < o.at) latest.set(o.id, { at: o.at, via: o.via });
     }
     const starred = new Set(senders.filter((s) => s.mustRead).map((s) => s.senderId));
     const issues = await this.batchGet([...latest.keys()].map(issueKey), LIST_ATTRIBUTES);
@@ -792,7 +792,8 @@ export class DynamoRepo implements RepoPort, CorpusSource, SearchSource, Related
       .map((i) => ({
         ...toListItem(i),
         ...(starred.has(i.senderId as string) ? { mustRead: true } : {}),
-        openedAt: latest.get(i.id as string)!,
+        openedAt: latest.get(i.id as string)!.at,
+        via: latest.get(i.id as string)!.via,
       }))
       .sort((a, b) => b.openedAt.localeCompare(a.openedAt));
     return {
@@ -804,20 +805,24 @@ export class DynamoRepo implements RepoPort, CorpusSource, SearchSource, Related
   }
 
   /** Opens and peeks between two instants (inclusive), from the `OPENS` partition of `gsi1`. */
-  private async opensBetween(from: string, to: string): Promise<{ id: string; at: string }[]> {
-    const out: { id: string; at: string }[] = [];
+  private async opensBetween(
+    from: string,
+    to: string,
+  ): Promise<{ id: string; at: string; via: HistoryItem["via"] }[]> {
+    const out: { id: string; at: string; via: HistoryItem["via"] }[] = [];
     let start: Item | undefined;
     do {
       const res: QueryCommandOutput = await this.query({
         IndexName: INDEX.list,
         KeyConditionExpression: "gsi1pk = :p AND gsi1sk BETWEEN :from AND :to",
         ExpressionAttributeValues: { ":p": PARTITION.opens, ":from": from, ":to": `${to}\uffff` },
-        ProjectionExpression: "gsi1sk",
+        ProjectionExpression: "gsi1sk, #t",
+        ExpressionAttributeNames: { "#t": "type" },
         ExclusiveStartKey: start,
       });
       for (const i of res.Items ?? []) {
         const [at, id] = (i.gsi1sk as string).split("#");
-        out.push({ id: id!, at: at! });
+        out.push({ id: id!, at: at!, via: i.type === "peek" ? "peek" : "open" });
       }
       start = res.LastEvaluatedKey;
     } while (start);
@@ -852,16 +857,26 @@ export class DynamoRepo implements RepoPort, CorpusSource, SearchSource, Related
         KeyConditionExpression: "pk = :pk AND begins_with(sk, :story)",
         ExpressionAttributeValues: { ":pk": issueKey(id).pk, ":story": "STORY#" },
         // Not the embedding: a few lines of text each.
-        ProjectionExpression: "#n, #h, #s, #l",
-        ExpressionAttributeNames: { "#n": "n", "#h": "headline", "#s": "summary", "#l": "link" },
+        ProjectionExpression: "#n, #h, #s, #l, #nm",
+        ExpressionAttributeNames: {
+          "#n": "n",
+          "#h": "headline",
+          "#s": "summary",
+          "#l": "link",
+          "#nm": "names",
+        },
       }),
     ]);
-    const stories: IssueStory[] = (res.Items ?? []).map((s) => ({
-      n: s.n as number,
-      headline: s.headline as string,
-      summary: s.summary as string,
-      ...(typeof s.link === "string" ? { link: s.link } : {}),
-    }));
+    const stories: IssueStory[] = (res.Items ?? []).map((s) => {
+      const names = Array.isArray(s.names) ? (s.names as string[]) : [];
+      return {
+        n: s.n as number,
+        headline: s.headline as string,
+        summary: s.summary as string,
+        ...(typeof s.link === "string" ? { link: s.link } : {}),
+        ...(names.length ? { names } : {}),
+      };
+    });
     return { stories: stories.sort((a, b) => a.n - b.n) };
   }
 
@@ -1264,7 +1279,8 @@ export class DynamoRepo implements RepoPort, CorpusSource, SearchSource, Related
       this.narrative(now),
     ]);
     return {
-      digest,
+      digest: digest?.ids ?? [],
+      ...(digest ? { digestAt: digest.at } : {}),
       digestStats,
       ...(narrative ? { narrative } : {}),
       items: picked.map((r) => {
@@ -1340,25 +1356,33 @@ export class DynamoRepo implements RepoPort, CorpusSource, SearchSource, Related
    * Today's digest (#5): the Summary's top 5 the first time it is shown in the reader's day, kept
    * as shown so the success measure can check them later. Later calls return what was logged.
    */
-  private async todaysDigest(day: string, top: string[]): Promise<string[]> {
-    const logged = async () =>
-      (await this.ddb.send(new GetCommand({ TableName: this.table, Key: digestKey(day) }))).Item;
+  private async todaysDigest(
+    day: string,
+    top: string[],
+  ): Promise<{ ids: string[]; at: string } | undefined> {
+    const logged = async () => {
+      const item = (
+        await this.ddb.send(new GetCommand({ TableName: this.table, Key: digestKey(day) }))
+      ).Item;
+      return item && { ids: (item.ids as string[] | undefined) ?? [], at: item.at as string };
+    };
     const found = await logged();
-    if (found) return (found.ids as string[] | undefined) ?? [];
-    if (!top.length) return [];
+    if (found) return found;
+    if (!top.length) return undefined;
+    const at = new Date().toISOString();
     try {
       await this.ddb.send(
         new PutCommand({
           TableName: this.table,
-          Item: { ...digestKey(day), ids: top, at: new Date().toISOString() },
+          Item: { ...digestKey(day), ids: top, at },
           ConditionExpression: "attribute_not_exists(pk)",
         }),
       );
-      return top;
+      return { ids: top, at };
     } catch (err) {
       // Another request logged today's first.
       if (!isConditionFailure(err)) throw err;
-      return ((await logged())?.ids as string[] | undefined) ?? top;
+      return (await logged()) ?? { ids: top, at };
     }
   }
 

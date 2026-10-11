@@ -11,10 +11,10 @@
     "dev:mock": "VITE_MOCK=1 vite --port 5173 --strictPort"
   },
   "dependencies": {
-    "@fontsource-variable/figtree": "^5.3.0",
-    "@fontsource-variable/ibm-plex-sans": "^5.3.0",
-    "@fontsource-variable/literata": "^5.3.0",
-    "@fontsource/ibm-plex-serif": "^5.3.0",
+    "@fontsource-variable/newsreader": "^5.3.0",
+    "@fontsource/courier-prime": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
     "preact": "^11.0.1",
     "preact-iso": "^2.12.2"
   },
