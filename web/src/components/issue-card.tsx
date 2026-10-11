@@ -23,17 +23,20 @@ export function IssueCard({
   openedAt,
   swipe,
   onSave,
+  onChange,
   found,
 }: {
   issue: IssueListItem;
   lead?: boolean;
   showPublication?: boolean;
-  /** In read history (#42): when it was opened, shown instead of when it arrived. */
+  /** In read history (#42): when it was read (opened, or peeked at, #56), not when it arrived. */
   openedAt?: string;
   /** Swipe to rate (#13); absent where cards do not swipe (the sideways Must Read row). */
   swipe?: SwipeActions;
   /** Save for later (#43): the card gets a bookmark. */
   onSave?: (issue: IssueListItem) => void;
+  /** Tells the list what a peek changed (#56), so the card keeps up. */
+  onChange?: (id: string, change: Partial<IssueListItem>) => void;
   /** A search result (#53): the words to mark, and the story inside a digest that matched. */
   found?: Found;
 }) {
@@ -85,7 +88,7 @@ export function IssueCard({
           </>
         )}
         {openedAt ? (
-          <time dateTime={openedAt}>Opened {clockTime(openedAt)}</time>
+          <time dateTime={openedAt}>Read {clockTime(openedAt)}</time>
         ) : (
           <time dateTime={issue.receivedAt}>{relativeTime(issue.receivedAt)}</time>
         )}
@@ -112,7 +115,14 @@ export function IssueCard({
         {link}
         {bookmark}
       </div>
-      {peeking && <StoryPeek issue={issue} id={peekId} onOpen={() => route(issueHref(issue.id))} />}
+      {peeking && (
+        <StoryPeek
+          issue={issue}
+          id={peekId}
+          onOpen={() => route(issueHref(issue.id))}
+          onChange={onChange}
+        />
+      )}
     </>
   );
   return (

@@ -688,6 +688,17 @@ export class DynamoRepo implements RepoPort, SearchSource {
     ]);
   }
 
+  /**
+   * A peek left open (#56) is a read too: indexed by time like an open, so read history lists the
+   * issue. Now reading stays where it is, since a peek has no place to come back to.
+   */
+  async logPeek(id: string): Promise<void> {
+    await this.mustGetIssue(id);
+    const now = new Date().toISOString();
+    const peek = { type: "peek", ...openIndexAttributes(id, now) };
+    await this.ddb.send(new PutCommand(this.event(id, now, peek).Put));
+  }
+
   // ---------- now reading (#44) ----------
 
   private async nowReadingItem(): Promise<Item | undefined> {
@@ -755,8 +766,9 @@ export class DynamoRepo implements RepoPort, SearchSource {
   // ---------- read history (#42) ----------
 
   /**
-   * The issues opened on a reader's day, each once at its latest open, latest first, with the
-   * nearest earlier and later days that have reads (so paging skips empty days).
+   * The issues read on a reader's day (opened, or peeked at, #56), each once at its latest read,
+   * latest first, with the nearest earlier and later days that have reads (so paging skips empty
+   * days).
    */
   async history(day: string): Promise<HistoryResponse> {
     const { from, to } = readerDayBounds(day);
@@ -789,7 +801,7 @@ export class DynamoRepo implements RepoPort, SearchSource {
     };
   }
 
-  /** Open events between two instants (inclusive), from the `OPENS` partition of `gsi1`. */
+  /** Opens and peeks between two instants (inclusive), from the `OPENS` partition of `gsi1`. */
   private async opensBetween(from: string, to: string): Promise<{ id: string; at: string }[]> {
     const out: { id: string; at: string }[] = [];
     let start: Item | undefined;
@@ -810,7 +822,7 @@ export class DynamoRepo implements RepoPort, SearchSource {
     return out;
   }
 
-  /** The time of the last open before `edge`, or the first after it. */
+  /** The time of the last read before `edge`, or the first after it. */
   private async nearestOpen(edge: string, side: "before" | "after"): Promise<string | undefined> {
     const res = await this.query({
       IndexName: INDEX.list,

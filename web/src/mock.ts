@@ -701,6 +701,11 @@ export class MockLibraryApi implements LibraryApi {
     const kept = mockPlace?.issueId === id ? mockPlace.position : 0;
     mockPlace = { issueId: id, position: kept < 1 ? kept : 0, since: at, at };
   }
+  /** The mock's history is a stand-in (see mockHistory), so a peek leaves it as it is. */
+  async logPeek(id: string) {
+    find(id);
+    await delay(20);
+  }
   async nowReading(): Promise<NowReadingResponse> {
     await delay();
     return mockNowReading();

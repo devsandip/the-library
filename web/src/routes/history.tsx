@@ -1,5 +1,6 @@
 import { useLocation } from "preact-iso";
 import { isReaderDay, readerDay } from "@library/core/days";
+import type { IssueListItem } from "@library/core/types";
 import { BASE } from "../config.js";
 import { useApp } from "../context.js";
 import { dayLine, shortDay } from "../format.js";
@@ -17,9 +18,9 @@ const historyHref = (day: string, issue?: string) =>
   `${BASE}/history?day=${day}${issue ? `&issue=${encodeURIComponent(issue)}` : ""}`;
 
 /**
- * Read history (#42): the issues opened on one day, latest first. Earlier and later skip days
- * with nothing read; the date field goes to any day. The day lives in the URL, so Back steps
- * through the days visited.
+ * Read history (#42): the issues read on one day (opened, or peeked at, #56), latest first.
+ * Earlier and later skip days with nothing read; the date field goes to any day. The day lives in
+ * the URL, so Back steps through the days visited.
  */
 export function History() {
   const { api } = useApp();
@@ -31,9 +32,9 @@ export function History() {
   const history = useAsync(() => api.history(day), [day]);
   const open = panes ? query.issue : undefined;
 
-  const save = useSaveToggle((id, change) =>
-    history.set((d) => ({ ...d, items: patchIssue(d.items, id, change) })),
-  );
+  const patch = (id: string, change: Partial<IssueListItem>) =>
+    history.set((d) => ({ ...d, items: patchIssue(d.items, id, change) }));
+  const save = useSaveToggle(patch);
 
   const go = (d: string) => route(historyHref(d));
   const openHere = (id: string) => route(historyHref(day, id), true);
@@ -119,13 +120,20 @@ export function History() {
                 selected={i.id === open}
                 onOpen={panes ? openHere : undefined}
                 onSave={save}
+                onChange={patch}
               />
             ))}
           </ul>
         ) : (
           <ul class="cards">
             {items.map((i) => (
-              <IssueCard key={i.id} issue={i} openedAt={i.openedAt} onSave={save} />
+              <IssueCard
+                key={i.id}
+                issue={i}
+                openedAt={i.openedAt}
+                onSave={save}
+                onChange={patch}
+              />
             ))}
           </ul>
         ))}

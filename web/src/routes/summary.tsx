@@ -34,6 +34,7 @@ function SummaryRow({
   onOpen,
   onArchive,
   onSave,
+  onChange,
   swipe,
 }: {
   issue: IssueListItem;
@@ -44,6 +45,8 @@ function SummaryRow({
   onArchive: (id: string) => void;
   /** Save for later (#43). */
   onSave: (issue: IssueListItem) => void;
+  /** Tells the list what a peek changed (#56), so the line keeps up. */
+  onChange: (id: string, change: Partial<IssueListItem>) => void;
   /** Swipe to rate (#13), on the phone. */
   swipe?: SwipeActions;
 }) {
@@ -103,7 +106,7 @@ function SummaryRow({
           <ArchiveIcon />
         </button>
       </div>
-      {peeking && !onOpen && <StoryPeek issue={i} id={peekId} onOpen={open} />}
+      {peeking && !onOpen && <StoryPeek issue={i} id={peekId} onOpen={open} onChange={onChange} />}
     </li>
   );
 }
@@ -188,6 +191,7 @@ export function Summary() {
       onOpen={panes ? openHere : undefined}
       onArchive={(id) => void archive(id)}
       onSave={save}
+      onChange={patch}
       swipe={wide ? undefined : rating.actions(i)}
     />
   );

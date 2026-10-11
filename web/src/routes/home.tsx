@@ -256,6 +256,7 @@ export function Home() {
             selected={panes && i.id === filters.issue}
             onOpen={panes ? openInPane : undefined}
             onSave={save}
+            onChange={patch}
           />
         ))}
       </ul>
@@ -425,7 +426,13 @@ export function Home() {
           </h2>
           <ul class="cards">
             {s.items.map((i) => (
-              <IssueCard key={i.id} issue={i} swipe={rating.actions(i)} onSave={save} />
+              <IssueCard
+                key={i.id}
+                issue={i}
+                swipe={rating.actions(i)}
+                onSave={save}
+                onChange={patch}
+              />
             ))}
           </ul>
         </section>

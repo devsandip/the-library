@@ -119,7 +119,7 @@ export function Sender() {
       ) : wide ? (
         <ul class="rows panel">
           {s.issues.map((i) => (
-            <IssueRow key={i.id} issue={i} showPublication={false} onSave={save} />
+            <IssueRow key={i.id} issue={i} showPublication={false} onSave={save} onChange={patch} />
           ))}
         </ul>
       ) : (
@@ -131,6 +131,7 @@ export function Sender() {
               showPublication={false}
               swipe={rating.actions(i)}
               onSave={save}
+              onChange={patch}
             />
           ))}
         </ul>

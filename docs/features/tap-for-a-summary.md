@@ -17,6 +17,7 @@ One tap on a row shows what is inside the issue, under the row; a double tap ope
 - **The Must Read row's lead cards open on a tap.** The row scrolls sideways and stretches its cards to one height, so a card that grew would stretch them all; those cards already show the most text.
 - **Swipe is unchanged.** A drag never counts as a tap: swipe already swallows the click that follows a drag.
 - **Only web links.** A story's link comes from the newsletter, so the peek shows it only when it starts with http or https.
+- **A peek left open 2 seconds reads the issue** (#56, 2026-10-11; was: a peek changed nothing). Read history lists it and an unread issue is marked read, as opening it would. One folded away sooner was only a glance. Now reading stays on the last issue opened.
 
 ## Open
 

@@ -43,6 +43,8 @@ export interface RepoPort {
   setRating(id: string, value: Rating | 0): Promise<IssueListItem>;
   /** Logs the open (read history, #42) and points Now reading at the issue (#44). */
   logOpen(id: string): Promise<void>;
+  /** Logs a peek left open (#56): read history lists the issue; Now reading stays put. */
+  logPeek(id: string): Promise<void>;
   /** The issue to come back to (#44), if there is one. */
   nowReading(): Promise<NowReadingResponse>;
   /** Saves how far down an issue the reader is, 0 to 1, where 1 means finished (#44). */
@@ -58,7 +60,7 @@ export interface RepoPort {
   unreadCounts(): Promise<UnreadCountsResponse>;
   /** The most relevant unread News, best first. */
   summary(): Promise<SummaryResponse>;
-  /** Issues opened on a reader's day (#42), latest first, and the nearest days with reads. */
+  /** Issues read on a reader's day (#42, #56), latest first, and the nearest days with reads. */
   history(day: string): Promise<HistoryResponse>;
   status(): Promise<StatusResponse>;
 }
