@@ -1,7 +1,7 @@
 # The Library: Journal
 
-Last refreshed: 2026-10-11 13:37
-Latest entry: [2026-10-11-1337-related-stories-inside-a-digest.md](entries/2026-10-11-1337-related-stories-inside-a-digest.md)
+Last refreshed: 2026-10-11 13:53
+Latest entry: [2026-10-11-1353-ux-redesign-brief.md](entries/2026-10-11-1353-ux-redesign-brief.md)
 
 A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Live at https://sandip.dev/thelibrary/.
 
@@ -15,8 +15,11 @@ Three ways back to an issue: Now reading, Saved, and a peek inside before openin
 
 How changes ship changed on 2026-10-11. Main is protected: every change is a pull request whose CI check passes, and merging deploys it through dev and the integration tests to prod in about 5 to 10 minutes. Nothing deploys prod by hand any more. The first run failed on how GitHub names this repository to AWS, and the second deployed everything. Next: how a story evolved (#19).
 
+I don't like the UX on either device, so on 2026-10-11 I handed the redesign to Claude Design, from first principles. The brief is a product overview and 185 user stories, in two packs: one with 123 screenshots of today's UI, and one with none, so the design doesn't anchor on it. Neither pack is in the repo yet.
+
 ## Recent entries
 
+- [2026-10-11 13:53: A redesign, briefed without the old screens](entries/2026-10-11-1353-ux-redesign-brief.md)
 - [2026-10-11 13:37: Related stories inside a digest](entries/2026-10-11-1337-related-stories-inside-a-digest.md)
 - [2026-10-11 11:18: Search, and one way to prod](entries/2026-10-11-1118-search-and-one-way-to-prod.md)
 - [2026-10-10 21:11: Now reading, Saved, and a peek inside](entries/2026-10-10-2111-now-reading-saved-and-a-peek.md)
@@ -44,6 +47,8 @@ None yet. The first, 2026-W41, is due on Monday 2026-10-12.
 - Will Claude be able to merge its own pull requests, as I asked, or does auto mode keep treating it as self-approval?
 - Which decision model for the bounded calls: Claude, Jev or OpenAI Decisions (#27)?
 - What to do about `robots.txt` on `sandip.dev` (#7)?
+- One visual identity for the phone and the Mac, or two on purpose?
+- Does new UI, starting with #19, wait for the redesign?
 - When does the AWS account get Haiku 5.5?
 
 ## Things ruled out
@@ -65,3 +70,4 @@ None yet. The first, 2026-W41, is due on Monday 2026-10-12.
 - Rebase merges: squash merges leave one commit per pull request and no branch behind to diverge (2026-10-11).
 - Taking house style out of story embeddings for Related: Claude wrote every story, so stories of one newsletter average 0.10 against 0.07 across (2026-10-11).
 - A lower Related cutoff for stories that share a name: from 0.40 to 0.45 they were related about as often without one (2026-10-11).
+- Polishing the current UI: the redesign starts from the requirements, not today's screens (2026-10-11).
