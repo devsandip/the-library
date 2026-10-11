@@ -217,3 +217,30 @@ Append-only session log. Newest entry at the bottom.
 - The same newsletter's story at 0.80 or more is a rerun and left out; another newsletter's near copy stays.
 - Earlier and Since headings only once something arrived after the open issue.
 - `RelatedResponse` keeps `earlier` and `since` and adds `stories`, so an old web build shows nothing for a digest instead of breaking.
+
+## 2026-10-11: The UX redesign brief for Claude Design
+
+**Did:**
+
+- Built the brief for redesigning the UX on both devices with Claude Design, in two packs under `design-handoff/` in the worktree `ux-redesign-handoff-9f9bf3` (untracked). Both share `1-PRODUCT-OVERVIEW.md` (what the app is, vocabulary, built and planned, constraints, content sizes, lessons) and `2-PRODUCT-REQUIREMENTS.md` (185 user stories in 15 areas, 144 shipped, 40 planned, 1 parked, plus 26 business rules).
+- The no-screens pack describes needs only, so the design doesn't anchor on today's UI. The with-screens pack adds `3-CURRENT-DESIGN-AND-SCREENS.md` and 123 screenshots from mock mode (phone, Mac light and dark, 1024 px, public pages), reduced to 256 colours to fit SendUserFile's 30 MiB limit.
+- Kept the Playwright capture script in `design-handoff/capture-tool/`, so the same screens can be retaken after the redesign.
+- Brought the docs up to date for #56 and #20, which shipped while the packs were being written; the zips were not rebuilt.
+- Merged #63 (another session's journal) and #64 (this session's journal entry) on Sandip's ship. Labelled #19 `needs-decision`: does it wait for the redesign?
+
+**State now:**
+
+- Main at acd123d plus this pull request; prod unchanged at b00373b. No code changed.
+- The packs exist only in the worktree. The zips predate the #56 and #20 updates.
+
+**Next:**
+
+- Decide where the packs live: commit the stories as `docs/user-stories.md` from a fresh `origin/main`, move the folders out of the repo, or both. Keep the screenshots out of git unless Sandip wants them.
+- Sandip adds his own critique to both READMEs, then sends a pack to Claude Design.
+- Monday 2026-10-12: the weekly journal summary for 2026-W41 before other work.
+
+**Decisions:**
+
+- Redesign from first principles, not a polish: one pack without screens so the design doesn't anchor, one with screens for reference.
+- Interactions are named in the stories only where Sandip asked for them; a better pattern comes as a proposal, not a silent swap.
+- Screenshots from mock mode, since Claude does not sign in for Sandip.
