@@ -1,42 +1,52 @@
 /*
- * The Library, redesigned (docs/features/redesign.md). One identity on the phone and the Mac:
- * Newsreader for what is read, IBM Plex Sans for controls and body, IBM Plex Mono for ranks,
- * counts, keys and status. Yellow is only ever the Machine's box. Light and dark share every
- * layout; dark is the default, the system decides, and Library > Settings can pin either.
+ * Nutgraf (formerly The Library), redesigned (docs/features/redesign.md). One identity on the
+ * phone and the Mac, in Apple's type and colour: SF Pro Display for titles, SF Pro Text for body,
+ * controls and labels (tabular figures for counts, costs and times), New York only for quoted
+ * text. System greys; yellow is the one highlight, and there is no blue. Every background is a
+ * token from the handoff's "Backgrounds (exact)" table (docs/mockups/redesign/README.md); a
+ * surface not in it is --bg. Light and dark share every layout; dark is the default, the system
+ * decides, and Library > Settings can pin either.
  */
 
 :root {
   color-scheme: dark;
-  --bg: #0c0d0e;
-  --panel: #141618;
-  --raised: #1b1e21;
-  --card: #16181b;
-  --line: #24282b;
-  --line-2: #2e3236;
-  --ink: #e9e7e2;
-  --ink-2: #a3a6a9;
-  --ink-3: #7d8185;
-  --on-ink: #0c0d0e;
-  --box: #ffd21f;
-  --box-text: #ffd21f;
-  --rel: #5cc98a;
-  --rel-bg: #15301f;
-  --irr: #ff6b57;
-  --irr-bg: #3a1914;
-  --verdict: #ffb547;
-  --verdict-line: #6b4e1e;
-  --verdict-bg: rgba(255, 181, 71, 0.07);
+  --bg: #000000;
+  --panel: #1c1c1e;
+  --raised: #2c2c2e;
+  --card: #1c1c1e;
+  --peek: #0e0e0f;
+  --deck-1: #151516;
+  --deck-2: #0e0e0f;
+  --chip: #2c2c2e; /* a topic chip that is off */
+  --tile: #1c1c1e; /* the logo tile in the Mac's top bar */
+  --line: #38383a;
+  --line-2: #48484a;
+  --ink: #ffffff;
+  --ink-2: #aeaeb2;
+  --ink-3: #8e8e93;
+  --ink-body: #d1d1d6; /* body text on panels */
+  --on-ink: #000000;
+  --box: #ffd60a;
+  --box-text: #ffd60a;
+  --rel: #30d158;
+  --rel-bg: #0d3317;
+  --rel-line: #1f5c2e;
+  --irr: #ff453a;
+  --irr-bg: #3a1412;
+  --irr-line: #6e2522;
+  --verdict: #ff9f0a;
+  --verdict-line: #6a4300;
+  --verdict-bg: rgba(255, 159, 10, 0.1);
   --scrim: rgba(0, 0, 0, 0.45);
+  --scrim-reader: rgba(0, 0, 0, 0.45); /* the story sheet over the reader */
   --page-filter: brightness(0.94);
-  --deck-1: #121416;
-  --deck-2: #101113;
   --shadow-card: 0 14px 34px rgba(0, 0, 0, 0.35);
   --shadow-sheet: 0 -10px 30px rgba(0, 0, 0, 0.35);
-  --soft: #c9cbcc; /* body text on panels */
 
-  --serif: "Newsreader Variable", Charter, Georgia, serif;
-  --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --fold: #ffd60a; /* the logo's folded corner: this yellow in both themes */
+  --font-text: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  --font-quote: ui-serif, "New York", Georgia, serif; /* quoted text and the empty state only */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   /* The phone's tab bar: 49 px of tabs plus the home indicator. */
@@ -46,63 +56,75 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     color-scheme: light;
-    --bg: #f2f1ec;
+    --bg: #f2f2f7;
     --panel: #ffffff;
     --raised: #ffffff;
     --card: #ffffff;
-    --line: #e1e0da;
-    --line-2: #d3d2cb;
-    --ink: #111213;
-    --ink-2: #4a4d50;
-    --ink-3: #6b6f73;
+    --peek: #fafafc;
+    --deck-1: #fafafc;
+    --deck-2: #f5f5f8;
+    --chip: #f2f2f7;
+    --tile: #000000;
+    --line: #e5e5ea;
+    --line-2: #d1d1d6;
+    --ink: #000000;
+    --ink-2: #3c3c43;
+    --ink-3: #6e6e73;
+    --ink-body: #3c3c43;
     --on-ink: #ffffff;
-    --box: #e3b600;
-    --box-text: #8a6d00;
-    --rel: #1f8a4c;
-    --rel-bg: #dcf0e3;
-    --irr: #c8361f;
-    --irr-bg: #fbe2dd;
-    --verdict: #9a5b00;
-    --verdict-line: #e9c98f;
-    --verdict-bg: #fff4e0;
-    --scrim: rgba(17, 18, 19, 0.28);
+    --box: #ffcc00;
+    --box-text: #946800;
+    --rel: #248a3d;
+    --rel-bg: #e3f5e7;
+    --rel-line: #a8ddb5;
+    --irr: #d70015;
+    --irr-bg: #fde4e4;
+    --irr-line: #f3b1b5;
+    --verdict: #c93400;
+    --verdict-line: #f2c9a6;
+    --verdict-bg: #fff1e6;
+    --scrim: rgba(0, 0, 0, 0.3);
+    --scrim-reader: rgba(0, 0, 0, 0.2);
     --page-filter: none;
-    --deck-1: #faf9f6;
-    --deck-2: #f4f3ef;
     --shadow-card: 0 14px 34px rgba(0, 0, 0, 0.12);
     --shadow-sheet: 0 -10px 30px rgba(0, 0, 0, 0.14);
-    --soft: #4a4d50;
   }
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f2f1ec;
+  --bg: #f2f2f7;
   --panel: #ffffff;
   --raised: #ffffff;
   --card: #ffffff;
-  --line: #e1e0da;
-  --line-2: #d3d2cb;
-  --ink: #111213;
-  --ink-2: #4a4d50;
-  --ink-3: #6b6f73;
+  --peek: #fafafc;
+  --deck-1: #fafafc;
+  --deck-2: #f5f5f8;
+  --chip: #f2f2f7;
+  --tile: #000000;
+  --line: #e5e5ea;
+  --line-2: #d1d1d6;
+  --ink: #000000;
+  --ink-2: #3c3c43;
+  --ink-3: #6e6e73;
+  --ink-body: #3c3c43;
   --on-ink: #ffffff;
-  --box: #e3b600;
-  --box-text: #8a6d00;
-  --rel: #1f8a4c;
-  --rel-bg: #dcf0e3;
-  --irr: #c8361f;
-  --irr-bg: #fbe2dd;
-  --verdict: #9a5b00;
-  --verdict-line: #e9c98f;
-  --verdict-bg: #fff4e0;
-  --scrim: rgba(17, 18, 19, 0.28);
+  --box: #ffcc00;
+  --box-text: #946800;
+  --rel: #248a3d;
+  --rel-bg: #e3f5e7;
+  --rel-line: #a8ddb5;
+  --irr: #d70015;
+  --irr-bg: #fde4e4;
+  --irr-line: #f3b1b5;
+  --verdict: #c93400;
+  --verdict-line: #f2c9a6;
+  --verdict-bg: #fff1e6;
+  --scrim: rgba(0, 0, 0, 0.3);
+  --scrim-reader: rgba(0, 0, 0, 0.2);
   --page-filter: none;
-  --deck-1: #faf9f6;
-  --deck-2: #f4f3ef;
   --shadow-card: 0 14px 34px rgba(0, 0, 0, 0.12);
   --shadow-sheet: 0 -10px 30px rgba(0, 0, 0, 0.14);
-  --soft: #4a4d50;
 }
 
 /* ---------- base ---------- */
@@ -120,7 +142,8 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 400 14.5px/1.45 var(--sans);
+  font: 400 14.5px/1.45 var(--font-text);
+  -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
   font-optical-sizing: auto;
@@ -176,10 +199,12 @@ p {
   border: 0;
 }
 
-/* Mono labels: ranks, counts, keys, costs and status. */
+/* Labels: SF Pro Text caps at 11 px with tabular figures, for meta lines, ranks, counts, keys,
+   costs and status. Never smaller. */
 .label {
-  font: 500 10.5px/1.2 var(--mono);
-  letter-spacing: 0.08em;
+  font: 500 11px/1.2 var(--font-text);
+  letter-spacing: 0.03em;
+  font-variant-numeric: tabular-nums;
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -231,7 +256,7 @@ p {
   border-radius: 6px;
   border: 1px solid transparent;
   background: none;
-  font: 600 14px/1 var(--sans);
+  font: 600 14px/1 var(--font-text);
   color: var(--ink);
   white-space: nowrap;
 }
@@ -256,11 +281,12 @@ p {
   font-size: 13px;
 }
 
-.btn.mono {
+.btn.caps {
   height: 40px;
   padding: 0 8px;
-  font: 600 10.5px/1 var(--mono);
-  letter-spacing: 0.04em;
+  font: 600 11px/1 var(--font-text);
+  letter-spacing: 0.03em;
+  font-variant-numeric: tabular-nums;
   text-transform: uppercase;
 }
 
@@ -303,7 +329,7 @@ select.btn {
 }
 
 .empty-title {
-  font: italic 400 30px/1.1 var(--serif);
+  font: italic 400 30px/1.1 var(--font-quote);
 }
 
 .empty-text {
@@ -423,7 +449,7 @@ select.btn {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  font: 600 10.5px/1 var(--sans);
+  font: 600 10.5px/1 var(--font-text);
   color: var(--ink-3);
 }
 
@@ -441,7 +467,7 @@ select.btn {
 }
 
 .screen-title {
-  font: 500 32px/1 var(--serif);
+  font: 700 32px/1 var(--font-display);
   letter-spacing: -0.02em;
 }
 
@@ -459,7 +485,8 @@ select.btn {
   border-radius: 17px;
   background: var(--raised);
   border: 1px solid var(--line-2);
-  font: 500 11px/1 var(--mono);
+  font: 500 11px/1 var(--font-text);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
   min-width: 0;
 }
@@ -509,6 +536,7 @@ select.btn {
   align-items: center;
   justify-content: space-between;
   height: 36px;
+  letter-spacing: 0.04em;
 }
 
 .deck-switch {
@@ -601,8 +629,8 @@ select.btn {
   right: 16px;
   padding: 7px 10px;
   border-radius: 4px;
-  font: 600 11px/1 var(--mono);
-  letter-spacing: 0.1em;
+  font: 600 11px/1 var(--font-text);
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--on-ink);
   opacity: 0;
@@ -619,17 +647,15 @@ select.btn {
 
 .card-label {
   font-weight: 600;
-  letter-spacing: 0.12em;
 }
 
 .card-meta {
   margin-top: 12px;
-  letter-spacing: 0.06em;
 }
 
 .card-title {
   margin-top: 8px;
-  font: 600 24px/1.15 var(--serif);
+  font: 700 24px/1.15 var(--font-display);
   letter-spacing: -0.01em;
   text-wrap: pretty;
 }
@@ -650,26 +676,26 @@ select.btn {
 }
 
 .card-inside .label {
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
 }
 
 .card-story {
   display: flex;
   gap: 10px;
   padding: 7px 0;
-  font: 500 15px/1.3 var(--serif);
+  font: 600 15px/1.3 var(--font-text);
 }
 
 .card-story .n {
   min-width: 12px;
-  font: 600 11.5px/1.5 var(--mono);
+  font: 600 11.5px/1.5 var(--font-text);
+  font-variant-numeric: tabular-nums;
   color: var(--ink-3);
 }
 
 .card-more {
   padding: 2px 0 0 22px;
   color: var(--ink-2);
-  letter-spacing: 0.06em;
 }
 
 .card-foot {
@@ -678,7 +704,7 @@ select.btn {
 }
 
 .card-why {
-  font: 400 14px/1.35 var(--sans);
+  font: 400 14px/1.35 var(--font-text);
 }
 
 .card-buttons {
@@ -703,20 +729,18 @@ select.btn {
 
 .brief-thread {
   display: block;
-  font: 600 16px/1.25 var(--serif);
+  font: 600 16px/1.25 var(--font-text);
 }
 
 .brief-threads .label {
   display: block;
   margin-top: 3px;
-  letter-spacing: 0.06em;
 }
 
 .deck-hints {
   display: flex;
   justify-content: space-between;
   margin-top: 12px;
-  letter-spacing: 0.06em;
 }
 
 .deck-skeleton {
@@ -747,7 +771,7 @@ select.btn {
   gap: 8px;
   padding: 0 16px 8px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.05em;
 }
 
 .five-head span:last-child {
@@ -815,7 +839,7 @@ select.btn {
 }
 
 .row-item.peeking .row-face {
-  background: var(--deck-2);
+  background: var(--peek);
 }
 
 .row-item.dim .row {
@@ -826,7 +850,6 @@ select.btn {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  letter-spacing: 0.06em;
   color: var(--ink-2);
 }
 
@@ -842,14 +865,14 @@ select.btn {
 .row-title {
   display: block;
   margin-top: 6px;
-  font: 500 18px/1.28 var(--serif);
+  font: 600 18px/1.28 var(--font-text);
   text-wrap: pretty;
 }
 
 .row-line {
   display: block;
   margin-top: 4px;
-  font: 400 14px/1.42 var(--sans);
+  font: 400 14px/1.42 var(--font-text);
   color: var(--ink-2);
   text-wrap: pretty;
 }
@@ -857,15 +880,13 @@ select.btn {
 .row-found {
   display: block;
   margin-top: 4px;
-  font: italic 400 14px/1.4 var(--sans);
+  font: italic 400 14px/1.4 var(--font-text);
   color: var(--ink-2);
 }
 
 .row-tags {
   display: block;
   margin-top: 8px;
-  font-size: 10px;
-  letter-spacing: 0.06em;
 }
 
 mark {
@@ -889,8 +910,8 @@ mark {
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
-  font: 600 11px/1 var(--mono);
-  letter-spacing: 0.1em;
+  font: 600 11px/1 var(--font-text);
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
@@ -933,8 +954,7 @@ mark {
   gap: 8px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--line);
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
 }
 
 .peek-story {
@@ -948,7 +968,8 @@ mark {
 .peek-n {
   flex: none;
   width: 12px;
-  font: 600 11px/1 var(--mono);
+  font: 600 11px/1 var(--font-text);
+  font-variant-numeric: tabular-nums;
   color: var(--ink-3);
 }
 
@@ -959,13 +980,13 @@ mark {
 
 .peek-headline {
   display: block;
-  font: 500 15px/1.25 var(--serif);
+  font: 600 15px/1.25 var(--font-text);
 }
 
 .peek-line {
   display: block;
   margin-top: 2px;
-  font: 400 13px/1.35 var(--sans);
+  font: 400 13px/1.35 var(--font-text);
   color: var(--ink-2);
   white-space: nowrap;
   overflow: hidden;
@@ -996,11 +1017,11 @@ mark {
   padding: 6px 6px 6px 12px;
 }
 
-.peek-foot .label {
-  letter-spacing: 0.06em;
-}
-
 /* ---------- Browse ---------- */
+
+.date-row .label {
+  letter-spacing: 0.04em;
+}
 
 .date-row {
   display: flex;
@@ -1020,7 +1041,7 @@ mark {
 .sentence {
   padding: 2px 20px 18px;
   border-bottom: 1px solid var(--line);
-  font: 500 28px/1.26 var(--serif);
+  font: 700 28px/1.26 var(--font-display);
   letter-spacing: -0.01em;
   color: var(--ink-3);
   text-wrap: pretty;
@@ -1103,7 +1124,7 @@ dialog {
   align-items: center;
   height: 44px;
   margin-top: 4px;
-  font: 600 15px/1 var(--sans);
+  font: 600 15px/1 var(--font-text);
 }
 
 .sheet-head button {
@@ -1114,8 +1135,9 @@ dialog {
   font-weight: 600;
 }
 
-.sheet-clear {
+.sheet .sheet-clear {
   justify-self: start;
+  font-weight: 400;
   color: var(--ink-2);
 }
 
@@ -1124,11 +1146,7 @@ dialog {
 }
 
 .sheet-title {
-  font: 600 17px/1 var(--serif);
-}
-
-.sheet-sub {
-  letter-spacing: 0.06em;
+  font: 600 17px/1 var(--font-text);
 }
 
 .chips {
@@ -1147,12 +1165,13 @@ dialog {
   padding: 0 14px;
   border-radius: 20px;
   border: 1px solid var(--line);
-  background: var(--bg);
-  font: 600 13.5px/1 var(--sans);
+  background: var(--chip);
+  font: 600 13.5px/1 var(--font-text);
 }
 
 .chip .n {
   font-weight: 500;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-3);
 }
 
@@ -1189,7 +1208,7 @@ dialog {
   border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--bg);
-  font: 600 15px/1.2 var(--sans);
+  font: 600 15px/1.2 var(--font-text);
   text-align: left;
 }
 
@@ -1208,7 +1227,7 @@ dialog {
   background: var(--raised);
   border: 1px solid var(--line-2);
   color: var(--ink-3);
-  font: 400 15px/1 var(--sans);
+  font: 400 15px/1 var(--font-text);
 }
 
 .field input {
@@ -1252,7 +1271,7 @@ dialog {
 
 .pick-name {
   flex: 1;
-  font: 500 15px/1.3 var(--sans);
+  font: 500 15px/1.3 var(--font-text);
 }
 
 .pick-none {
@@ -1287,7 +1306,7 @@ dialog {
   background: var(--raised);
   border: 1px solid var(--line-2);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-  font: 500 13.5px/1.3 var(--sans);
+  font: 500 13.5px/1.3 var(--font-text);
   pointer-events: auto;
   animation: rise 160ms ease-out;
 }
@@ -1301,8 +1320,8 @@ dialog {
   padding: 0 8px;
   border: 0;
   background: none;
-  font: 600 11px/1 var(--mono);
-  letter-spacing: 0.08em;
+  font: 600 11px/1 var(--font-text);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--box-text);
 }
@@ -1322,7 +1341,7 @@ dialog {
   padding: 0 12px;
   border: 0;
   background: none;
-  font: 600 15px/1 var(--sans);
+  font: 600 15px/1 var(--font-text);
 }
 
 .top-link {
@@ -1331,7 +1350,6 @@ dialog {
   height: 44px;
   padding: 0 12px;
   font-size: 11px;
-  letter-spacing: 0.06em;
   color: var(--ink-2);
 }
 
@@ -1345,7 +1363,6 @@ dialog {
 
 .reader-meta {
   line-height: 1.4;
-  letter-spacing: 0.06em;
 }
 
 .reader-meta a {
@@ -1366,7 +1383,7 @@ dialog {
 
 .issue-title {
   margin-top: 7px;
-  font: 600 23px/1.18 var(--serif);
+  font: 700 23px/1.18 var(--font-display);
   letter-spacing: -0.01em;
   text-wrap: pretty;
 }
@@ -1428,9 +1445,10 @@ dialog {
   border-radius: 6px;
   border: 1px solid var(--line-2);
   background: none;
-  font: 600 10px/1 var(--mono);
-  letter-spacing: 0.04em;
+  font: 600 11px/1 var(--font-text);
+  letter-spacing: 0.03em;
   text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -1464,7 +1482,7 @@ dialog {
 .scrim {
   position: absolute;
   inset: 0;
-  background: var(--scrim);
+  background: var(--scrim-reader);
   animation: fade 200ms ease-out;
 }
 
@@ -1517,7 +1535,7 @@ dialog {
 }
 
 .story-bar .label {
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
 }
 
 .steppers {
@@ -1529,7 +1547,7 @@ dialog {
   height: 40px;
   border: 0;
   background: none;
-  font: 500 20px/1 var(--sans);
+  font: 500 20px/1 var(--font-text);
 }
 
 .steppers button:disabled {
@@ -1537,7 +1555,7 @@ dialog {
 }
 
 .story-headline {
-  font: 600 21px/1.2 var(--serif);
+  font: 700 21px/1.2 var(--font-display);
   letter-spacing: -0.01em;
   text-wrap: pretty;
 }
@@ -1551,7 +1569,6 @@ dialog {
 .story-names {
   margin-top: 7px;
   line-height: 1.4;
-  letter-spacing: 0.06em;
 }
 
 .story-actions {
@@ -1565,7 +1582,7 @@ dialog {
   display: flex;
   justify-content: space-between;
   margin: 18px 0 10px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
 }
 
 .related-none {
@@ -1601,14 +1618,12 @@ dialog {
 
 .timeline-when {
   display: block;
-  font-size: 10px;
-  letter-spacing: 0.06em;
 }
 
 .timeline-text {
   display: block;
   margin-top: 3px;
-  font: 500 15px/1.3 var(--serif);
+  font: 600 15px/1.3 var(--font-text);
 }
 
 .timeline.compact a {
@@ -1630,8 +1645,8 @@ dialog {
 
 .timeline.compact .timeline-text {
   margin: 0;
-  font: 400 12.5px/1.35 var(--sans);
-  color: var(--soft);
+  font: 400 12.5px/1.35 var(--font-text);
+  color: var(--ink-body);
 }
 
 .timeline-pub {
@@ -1677,7 +1692,7 @@ dialog {
 
 .group-name {
   flex: 1;
-  font: 600 16px/1.2 var(--sans);
+  font: 600 16px/1.2 var(--font-text);
 }
 
 .group-row .label {
@@ -1691,7 +1706,7 @@ dialog {
 
 .group-label {
   margin: 22px 4px 0;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
 }
 
 .group.later {
@@ -1750,7 +1765,7 @@ dialog {
 
 .page-title {
   margin-top: 6px;
-  font: 500 32px/1.05 var(--serif);
+  font: 700 32px/1.05 var(--font-display);
   letter-spacing: -0.02em;
 }
 
@@ -1812,7 +1827,8 @@ dialog {
   border-radius: 6px;
   border: 1px solid var(--line-2);
   background: var(--raised);
-  font: 500 13px/1 var(--mono);
+  font: 500 13px/1 var(--font-text);
+  font-variant-numeric: tabular-nums;
 }
 
 .lib-page .group .sender {
@@ -1871,8 +1887,9 @@ dialog {
 }
 
 .facts dt {
-  font: 500 10.5px/1.6 var(--mono);
-  letter-spacing: 0.08em;
+  font: 500 11px/1.6 var(--font-text);
+  letter-spacing: 0.03em;
+  font-variant-numeric: tabular-nums;
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -1907,16 +1924,13 @@ dialog {
 }
 
 .thread h2 {
-  font: 600 19px/1.25 var(--serif);
+  font: 700 19px/1.25 var(--font-display);
+  letter-spacing: -0.01em;
 }
 
 .thread p {
   margin-top: 6px;
   color: var(--ink-2);
-}
-
-.thread .thread-sources {
-  letter-spacing: 0.06em;
 }
 
 .thread-sources a,
@@ -1949,32 +1963,40 @@ dialog {
 .logo {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   flex: none;
 }
 
+/* The folded page: a black page, its corner turned down in yellow, and an n. The fold's upper
+   triangle is the top bar's own colour, so the corner reads as cut. */
 .logo-tile {
   position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-end;
   width: 24px;
   height: 24px;
-  border-radius: 5px;
-  box-shadow: inset 0 0 0 1px var(--line-2);
-  font:
-    700 13px/1 "Courier Prime",
-    monospace;
+  padding: 0 0 3px 5px;
+  border-radius: 6px;
+  background: var(--tile);
+  overflow: hidden;
+  font: 700 14px/1 var(--font-display);
+  color: #ffffff;
 }
 
-.logo-tile .ybox {
-  --inset: 4px;
-  --arm: 5px;
-  --w: 1.5px;
+.logo-fold {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-bottom-left-radius: 2px;
+  background: linear-gradient(225deg, var(--bg) 50%, var(--fold) 50%);
 }
 
+/* The wordmark is always lowercase and never yellow. */
 .logo-name {
-  font: italic 500 18px/1 var(--serif);
+  font: 600 19px/1 var(--font-display);
+  letter-spacing: -0.02em;
   white-space: nowrap;
 }
 
@@ -1990,9 +2012,10 @@ dialog {
   height: 30px;
   padding: 0 12px;
   border-radius: 4px;
-  font: 600 11px/1 var(--mono);
-  letter-spacing: 0.08em;
+  font: 600 11px/1 var(--font-text);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-2);
 }
 
@@ -2021,7 +2044,7 @@ dialog {
   background: var(--panel);
   border: 1px solid var(--line-2);
   color: var(--ink-3);
-  font: 400 13.5px/1 var(--sans);
+  font: 400 13.5px/1 var(--font-text);
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
@@ -2031,7 +2054,8 @@ dialog {
   padding: 3px 6px;
   border: 1px solid var(--line-2);
   border-radius: 3px;
-  font: 600 10.5px/1 var(--mono);
+  font: 600 11px/1 var(--font-text);
+  font-variant-numeric: tabular-nums;
   color: var(--ink-2);
 }
 
@@ -2081,7 +2105,7 @@ dialog {
 
 .queue-line {
   height: 40px;
-  font: 500 15px/40px var(--serif);
+  font: 600 15px/40px var(--font-text);
   color: var(--ink-3);
   white-space: nowrap;
   overflow: hidden;
@@ -2120,7 +2144,7 @@ dialog {
   border-radius: 4px;
   background: none;
   text-align: left;
-  font: 500 14px/1.2 var(--sans);
+  font: 500 14px/1.2 var(--font-text);
 }
 
 .menu-item.on,
@@ -2152,7 +2176,6 @@ dialog {
 
 .five-frame.mac .five-head {
   padding: 0 8px 8px;
-  font-size: 10px;
 }
 
 .queue-rows {
@@ -2190,7 +2213,8 @@ dialog {
 }
 
 .qrow-rank {
-  font: 600 13px/1.3 var(--mono);
+  font: 600 13px/1.3 var(--font-text);
+  font-variant-numeric: tabular-nums;
   color: var(--ink-3);
 }
 
@@ -2200,14 +2224,12 @@ dialog {
 
 .qrow-meta {
   display: block;
-  font-size: 10px;
-  letter-spacing: 0.06em;
 }
 
 .qrow-title {
   display: block;
   margin-top: 4px;
-  font: 500 16px/1.3 var(--serif);
+  font: 600 16px/1.3 var(--font-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2216,8 +2238,6 @@ dialog {
 .qrow-code {
   display: block;
   margin-top: 3px;
-  font-size: 10px;
-  letter-spacing: 0.06em;
 }
 
 .qrow .peek {
@@ -2249,15 +2269,10 @@ dialog {
   border: 1px solid var(--line);
 }
 
-.summary-panel .label {
-  font-size: 9.5px;
-  letter-spacing: 0.12em;
-}
-
 .summary-panel p:last-child {
   margin-top: 6px;
   line-height: 1.5;
-  color: var(--soft);
+  color: var(--ink-body);
 }
 
 .keybtns {
@@ -2276,9 +2291,10 @@ dialog {
   border-radius: 4px;
   border: 1px solid var(--line-2);
   background: none;
-  font: 600 10.5px/1 var(--mono);
-  letter-spacing: 0.06em;
+  font: 600 11px/1 var(--font-text);
+  letter-spacing: 0.03em;
   text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-2);
 }
 
@@ -2288,12 +2304,12 @@ dialog {
 
 .keybtn.rel {
   color: var(--rel);
-  border-color: color-mix(in srgb, var(--rel) 45%, var(--bg));
+  border-color: var(--rel-line);
 }
 
 .keybtn.irr {
   color: var(--irr);
-  border-color: color-mix(in srgb, var(--irr) 40%, var(--bg));
+  border-color: var(--irr-line);
 }
 
 .keybtn.on {
@@ -2317,8 +2333,7 @@ dialog {
 
 .page-label {
   margin-top: 18px;
-  font-size: 9.5px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.05em;
 }
 
 .mac-reader .page {
@@ -2332,7 +2347,7 @@ dialog {
 }
 
 .reader-empty .empty-title {
-  font: italic 400 28px/1.1 var(--serif);
+  font: italic 400 28px/1.1 var(--font-quote);
 }
 
 .reader-empty .label {
@@ -2348,9 +2363,8 @@ dialog {
   align-items: center;
   justify-content: space-between;
   height: 40px;
-  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.05em;
 }
 
 .index-head .link-btn {
@@ -2378,13 +2392,14 @@ dialog {
 .index-open-h {
   display: flex;
   gap: 8px;
-  font: 600 15px/1.3 var(--serif);
+  font: 600 15px/1.3 var(--font-text);
 }
 
 .index-open-h .n,
 .index-line .n {
   min-width: 10px;
-  font: 600 11.5px/1.4 var(--mono);
+  font: 600 11.5px/1.4 var(--font-text);
+  font-variant-numeric: tabular-nums;
   color: var(--ink-2);
 }
 
@@ -2393,7 +2408,7 @@ dialog {
 .index-note {
   margin-top: 5px;
   padding-left: 18px;
-  font: 400 12.5px/1.45 var(--sans);
+  font: 400 12.5px/1.45 var(--font-text);
   color: var(--ink-2);
 }
 
@@ -2408,10 +2423,11 @@ dialog {
   align-items: center;
   margin-top: 10px;
   padding-left: 18px;
-  font: 500 10.5px/1 var(--mono);
-  letter-spacing: 0.04em;
+  font: 500 11px/1 var(--font-text);
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: var(--soft);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-body);
 }
 
 .key-grid .keycap {
@@ -2430,7 +2446,6 @@ dialog {
 
 .index-related .section-label {
   margin: 10px 0 8px;
-  font-size: 10px;
 }
 
 .index-line {
@@ -2453,15 +2468,11 @@ dialog {
 .index-h {
   flex: 1;
   min-width: 0;
-  font: 400 13px/1.35 var(--sans);
-  color: var(--soft);
+  font: 400 13px/1.35 var(--font-text);
+  color: var(--ink-body);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.index-line .count {
-  font-size: 9.5px;
 }
 
 .status-line {
@@ -2540,7 +2551,7 @@ dialog {
   border-bottom: 1px solid var(--line);
   background: none;
   outline: none;
-  font: 400 16px/1 var(--sans);
+  font: 400 16px/1 var(--font-text);
 }
 
 .palette-list {
@@ -2562,7 +2573,7 @@ dialog {
   border-radius: 6px;
   background: none;
   text-align: left;
-  font: 500 14px/1.2 var(--sans);
+  font: 500 14px/1.2 var(--font-text);
 }
 
 .palette-line.on {

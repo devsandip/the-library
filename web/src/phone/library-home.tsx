@@ -88,7 +88,7 @@ export function LibraryHome() {
           <span class="label">Stories you track</span>
         </li>
         <li class="group-row">
-          <span class="group-name">Ask the Library</span>
+          <span class="group-name">Ask Nutgraf</span>
           <span class="label">5–20¢ a question</span>
         </li>
         <li class="group-row">

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <!-- The folded page scaled into the inner 80% of a maskable icon, on black. -->
+  <rect width="120" height="120" fill="#000000"/>
+  <g transform="translate(12 12) scale(0.8)">
+  <path fill="#FFD60A" d="M74 0L120 46H82A8 8 0 0 1 74 38Z"/>
+  <path fill="#FFFFFF" transform="translate(22 94.1875) scale(0.03125 -0.03125)" d="M95 0V1072H387V895.5H393Q434.5 988 516.5 1041Q598.5 1094 720 1094Q896.5 1094 993 987.2Q1089.5 880.5 1089.5 692V0H797.5V631.5Q797.5 736.5 748.2 794.2Q699 852 600.5 852Q535.5 852 487.5 822.2Q439.5 792.5 413.2 739.5Q387 686.5 387 616V0Z"/>
+  </g>
+</svg>

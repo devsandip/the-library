@@ -28,7 +28,8 @@ import { REPO_ROOT } from "./functions.js";
 
 /**
  * Viewer-request function for the static behavior. Everything under /thelibrary/ that is not a
- * real file becomes index.html (SPA routing). about/privacy/terms are public static pages that
+ * real file becomes index.html (SPA routing). The icons and the web manifest pass through, for the
+ * tab and the home screen. about/privacy/terms are public static pages that
  * Google's OAuth consent screen links to; they hold no user data. Redirects use a relative
  * Location so a request proxied through sandip.dev never bounces to the cloudfront.net domain.
  */
@@ -44,10 +45,9 @@ function handler(event) {
   }
   if (
     uri.indexOf("${BASE_PATH}/assets/") === 0 ||
+    uri.indexOf("${BASE_PATH}/icons/") === 0 ||
     uri === "${BASE_PATH}/config.json" ||
-    uri === "${BASE_PATH}/favicon.svg" ||
-    uri === "${BASE_PATH}/favicon-32.png" ||
-    uri === "${BASE_PATH}/apple-touch-icon.png" ||
+    uri === "${BASE_PATH}/manifest.json" ||
     uri === "${BASE_PATH}/about.html" ||
     uri === "${BASE_PATH}/privacy.html" ||
     uri === "${BASE_PATH}/terms.html"
@@ -59,7 +59,7 @@ function handler(event) {
 }
 `;
 
-const PLACEHOLDER_SHELL = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>The Library</title></head><body>The Library: web/dist was not built when this was deployed.</body></html>`;
+const PLACEHOLDER_SHELL = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>Nutgraf</title></head><body>Nutgraf: web/dist was not built when this was deployed.</body></html>`;
 
 export interface WebProps {
   stage: Stage;
