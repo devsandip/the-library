@@ -130,7 +130,7 @@ export function Search({ q, sort, wide }: { q: string; sort: SearchSort; wide: b
       {q && results.status === "error" && <Failed message={results.error} retry={results.reload} />}
       {q && data && items.length === 0 && (
         <div class="empty">
-          <p class="empty-text">Nothing matches "{q}". Try other words, or ask the Library.</p>
+          <p class="empty-text">Nothing matches "{q}". Try other words, or ask Nutgraf.</p>
         </div>
       )}
       {data && !data.byMeaning && items.length > 0 && (

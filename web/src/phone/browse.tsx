@@ -131,7 +131,7 @@ export function Browse({ filters }: { filters: BrowseFilters }) {
         </span>
         <span class="date-tools">
           <ContinuePill />
-          <a class="icon-btn" href={searchHref()} aria-label="Search the Library">
+          <a class="icon-btn" href={searchHref()} aria-label="Search everything">
             <SearchIcon />
           </a>
         </span>

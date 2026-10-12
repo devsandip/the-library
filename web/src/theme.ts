@@ -18,10 +18,18 @@ export function readTheme(): ThemePref {
   }
 }
 
+/** The browser's own colour around the page (`theme-color` in index.html): --bg of each theme. */
+const THEME_COLOR = { dark: "#000000", light: "#F2F2F7" } as const;
+
 export function applyTheme(pref: ThemePref) {
   const root = document.documentElement;
   if (pref === "system") delete root.dataset.theme;
   else root.dataset.theme = pref;
+  // index.html gives one theme-color per system scheme; a pinned theme sets both to its own.
+  for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+    const scheme = meta.media.includes("light") ? "light" : "dark";
+    meta.content = THEME_COLOR[pref === "system" ? scheme : pref];
+  }
 }
 
 export function saveTheme(pref: ThemePref) {
