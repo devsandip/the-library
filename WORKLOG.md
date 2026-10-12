@@ -316,3 +316,28 @@ Append-only session log. Newest entry at the bottom.
 - The 301s come from the app's CloudFront function, not an Amplify redirect rule, so they live in the CDK code and are tested; Amplify proxies both paths.
 - The manifest is `manifest.json`, not `.webmanifest`, so S3 serves it as JSON whatever the deployment's content-type table knows.
 - Internal names keep "library": renaming stacks or SSM paths would rebuild resources for no visible gain.
+
+## 2026-10-12: Addendum: the about pages, a flaky test, and TickTick without #
+
+**Did:**
+
+- #78: the about, privacy and terms pages say Nutgraf, after Sandip renamed the app on Google's OAuth consent screen and pointed its links at `/nutgraf/`. Its first Deploy run (38207008908) failed in dev on a flaky integration test; re-running the failed jobs passed check, dev and prod.
+- #79 (open): that test, "archives week-old unread news except from Must Read newsletters", now waits for the GSIs to show its writes before running the rule, as the API and store tests already do. 8 of 8 pass against dev.
+- A rule in `~/.claude/CLAUDE.md`: never write `#` in a TickTick task, because TickTick makes it a tag; titles say "PR 73". localyap PR 181 (merged) brought ryvl's protocol in line.
+- TickTick: four Nutgraf tasks in the Inbox (update PR 72, tighten the CSP's `font-src`, the SF Pro licence, re-add the home-screen icon and do the iPhone pass). In ryvl, the review task for localyap PR 181, completed when it merged.
+
+**State now:**
+
+- Prod runs 37d5638 (#78), from the second attempt of Deploy run 38207008908.
+- Open: #79 (the test fix) and #72 (needs an update from main).
+- Google's consent screen is renamed and points at `/nutgraf/`.
+
+**Next:**
+
+- Ship #79.
+- The four Nutgraf tasks in the TickTick Inbox, starting with the home-screen icon and the iPhone pass.
+
+**Decisions:**
+
+- A Deploy that fails on a flaky test gets its failed jobs re-run, never a deploy by hand; the test is fixed in its own pull request.
+- No `#` in anything sent to TickTick.
