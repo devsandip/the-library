@@ -103,7 +103,7 @@ SPA function, applied to the default behavior:
 - `/nutgraf/about.html`, `/nutgraf/privacy.html`, `/nutgraf/terms.html`: pass through. Public static pages (no user data) that Google requires as the OAuth app's home page, privacy policy and terms before it can be published to production.
 - Any other path under `/nutgraf/`: rewrite to `/nutgraf/index.html`. No extension guessing: sender URLs use opaque IDs, but this rule means a dot in a path can never cause a 403.
 - `/` or `/nutgraf`: 301 with a **relative** `Location` (`/nutgraf/`), so a proxied request never bounces to the `cloudfront.net` domain.
-- `/thelibrary` and everything under it (the app's path until 2026-10-12): 301 to the same path under `/nutgraf/`, query string as received, so bookmarks and the old home-screen icon keep working. `infra/test/spa-function.test.ts` runs the function against sample requests.
+- `/thelibrary` and everything under it (the app's path until 2026-10-12): 301 to the same path under `/nutgraf/` with the same query parameters (their values as received; CloudFront may reorder them), so bookmarks and the old home-screen icon keep working. A bare `/thelibrary` takes two hops: Amplify adds the slash first. `infra/test/spa-function.test.ts` runs the function against sample requests.
 - Anything else: 404.
 
 Response headers policy on both behaviors: CSP (section 8), `X-Robots-Tag: noindex, nofollow`, HSTS, `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`.

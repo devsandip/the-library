@@ -33,7 +33,7 @@ describe("the SPA routing function", () => {
     expect(location("/thelibrary/about.html")).toBe("/nutgraf/about.html");
   });
 
-  it("keeps the query string as it arrived, repeated keys included", () => {
+  it("keeps every query parameter as it arrived, repeated keys included", () => {
     expect(
       location("/thelibrary/browse", {
         kind: { value: "news" },

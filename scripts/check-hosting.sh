@@ -29,13 +29,22 @@ loc="$(curl -sI "$BASE" | tr -d '\r' | awk 'tolower($1)=="location:"{print $2}')
 code="$(status "$BASE")"
 check "no-slash path redirects to the slash path ($code -> $loc)" \
   '[[ "$code" =~ ^30[178]$ ]] && [[ "$loc" == "/nutgraf/" || "$loc" == "$ORIGIN/nutgraf/" ]]'
-# The app was at /thelibrary until 2026-10-12: its URLs move to the same path and query.
+# The app was at /thelibrary until 2026-10-12: its URLs move, with a 301, to the same path and
+# query parameters. Followed to where they end: Amplify first adds the slash to a bare
+# /thelibrary, and CloudFront may hand the parameters over in another order.
+canon() {
+  local q=""
+  [[ "$1" == *\?* ]] && q="$(printf '%s' "${1#*\?}" | tr '&' '\n' | sort | paste -sd '&' -)"
+  printf '%s?%s' "${1%%\?*}" "$q"
+}
+code="$(status "$ORIGIN/thelibrary/today")"
+check "an old URL answers with a permanent redirect ($code)" '[[ "$code" == 301 ]]'
 for p in "/thelibrary:/nutgraf/" "/thelibrary/:/nutgraf/" "/thelibrary/browse?kind=news&topic=ai-llms:/nutgraf/browse?kind=news&topic=ai-llms"; do
   from="${p%%:*}" to="${p#*:}"
-  loc="$(curl -sI "$ORIGIN$from" | tr -d '\r' | awk 'tolower($1)=="location:"{print $2}')"
-  code="$(status "$ORIGIN$from")"
-  check "$from moves to $to ($code -> $loc)" \
-    '[[ "$code" == 301 ]] && [[ "$loc" == "$to" || "$loc" == "$ORIGIN$to" ]]'
+  read -r code url < <(curl -sL -o /dev/null -w '%{http_code} %{url_effective}' "$ORIGIN$from")
+  url="${url#"$ORIGIN"}"
+  check "$from ends at $to ($code $url)" \
+    '[[ "$code" == 200 ]] && [[ "$(canon "$url")" == "$(canon "$to")" ]]'
 done
 for p in "/" "/x/y" "/senders/a.b" "/auth/callback?code=abc&state=xyz"; do
   check "GET $p serves the shell" '[[ "$(status "$BASE$p")" == 200 ]] && curl -s "$BASE$p" | grep -q "<title>Nutgraf</title>"'
