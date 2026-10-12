@@ -69,7 +69,7 @@ In the [Google Cloud console](https://console.cloud.google.com/), signed in as t
 1. Create a project called `the-library` (project picker at the top > **New project**), and make sure it is selected in the picker.
 2. APIs & Services > Library: enable the **Gmail API**.
 3. Navigation menu > **Google Auth platform** (or open https://console.cloud.google.com/auth/overview). A new project shows "Google Auth platform not configured yet": click **Get started**. The wizard asks for:
-   - **App information:** App name "The Library", User support email: your Gmail. **Next**.
+   - **App information:** App name "Nutgraf" (it was "The Library" until 2026-10-12), User support email: your Gmail. **Next**.
    - **Audience:** **External**. **Next**.
    - **Contact information:** your Gmail. **Next**.
    - **Finish:** tick "I agree to the Google API Services: User Data Policy", **Continue**, then **Create**.
