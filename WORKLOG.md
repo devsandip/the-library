@@ -244,3 +244,100 @@ Append-only session log. Newest entry at the bottom.
 - Redesign from first principles, not a polish: one pack without screens so the design doesn't anchor, one with screens for reference.
 - Interactions are named in the stories only where Sandip asked for them; a better pattern comes as a proposal, not a silent swap.
 - Screenshots from mock mode, since Claude does not sign in for Sandip.
+
+## 2026-10-11: The redesign, built from the Claude Design handoff (#66)
+
+**Did:**
+
+- Built the Claude Design handoff (`docs/mockups/redesign/README.md`, with its HTML as the visual reference) in PR #66:
+  - the phone has four tabs (Today as a deck, Browse under the filter sentence, Saved, Library) and a reader with a story sheet;
+  - the Mac is a keyboard console of queue, reader and story index, with a ⌘K palette;
+  - new tokens, dark by default; self-hosted Newsreader, IBM Plex Sans and Mono, and Courier Prime; the yellow-box rule; the icon redrawn from Courier Prime's own L.
+- Replaced `web/src/routes/` and most of `web/src/components/` with `web/src/phone/`, `web/src/mac/` and `web/src/pages/`. URLs are parsed in `web/src/paths.ts`, and old URLs redirect.
+- Added three API fields: each story's `names`, the Summary's `digestAt`, and History's `via` (open or peek). The integration tests assert all three.
+- 355 unit tests pass; typecheck and lint clean. Checked in mock mode at phone and Mac widths, light and dark: the deck's swipes, spring-back, fold and Undo; Browse's sheets, peek, and Back restoring rows; the reader and story sheet; the console's keys, palette and slide-over. The first story starts at 10 to 17% of the screen height.
+- Merged #66 on Sandip's word; Deploy run 38127624439 passed. Wrote the journal entry (#67, merged) and the 2026-W41 weekly summary (this pull request).
+
+**State now:**
+
+- Prod runs e5f277c (#66). Main is at c8d14fa plus this docs pull request; the main checkout is synced.
+- The redesign was tested in mock mode only. Nobody has used it on a real iPhone.
+- Not built, by decision: the deep dives (Timeline, Backstory, Takes, Source), the job line, verdicts, Follow and Ask (#19, #16, #17, #23, #22, #21). `docs/features/redesign.md` has the reasons.
+- The handoff download sits untracked at `claude-design/` in the main checkout. Its content is committed under `docs/mockups/redesign/`.
+
+**Next:**
+
+- Open the home-screen app on the iPhone and work through `docs/features/redesign.md`, Open: safe areas, pull to refresh inside the standalone app, the story sheet's drag between heights, VoiceOver, and the deck's swipes. File what breaks as issues.
+- Monday 2026-10-12: read a weekday's day in brief and its cost (`narrative done` in the ingest logs).
+- Then #19 (how a story evolved), the first deep dive, as the Timeline tab where the handoff draws it. Start from `closestStories` in `packages/core/src/related.ts`. Take #19's `needs-decision` label off first: the redesign it was waiting for has shipped.
+
+**Decisions:**
+
+- No controls for features without a backend. Each deep dive arrives with its issue, in the place the design gives it.
+- One tap opens a card in Today's deck (the handoff's proposed alternative); Browse keeps tap to peek and double tap to open.
+- Irrelevant always archives, from every place it appears.
+- Rows read or saved stay in place, faded, until the view changes (RET-10).
+- A newsletter wider than the column is scaled down with CSS `zoom`, so its layout survives.
+- On the Mac, `/library` lands on the News queue; Library's pages open from ⌘K.
+
+## 2026-10-12: Nutgraf: the Apple look, the folded page, and sandip.dev/nutgraf (#73 to #76)
+
+**Did:**
+
+- Built the second Claude Design handoff in #73. It kept every layout from #66 and changed three things:
+  - the name is Nutgraf (the handoff spells it Nurgraf; Sandip confirmed Nutgraf, and the copy under `docs/mockups/redesign/` is corrected);
+  - the look is Apple's: the tokens exactly as the handoff's "Backgrounds (exact)" table, SF Pro and New York from the system (the four `@fontsource` packages are removed), 11 px tabular labels, no blue;
+  - the logo is the folded page. The icon SVGs are drawn from SF Pro's own `n`, so they need no font, and `pnpm icons` renders the PNGs into `web/public/icons/`. A web manifest is new, and a pinned theme also sets `theme-color`.
+- #74: a tap on a row's title opens the issue; the rest of the row still peeks (Sandip asked for it).
+- #75: moved the app to `/nutgraf/` (`BASE_PATH`, the API route, Cognito's URLs, the S3 prefix, Vite's base, the manifest). The CloudFront function answers every `/thelibrary/*` URL with a 301 to the same path and query parameters, and `infra/test/spa-function.test.ts` runs it against sample requests. Before merging, `pnpm amplify-proxy --apply` added the `/nutgraf/<*>` rule on sandip.dev (backup: `scratch/amplify-rules-backup-2026-10-12T04-03-51-247Z.json` in the main checkout).
+- #75's Deploy (run 38202272444) deployed prod but failed 2 of 32 hosting checks that were too strict: Amplify adds the slash to a bare `/thelibrary` before our 301, and CloudFront reorders query parameters. #76 makes the check follow each old URL to where it ends.
+- Deployed #75's branch to dev first; `pnpm test:int` passed (46). Unit tests: 360.
+- Merged #73, #74, #75, #76 and #68 on Sandip's word.
+
+**State now:**
+
+- Prod runs 2f9acc3 (#76); Deploy run 38203184707 passed check, dev and prod, with every hosting check. Main is at c100f00 (#68) plus this docs pull request.
+- Live at https://sandip.dev/nutgraf/, in the new look; every `/thelibrary` URL redirects there. Checked in mock mode and by following old URLs on prod. Nobody has used it on a real iPhone.
+- Internal names keep "library": the repository, the stacks, the SSM paths, the Cognito domain and the storage keys.
+- The about, privacy and terms pages still say The Library, as Google's consent screen does.
+- #72 (one line in `docs/features/redesign.md`) is still open and needs updating from main.
+
+**Next:**
+
+- Sandip deletes the home-screen icon and adds it again from `https://sandip.dev/nutgraf/`, then does the real-iPhone pass against `docs/features/redesign.md`, Open. File what breaks as issues.
+- Sandip, on Google's OAuth consent screen (Branding): point the home page, privacy and terms links at `/nutgraf/`, and rename the app to Nutgraf. Then rename the about, privacy and terms pages in `web/public/`.
+- Read a weekday's day in brief and its cost (`narrative done` in the ingest logs), carried from last session.
+- Then #19 (how a story evolved), as the Timeline tab, from `closestStories` in `packages/core/src/related.ts`.
+
+**Decisions:**
+
+- The name is Nutgraf, not the handoff's Nurgraf.
+- Three pull requests in order: the look, the title tap, the address. The address waited because it touches the API, Cognito and sandip.dev's Amplify rules.
+- The 301s come from the app's CloudFront function, not an Amplify redirect rule, so they live in the CDK code and are tested; Amplify proxies both paths.
+- The manifest is `manifest.json`, not `.webmanifest`, so S3 serves it as JSON whatever the deployment's content-type table knows.
+- Internal names keep "library": renaming stacks or SSM paths would rebuild resources for no visible gain.
+
+## 2026-10-12: Addendum: the about pages, a flaky test, and TickTick without #
+
+**Did:**
+
+- #78: the about, privacy and terms pages say Nutgraf, after Sandip renamed the app on Google's OAuth consent screen and pointed its links at `/nutgraf/`. Its first Deploy run (38207008908) failed in dev on a flaky integration test; re-running the failed jobs passed check, dev and prod.
+- #79 (open): that test, "archives week-old unread news except from Must Read newsletters", now waits for the GSIs to show its writes before running the rule, as the API and store tests already do. 8 of 8 pass against dev.
+- A rule in `~/.claude/CLAUDE.md`: never write `#` in a TickTick task, because TickTick makes it a tag; titles say "PR 73". localyap PR 181 (merged) brought ryvl's protocol in line.
+- TickTick: four Nutgraf tasks in the Inbox (update PR 72, tighten the CSP's `font-src`, the SF Pro licence, re-add the home-screen icon and do the iPhone pass). In ryvl, the review task for localyap PR 181, completed when it merged.
+
+**State now:**
+
+- Prod runs 37d5638 (#78), from the second attempt of Deploy run 38207008908.
+- Open: #79 (the test fix) and #72 (needs an update from main).
+- Google's consent screen is renamed and points at `/nutgraf/`.
+
+**Next:**
+
+- Ship #79.
+- The four Nutgraf tasks in the TickTick Inbox, starting with the home-screen icon and the iPhone pass.
+
+**Decisions:**
+
+- A Deploy that fails on a flaky test gets its failed jobs re-run, never a deploy by hand; the test is fixed in its own pull request.
+- No `#` in anything sent to TickTick.

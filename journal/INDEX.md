@@ -1,9 +1,9 @@
-# The Library: Journal
+# Nutgraf: Journal
 
-Last refreshed: 2026-10-11 14:44
-Latest entry: [2026-10-11-1444-today-browse-and-the-console.md](entries/2026-10-11-1444-today-browse-and-the-console.md)
+Last refreshed: 2026-10-12 09:51
+Latest entry: [2026-10-12-0951-nutgraf.md](entries/2026-10-12-0951-nutgraf.md)
 
-A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Live at https://sandip.dev/thelibrary/.
+A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Called The Library until 2026-10-12. Live at https://sandip.dev/nutgraf/.
 
 ## Where we are now
 
@@ -15,10 +15,13 @@ Three ways back to an issue: Continue, Saved, and a peek inside before opening i
 
 How changes ship changed on 2026-10-11. Main is protected: every change is a pull request whose CI check passes, and merging deploys it through dev and the integration tests to prod in about 5 to 10 minutes. Nothing deploys prod by hand any more. The first run failed on how GitHub names this repository to AWS, and the second deployed everything. Next: how a story evolved (#19).
 
-Since 2026-10-11 both devices have one look, from a Claude Design redesign briefed without the old screens (`docs/features/redesign.md`). The phone has four tabs: Today is the Summary as a deck of cards, Browse is everything else under a filter sentence, then Saved and Library. The Mac is a keyboard console of queue, reader and stories. It was tested in mock mode only. The design's deep dives, Follow and Ask wait for their backends, starting with how a story evolved (#19).
+Since 2026-10-11 both devices have one look, from a Claude Design redesign briefed without the old screens (`docs/features/redesign.md`). The phone has four tabs: Today is the Summary as a deck of cards, Browse is everything else under a filter sentence, then Saved and Library. The Mac is a keyboard console of queue, reader and stories. The design's deep dives, Follow and Ask wait for their backends, starting with how a story evolved (#19).
+
+Since 2026-10-12 the app is Nutgraf, at sandip.dev/nutgraf, and every /thelibrary link redirects there. A second handoff gave it Apple's type and colour (SF Pro, true black, no blue, yellow the one highlight) and a logo: a folded page over an n. A tap on a row's title opens the issue. The repository and the AWS resources keep the old name. None of the redesign has been tried on a real iPhone yet.
 
 ## Recent entries
 
+- [2026-10-12 09:51: Nutgraf](entries/2026-10-12-0951-nutgraf.md)
 - [2026-10-11 14:44: Today, Browse and the console](entries/2026-10-11-1444-today-browse-and-the-console.md)
 - [2026-10-11 13:53: A redesign, briefed without the old screens](entries/2026-10-11-1353-ux-redesign-brief.md)
 - [2026-10-11 13:37: Related stories inside a digest](entries/2026-10-11-1337-related-stories-inside-a-digest.md)
@@ -31,7 +34,7 @@ Since 2026-10-11 both devices have one look, from a Claude Design redesign brief
 
 ## Weekly summaries
 
-None yet. The first, 2026-W41, is due on Monday 2026-10-12.
+- [2026-W41: from a brief to a redesign](weekly/2026-W41-summary.md)
 
 ## Working hypotheses
 
@@ -72,3 +75,6 @@ None yet. The first, 2026-W41, is due on Monday 2026-10-12.
 - Polishing the current UI: the redesign starts from the requirements, not today's screens (2026-10-11).
 - A look per device (dark cards on the phone, two panes on the Mac): one identity on both (2026-10-11).
 - Showing the design's deep dives, Follow and Ask before their backends exist: no dead controls (2026-10-11).
+- Self-hosted web fonts: system fonts only, so the app downloads none (2026-10-12).
+- An Amplify redirect rule for /thelibrary: the app's CloudFront function sends the 301s, in code and under test (2026-10-12).
+- Checking the old URLs for one hop and the same query order: Amplify adds the slash first and CloudFront reorders parameters, so the check follows each URL to where it ends (2026-10-12).

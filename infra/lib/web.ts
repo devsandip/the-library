@@ -23,31 +23,51 @@ import { HttpOrigin, S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { BlockPublicAccess, Bucket, BucketEncryption } from "aws-cdk-lib/aws-s3";
 import { BucketDeployment, CacheControl, Source } from "aws-cdk-lib/aws-s3-deployment";
 import { Construct } from "constructs";
-import { BASE_PATH, CONTENT_SECURITY_POLICY, type Stage } from "./config.js";
+import { BASE_PATH, CONTENT_SECURITY_POLICY, OLD_BASE_PATH, type Stage } from "./config.js";
 import { REPO_ROOT } from "./functions.js";
 
 /**
- * Viewer-request function for the static behavior. Everything under /thelibrary/ that is not a
- * real file becomes index.html (SPA routing). about/privacy/terms are public static pages that
+ * Viewer-request function for the static behavior. Everything under /nutgraf/ that is not a
+ * real file becomes index.html (SPA routing). Every URL under /thelibrary/, where the app was
+ * until 2026-10-12, moves with a 301 to the same path and query parameters under /nutgraf/, so
+ * bookmarks and the home-screen icon keep working. The parameters keep their values as received;
+ * CloudFront may hand them over in another order, which the app does not mind. The icons and the web manifest pass through, for the
+ * tab and the home screen. about/privacy/terms are public static pages that
  * Google's OAuth consent screen links to; they hold no user data. Redirects use a relative
  * Location so a request proxied through sandip.dev never bounces to the cloudfront.net domain.
  */
-const SPA_FUNCTION = `
+export const SPA_FUNCTION = `
+function moved(location) {
+  return { statusCode: 301, statusDescription: "Moved Permanently", headers: { location: { value: location } } };
+}
+function query(qs) {
+  var parts = [];
+  for (var key in qs) {
+    if (qs[key].multiValue) {
+      qs[key].multiValue.forEach(function (mv) { parts.push(key + "=" + mv.value); });
+    } else {
+      parts.push(key + "=" + qs[key].value);
+    }
+  }
+  return parts.length ? "?" + parts.join("&") : "";
+}
 function handler(event) {
   var request = event.request;
   var uri = request.uri;
   if (uri === "/" || uri === "${BASE_PATH}") {
-    return { statusCode: 301, statusDescription: "Moved Permanently", headers: { location: { value: "${BASE_PATH}/" } } };
+    return moved("${BASE_PATH}/");
+  }
+  if (uri === "${OLD_BASE_PATH}" || uri.indexOf("${OLD_BASE_PATH}/") === 0) {
+    return moved("${BASE_PATH}" + (uri.slice(${OLD_BASE_PATH.length}) || "/") + query(request.querystring));
   }
   if (uri.indexOf("${BASE_PATH}/") !== 0) {
     return { statusCode: 404, statusDescription: "Not Found" };
   }
   if (
     uri.indexOf("${BASE_PATH}/assets/") === 0 ||
+    uri.indexOf("${BASE_PATH}/icons/") === 0 ||
     uri === "${BASE_PATH}/config.json" ||
-    uri === "${BASE_PATH}/favicon.svg" ||
-    uri === "${BASE_PATH}/favicon-32.png" ||
-    uri === "${BASE_PATH}/apple-touch-icon.png" ||
+    uri === "${BASE_PATH}/manifest.json" ||
     uri === "${BASE_PATH}/about.html" ||
     uri === "${BASE_PATH}/privacy.html" ||
     uri === "${BASE_PATH}/terms.html"
@@ -59,7 +79,7 @@ function handler(event) {
 }
 `;
 
-const PLACEHOLDER_SHELL = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>The Library</title></head><body>The Library: web/dist was not built when this was deployed.</body></html>`;
+const PLACEHOLDER_SHELL = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>Nutgraf</title></head><body>Nutgraf: web/dist was not built when this was deployed.</body></html>`;
 
 export interface WebProps {
   stage: Stage;
@@ -83,7 +103,7 @@ export class Web extends Construct {
     });
 
     const headers = new ResponseHeadersPolicy(this, "Headers", {
-      comment: `The Library ${props.stage}: security headers + noindex`,
+      comment: `Nutgraf ${props.stage}: security headers + noindex`,
       securityHeadersBehavior: {
         contentSecurityPolicy: { contentSecurityPolicy: CONTENT_SECURITY_POLICY, override: true },
         strictTransportSecurity: {
@@ -103,7 +123,7 @@ export class Web extends Construct {
     const spa = new CloudFrontFunction(this, "SpaRouting", {
       runtime: FunctionRuntime.JS_2_0,
       code: FunctionCode.fromInline(SPA_FUNCTION),
-      comment: "SPA routing under /thelibrary/",
+      comment: "SPA routing under /nutgraf/, and moves from /thelibrary/",
     });
 
     const apiDomain = `${props.httpApi.apiId}.execute-api.${stack.region}.${stack.urlSuffix}`;
@@ -142,7 +162,7 @@ export class Web extends Construct {
   /**
    * Two deployments, neither prunes: hashed assets are immutable (old chunks stay for open tabs);
    * the shell and config.json are no-cache because Amplify's cache only clears on Amplify deploys.
-   * `config` becomes /thelibrary/config.json and may contain deploy-time tokens.
+   * `config` becomes /nutgraf/config.json and may contain deploy-time tokens.
    */
   deploy(config: Record<string, unknown>) {
     const dist = join(REPO_ROOT, "web", "dist");

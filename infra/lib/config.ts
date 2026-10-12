@@ -3,7 +3,10 @@ export type Stage = "dev" | "prod";
 export const REGION = "us-east-1";
 
 /** Path the app is served under, on sandip.dev and on its own distribution. */
-export const BASE_PATH = "/thelibrary";
+export const BASE_PATH = "/nutgraf";
+
+/** Where the app was until 2026-10-12. Every URL under it moves, with a 301, to the same place under BASE_PATH. */
+export const OLD_BASE_PATH = "/thelibrary";
 
 /** Cognito managed-login domain prefix (prod). Fixed so the CSP can name it before the pool exists. */
 export const COGNITO_DOMAIN_PREFIX = "thelibrary-sandip";

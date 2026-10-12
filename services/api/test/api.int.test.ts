@@ -58,14 +58,14 @@ async function call<T = unknown>(
 ): Promise<{ status: number; body: T }> {
   const event = {
     version: "2.0",
-    rawPath: `/thelibrary/api${path}`,
+    rawPath: `/nutgraf/api${path}`,
     rawQueryString: new URLSearchParams(opts.query).toString(),
     queryStringParameters: opts.query,
     headers: { "content-type": "application/json" },
     body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
     isBase64Encoded: false,
     requestContext: {
-      http: { method, path: `/thelibrary/api${path}` },
+      http: { method, path: `/nutgraf/api${path}` },
       authorizer: { jwt: { claims: { sub: "int-test" }, scopes: [] } },
     },
   };

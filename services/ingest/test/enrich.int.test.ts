@@ -40,6 +40,17 @@ const topics: Topic[] = [
   { name: "Media", description: "Publishing, newsletters, culture and everything else" },
 ];
 
+/** GSIs are eventually consistent: retry a read until it matches. */
+async function eventually<T>(read: () => Promise<T>, ok: (v: T) => boolean): Promise<T> {
+  let last: T | undefined;
+  for (let i = 0; i < 20; i++) {
+    last = await read();
+    if (ok(last)) return last;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return last as T;
+}
+
 const get = (key: Record<string, string>) =>
   ddb
     .send(new GetCommand({ TableName: stack.tableName, Key: key, ConsistentRead: true }))
@@ -158,15 +169,28 @@ describe("archive rules on dev", () => {
         }),
       );
     }
+    const platformer = senderIdentity("casey@platformer.news", "").senderId;
     await ddb.send(
       new UpdateCommand({
         TableName: stack.tableName,
-        Key: senderItemKey(senderIdentity("casey@platformer.news", "").senderId),
+        Key: senderItemKey(platformer),
         UpdateExpression: "SET mustRead = :t",
         ExpressionAttributeValues: { ":t": true },
       }),
     );
     const now = Date.parse("2026-10-09T00:00:00.000Z");
+    // The rule reads senders and unread news through GSIs, which lag the writes above: wait
+    // until both show them, or Platformer can be archived before its Must Read star arrives.
+    const cutoff = new Date(now - 7 * 86_400_000).toISOString();
+    await eventually(
+      () => Promise.all([store.senderSettings(), store.unreadNewsBefore(cutoff)]),
+      ([senders, stale]) =>
+        senders.get(platformer)?.mustRead === true &&
+        stale
+          .map((i) => i.id)
+          .sort()
+          .join() === "fx-platformer,fx-tldr",
+    );
     expect(await archiveOldNews(store, { now })).toBe(1);
     expect((await get(issueKey("fx-tldr")))?.autoArchived).toBe("old-news");
     expect((await get(issueKey("fx-platformer")))?.state).toBe("unread"); // Must Read

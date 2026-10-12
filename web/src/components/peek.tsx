@@ -20,10 +20,16 @@ export const isWebLink = (url: string | undefined): url is string =>
 /**
  * Tap and double tap on a row (#41). The row shows as pressed the moment a finger lands, which
  * hides the wait; one tap toggles the peek once 260 ms pass with no second tap; a second tap
- * inside that opens the issue with no peek flashing first. Enter opens at once (a click with no
- * pointer behind it), Space peeks, and modified clicks keep the browser's own behaviour.
+ * inside that opens the issue with no peek flashing first. A tap where `opensAt` says (the
+ * row's title) opens at once. Enter opens at once (a click with no pointer behind it), Space
+ * peeks, and modified clicks keep the browser's own behaviour.
  */
-export function useTapToPeek(actions: { toggle: () => void; open: () => void }) {
+export function useTapToPeek(actions: {
+  toggle: () => void;
+  open: () => void;
+  /** Whether a tap on this target opens the issue straight away instead of peeking. */
+  opensAt?: (target: EventTarget | null) => boolean;
+}) {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const latest = useRef(actions);
   latest.current = actions;
@@ -48,7 +54,7 @@ export function useTapToPeek(actions: { toggle: () => void; open: () => void }) 
         // preact-iso follows in-scope links from a window listener that ignores preventDefault.
         e.preventDefault();
         e.stopPropagation();
-        if (e.detail === 0 || timer.current !== undefined) {
+        if (e.detail === 0 || timer.current !== undefined || latest.current.opensAt?.(e.target)) {
           clearTimeout(timer.current);
           timer.current = undefined;
           setPressed(false);

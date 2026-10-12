@@ -10,7 +10,7 @@ import type {
 import { badRequest, HttpError, notFound } from "./errors.js";
 import type { Services } from "./port.js";
 
-export const API_PREFIX = "/thelibrary/api";
+export const API_PREFIX = "/nutgraf/api";
 
 export interface Request {
   method: string;
