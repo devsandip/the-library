@@ -29,8 +29,9 @@ import { REPO_ROOT } from "./functions.js";
 /**
  * Viewer-request function for the static behavior. Everything under /nutgraf/ that is not a
  * real file becomes index.html (SPA routing). Every URL under /thelibrary/, where the app was
- * until 2026-10-12, moves with a 301 to the same path and query under /nutgraf/, so bookmarks and
- * the home-screen icon keep working; the query string goes through as received. The icons and the web manifest pass through, for the
+ * until 2026-10-12, moves with a 301 to the same path and query parameters under /nutgraf/, so
+ * bookmarks and the home-screen icon keep working. The parameters keep their values as received;
+ * CloudFront may hand them over in another order, which the app does not mind. The icons and the web manifest pass through, for the
  * tab and the home screen. about/privacy/terms are public static pages that
  * Google's OAuth consent screen links to; they hold no user data. Redirects use a relative
  * Location so a request proxied through sandip.dev never bounces to the cloudfront.net domain.
