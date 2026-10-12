@@ -30,7 +30,7 @@ code="$(status "$BASE")"
 check "no-slash path redirects to the slash path ($code -> $loc)" \
   '[[ "$code" =~ ^30[178]$ ]] && [[ "$loc" == "/thelibrary/" || "$loc" == "$ORIGIN/thelibrary/" ]]'
 for p in "/" "/x/y" "/senders/a.b" "/auth/callback?code=abc&state=xyz"; do
-  check "GET $p serves the shell" '[[ "$(status "$BASE$p")" == 200 ]] && curl -s "$BASE$p" | grep -q "<title>The Library</title>"'
+  check "GET $p serves the shell" '[[ "$(status "$BASE$p")" == 200 ]] && curl -s "$BASE$p" | grep -q "<title>Nutgraf</title>"'
 done
 check "exactly one CSP header" '[[ "$(header "$BASE/" content-security-policy | wc -l | tr -d " ")" == 1 ]]'
 check "CSP keeps scripts to self" 'header "$BASE/" content-security-policy | grep -q "script-src '"'"'self'"'"'"'
@@ -44,7 +44,7 @@ check "config.json served" '[[ "$(status "$BASE/config.json")" == 200 ]]'
 for page in about privacy terms; do
   check "public $page page loads without sign-in" '[[ "$(status "$BASE/$page.html")" == 200 ]] && ! curl -s "$BASE/$page.html" | grep -q "/src/main\|assets/index-"'
 done
-for icon in favicon.svg:image/svg+xml favicon-32.png:image/png apple-touch-icon.png:image/png; do
+for icon in icons/favicon.svg:image/svg+xml icons/favicon-32.png:image/png icons/apple-touch-icon.png:image/png icons/icon-512.png:image/png manifest.json:application/json; do
   check "${icon%%:*} is served as ${icon#*:}" '[[ "$(status "$BASE/${icon%%:*}")" == 200 ]] && header "$BASE/${icon%%:*}" content-type | grep -qi "${icon#*:}"'
 done
 check "privacy page states the Gmail scope" 'curl -s "$BASE/privacy.html" | grep -q "gmail.readonly"'

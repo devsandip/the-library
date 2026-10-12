@@ -68,7 +68,7 @@ export function Reader({ id, story, deep }: { id: string; story?: number; deep?:
         <Failed message={issue.error} />
         <p class="center">
           <a class="btn line" href={todayHref()}>
-            Back to the Library
+            Back to Nutgraf
           </a>
         </p>
       </article>
@@ -337,15 +337,15 @@ function StorySheet({
           {names && <p class="story-names label">{names}</p>}
           <div class="story-actions">
             {isWebLink(s.link) ? (
-              <a class="btn line mono" href={s.link} target="_blank" rel="noopener noreferrer">
+              <a class="btn line caps" href={s.link} target="_blank" rel="noopener noreferrer">
                 Source ↗
               </a>
             ) : (
-              <button type="button" class="btn line mono" disabled>
+              <button type="button" class="btn line caps" disabled>
                 No source link
               </button>
             )}
-            <button type="button" class="btn line mono" onClick={showRelated}>
+            <button type="button" class="btn line caps" onClick={showRelated}>
               Related {related.status === "ok" ? relCount : "…"}
             </button>
           </div>
