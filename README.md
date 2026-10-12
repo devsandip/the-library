@@ -31,6 +31,7 @@ pnpm install
 | `pnpm lint` / `pnpm typecheck` | eslint + prettier, TypeScript |
 | Merge a pull request | GitHub Actions deploys it: dev, the integration tests, then prod and the hosting checks |
 | `pnpm sync-main` | Fast-forward the main checkout after a merge (only when it is on main and clean) |
+| `pnpm track 81 "In progress" Sorting` | Put an issue or pull request on the [Nutgraf project](https://github.com/users/devsandip/projects/10) and set its Status and Track |
 | `AWS_PROFILE=admin pnpm cdk deploy -c stage=dev` | Deploy the disposable dev stack, to try a branch before its pull request |
 | `AWS_PROFILE=admin pnpm deploy` | Fallback only, when GitHub Actions is down: build the web app and deploy prod from this folder |
 | `AWS_PROFILE=admin pnpm seed-dev` | Reset dev to the fixture inbox |
@@ -133,5 +134,5 @@ services/api/      reader API: routes, DynamoDB repository, Lambda handler
 web/               Preact app (base path /nutgraf/)
 infra/             CDK app: one stack per stage, and the role GitHub Actions deploys with
 .github/workflows/ ci (every pull request), deploy (every push to main)
-scripts/           amplify-proxy, check-hosting, create-user, gmail-auth, gmail-check, backfill, reprocess, rebuild-senders, seed-dev, sync-main
+scripts/           amplify-proxy, check-hosting, create-user, gmail-auth, gmail-check, backfill, reprocess, rebuild-senders, seed-dev, sync-main, track
 ```
