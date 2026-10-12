@@ -2,7 +2,7 @@
 
 A private, single-user newsletter reader. It was called The Library until 2026-10-12; the repository, the stacks and the AWS resources keep that name. It pulls newsletters from Gmail every two hours, shows them in one clean list, and records Relevant/Irrelevant ratings that Phase 2 uses to rank what comes first.
 
-Live at **https://sandip.dev/thelibrary/** (behind Cognito sign-in with an authenticator app).
+Live at **https://sandip.dev/nutgraf/** (behind Cognito sign-in with an authenticator app). Every old `https://sandip.dev/thelibrary/...` URL redirects to the same place there.
 
 - Product brief: [docs/prd.md](docs/prd.md)
 - Technical spec: [docs/architecture.md](docs/architecture.md)
@@ -11,7 +11,7 @@ Live at **https://sandip.dev/thelibrary/** (behind Cognito sign-in with an authe
 
 ## How it fits together
 
-`sandip.dev` is an Amplify Hosting site. One Amplify rewrite rule sends `/thelibrary/*` to this app's own CloudFront distribution, which serves the web app from S3 and the API from API Gateway + Lambda. An ingest Lambda reads Gmail with a read-only token kept in SSM, sanitizes each issue, and stores it in S3 and DynamoDB. Everything is one CDK stack per stage, in us-east-1.
+`sandip.dev` is an Amplify Hosting site. Amplify rewrite rules send `/nutgraf/*` (and the old `/thelibrary/*`, which the distribution redirects) to this app's own CloudFront distribution, which serves the web app from S3 and the API from API Gateway + Lambda. An ingest Lambda reads Gmail with a read-only token kept in SSM, sanitizes each issue, and stores it in S3 and DynamoDB. Everything is one CDK stack per stage, in us-east-1.
 
 ## Prerequisites
 
@@ -35,7 +35,7 @@ pnpm install
 | `AWS_PROFILE=admin pnpm deploy` | Fallback only, when GitHub Actions is down: build the web app and deploy prod from this folder |
 | `AWS_PROFILE=admin pnpm seed-dev` | Reset dev to the fixture inbox |
 | `AWS_PROFILE=admin pnpm test:int` | Integration tests against dev (wipes and reseeds it) |
-| `pnpm check-hosting` | Hosting and auth checks through https://sandip.dev/thelibrary |
+| `pnpm check-hosting` | Hosting and auth checks through https://sandip.dev/nutgraf |
 | `pnpm --filter @library/web dev:mock` | Run the UI locally against an in-memory backend |
 | `AWS_PROFILE=admin pnpm topics` | Claude proposes the topic list (dry run; `--apply` stores it) |
 | `AWS_PROFILE=admin pnpm enrich` | Claude sorts and summarizes issues not done yet (`--days 30`, `--force`) |
@@ -56,8 +56,8 @@ Prod runs what main holds, and only GitHub Actions deploys it ([docs/features/pi
 These steps were done once in October 2026; they are here for a rebuild or a new account.
 
 1. **Deploy.** `AWS_PROFILE=admin pnpm deploy`. Confirm the "AWS Notification - Subscription Confirmation" email so alarms reach you.
-2. **Expose it on sandip.dev.** `AWS_PROFILE=admin pnpm amplify-proxy` shows the change; add `--apply` to make it. It only touches the `/thelibrary/<*>` rule and backs up the rest to `scratch/`.
-3. **Create your login.** `AWS_PROFILE=admin pnpm create-user`. Cognito emails a temporary password; sign in at https://sandip.dev/thelibrary/, choose a password, and scan the QR code with an authenticator app. The app is single-user (every account has full control), so the script refuses to create a second account; rerun it to resend your own unused invite.
+2. **Expose it on sandip.dev.** `AWS_PROFILE=admin pnpm amplify-proxy` shows the change; add `--apply` to make it. It only touches the `/nutgraf/<*>` and `/thelibrary/<*>` rules and backs up the rest to `scratch/`.
+3. **Create your login.** `AWS_PROFILE=admin pnpm create-user`. Cognito emails a temporary password; sign in at https://sandip.dev/nutgraf/, choose a password, and scan the QR code with an authenticator app. The app is single-user (every account has full control), so the script refuses to create a second account; rerun it to resend your own unused invite.
 4. **Connect Gmail** (below).
 5. **Let GitHub deploy.** `AWS_PROFILE=admin pnpm cdk deploy -c stage=ci` creates the role GitHub Actions deploys with; set the repository variable `AWS_ROLE_ARN` to the ARN it prints, and create the `dev` and `prod` environments with only `main` allowed to deploy.
 5. **Backfill and turn on the schedule** (below).
@@ -77,9 +77,9 @@ In the [Google Cloud console](https://console.cloud.google.com/), signed in as t
    Only after this do **Branding**, **Audience**, **Clients** and **Data Access** appear in the left menu.
 4. **Data Access** > **Add or remove scopes**: paste `https://www.googleapis.com/auth/gmail.readonly` under "Manually add scopes", **Add to table**, **Update**, then **Save**.
 5. **Branding**: fill in the fields Google requires before publishing, then **Save**. Leave App logo empty (uploading one forces Google's verification review).
-   - Application home page: `https://sandip.dev/thelibrary/about.html`
-   - Application privacy policy link: `https://sandip.dev/thelibrary/privacy.html`
-   - Application terms of service link: `https://sandip.dev/thelibrary/terms.html`
+   - Application home page: `https://sandip.dev/nutgraf/about.html`
+   - Application privacy policy link: `https://sandip.dev/nutgraf/privacy.html`
+   - Application terms of service link: `https://sandip.dev/nutgraf/terms.html`
    - Authorized domains: **Add domain** > `sandip.dev`
    - Developer contact information: your Gmail
 
@@ -105,7 +105,7 @@ Then set `INGEST_SCHEDULE_ENABLED = true` in `infra/lib/config.ts` and deploy. T
 
 ## Runbook
 
-- **"ingest failed" alarm email.** Open https://sandip.dev/thelibrary/library/status for the last error. `invalid_grant` means the Gmail token was revoked (password change, removed access, or the app was left in Testing): rerun `pnpm gmail:auth`. Anything else: CloudWatch logs for the ingest Lambda. Failed messages retry on the next run automatically.
+- **"ingest failed" alarm email.** Open https://sandip.dev/nutgraf/library/status for the last error. `invalid_grant` means the Gmail token was revoked (password change, removed access, or the app was left in Testing): rerun `pnpm gmail:auth`. Anything else: CloudWatch logs for the ingest Lambda. Failed messages retry on the next run automatically.
 - **A newsletter is missing or noise is getting through.** Edit `packages/core/src/sources.ts` (labels, sender allowlist, noise rules, sender aliases), add a fixture test, merge (merging deploys).
 - **A newsletter shows the wrong name, or two newsletters are merged into one sender.** Add an alias or a split-by-name rule in `packages/core/src/sources.ts`, add a test, merge, then once it is deployed `AWS_PROFILE=admin pnpm rebuild-senders` to see the plan and `pnpm rebuild-senders --apply` to re-key stored issues. Read state, ratings and mutes are kept.
 - **An issue renders badly.** Fix the sanitizer or extractor in `packages/core`, add a fixture test, merge, then once it is deployed `AWS_PROFILE=admin pnpm reprocess` to rebuild the last 30 days (raw messages are kept 30 days; state and ratings are untouched).
@@ -130,7 +130,7 @@ docs/              prd.md, architecture.md, build-plan.md
 packages/core/     classification, sanitizing, extraction, keys, shared API types
 services/ingest/   Gmail client, ingest loop, Lambda handler
 services/api/      reader API: routes, DynamoDB repository, Lambda handler
-web/               Preact app (base path /thelibrary/)
+web/               Preact app (base path /nutgraf/)
 infra/             CDK app: one stack per stage, and the role GitHub Actions deploys with
 .github/workflows/ ci (every pull request), deploy (every push to main)
 scripts/           amplify-proxy, check-hosting, create-user, gmail-auth, gmail-check, backfill, reprocess, rebuild-senders, seed-dev, sync-main

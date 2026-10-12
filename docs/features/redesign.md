@@ -35,7 +35,7 @@ A second handoff (2026-10-12) kept every layout and changed three things: the na
 - **The app icon is the folded page,** drawn from SF Pro's own `n` (700, at its 64 px optical size) so the SVG needs no font. It matches Chrome's render of the handoff's HTML to within a pixel at 4x. `pnpm icons` renders the PNGs from `web/icons/` and `web/public/icons/favicon.svg`.
 - **Icons live in `/icons/`, with a web manifest** (`manifest.json`: name, standalone, the 192, 512 and maskable icons). The CloudFront function passes both through; the hosting check looks for them.
 - **A pinned theme also sets the browser's own colour** (`theme-color`), so the area around the page matches `--bg` when Settings overrides the system.
-- **The URL stays `/thelibrary/` for now.** The move to `/nutgraf/`, with 301s from every old path, is its own change: it touches the API prefix, Cognito's callback URLs and sandip.dev's Amplify rules. Internal names keep "library": the repository, the stacks, the SSM paths and the `library.*` storage keys.
+- **The URL is `/nutgraf/`, and every `/thelibrary/` URL moves there with a 301** (2026-10-12), same path and query, so bookmarks and the home-screen icon keep working. The app's CloudFront function sends the 301; sandip.dev's Amplify app proxies both paths to it. The API moved with it (`/nutgraf/api/`), and so did Cognito's callback and sign-out URLs. Internal names keep "library": the repository, the stacks, the Cognito domain, the SSM paths and the `library.*` and `thelibrary.*` storage keys, so a signed-in session survives the move. The about, privacy and terms pages still name the app The Library, as Google's consent screen does.
 - **The handoff is in the repo** (`docs/mockups/redesign/`): the spec, the HTML samples and the screenshots, without the old UI's screenshot.
 
 ## Open
@@ -44,5 +44,6 @@ A second handoff (2026-10-12) kept every layout and changed three things: the na
 - The deep dives and the job line (#19 first), then Follow and Ask.
 - Pull to refresh waits a fixed 8 seconds for the Gmail check, as the old refresh button did.
 - Retake the handoff's screens from mock mode for a before and after.
-- The route move to `sandip.dev/nutgraf/`. After it ships, delete the home-screen icon and add it again: iOS keeps the old name and icon until then.
+- Delete the home-screen icon and add it again from `sandip.dev/nutgraf/`: iOS keeps the old name, icon and address until then.
+- On Google's OAuth consent screen (Branding), point the home page, privacy and terms links at `/nutgraf/` and rename the app to Nutgraf; then rename it in the about, privacy and terms pages too.
 - The icon's `n` is SF Pro's outline. Apple licenses SF Pro for use on its platforms; fine for a private app, worth a second look if the app opens to others.

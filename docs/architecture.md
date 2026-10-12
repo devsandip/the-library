@@ -17,7 +17,7 @@ This is the second version. The first assumed `sandip.dev` sat on a CloudFront d
 | 1 | Gmail API polling vs. SES inbound | **Gmail API polling**, `gmail.readonly` | Labels already exist; polling can backfill; no per-sender forwarding filters. |
 | 2 | AWS region | **us-east-1** | Verified: `us.anthropic.claude-haiku-5-5` and `amazon.titan-embed-text-v2:0` are available there. Mumbai only has the `global.` Haiku 5.5 profile. Static assets come from the nearest edge, so only API calls pay the round trip. |
 | 3 | Sync read state to Gmail | **No** (v1) | Keeps the token read-only. |
-| 4 | Frontend stack | **Preact + Vite + TypeScript, plain CSS** | Small runtime, React-style components, handles the `/thelibrary/` base path. |
+| 4 | Frontend stack | **Preact + Vite + TypeScript, plain CSS** | Small runtime, React-style components, handles the `/nutgraf/` base path. |
 | 5 | Retention | Raw `.eml` 30 days, sanitized HTML 365 days, text/metadata/ratings forever | S3 lifecycle rules; raw MIME exists only to re-run the sanitizer. |
 | 6 | Backfill | **4 weeks**, configurable | Enough to rate in week one. |
 | 7 | Where `sandip.dev` is hosted | **Amplify Hosting** (app `demw5c5zfs2r9`, static, repo `devsandip/sandip.dev`, not IaC-managed). The app gets its own CloudFront distribution; `sandip.dev/thelibrary/*` is exposed with **one Amplify reverse-proxy rewrite rule**. | Leaves the root site's hosting untouched and is removable in one command. Proven by a spike (build plan R2) before anything else is built; fallbacks in section 4. |
@@ -33,9 +33,9 @@ This is the second version. The first assumed `sandip.dev` sat on a CloudFront d
 ## 2. System overview
 
 ```
-Browser --> sandip.dev (Amplify, unchanged) --rewrite /thelibrary/<*>--> App CloudFront (CDK)
-                                                                          |-- /thelibrary/api/*  --> HTTP API (Cognito JWT authorizer) --> api Lambda
-                                                                          '-- /thelibrary/*      --> web bucket (OAC), SPA rewrite function
+Browser --> sandip.dev (Amplify, unchanged) --rewrite /nutgraf/<*>--> App CloudFront (CDK)
+                                                                       |-- /nutgraf/api/*  --> HTTP API (Cognito JWT authorizer) --> api Lambda
+                                                                       '-- /nutgraf/*      --> web bucket (OAC), SPA rewrite function
 
 EventBridge Scheduler (every 2h, 06:00-22:00 IST) --> ingest Lambda --> Gmail API (refresh token from SSM)
                                                           |--> S3 content bucket: raw/ html/ text/
@@ -88,36 +88,38 @@ One bad message is logged and counted; the run continues; the message is retried
 - Both email `dev.sandip@gmail.com` via SNS (subscription must be confirmed once).
 - `GET /status` returns the last run's stats.
 
-## 4. Hosting on `sandip.dev/thelibrary`
+## 4. Hosting on `sandip.dev/nutgraf` (`/thelibrary` until 2026-10-12)
 
 ### App distribution (CDK)
 
 | Behavior | Origin | Cache | Notes |
 |---|---|---|---|
-| `/thelibrary/api/*` | HTTP API | CachingDisabled | Origin request policy `AllViewerExceptHostHeader` (forwards `Authorization`). |
-| default `*` | web bucket via OAC, objects under `thelibrary/` | CachingOptimized | Viewer-request CloudFront Function (below). |
+| `/nutgraf/api/*` | HTTP API | CachingDisabled | Origin request policy `AllViewerExceptHostHeader` (forwards `Authorization`). |
+| default `*` | web bucket via OAC, objects under `nutgraf/` | CachingOptimized | Viewer-request CloudFront Function (below). |
 
 SPA function, applied to the default behavior:
-- `/thelibrary/assets/*`, `/thelibrary/config.json`: pass through.
-- `/thelibrary/icons/*` and `/thelibrary/manifest.json`: pass through. The tab icon (SVG, with a 32 px PNG for browsers without SVG favicons), the iPhone home-screen icon, and the web manifest with its 192, 512 and maskable icons (see `scripts/icons.sh`).
-- `/thelibrary/about.html`, `/thelibrary/privacy.html`, `/thelibrary/terms.html`: pass through. Public static pages (no user data) that Google requires as the OAuth app's home page, privacy policy and terms before it can be published to production.
-- Any other path under `/thelibrary/`: rewrite to `/thelibrary/index.html`. No extension guessing: sender URLs use opaque IDs, but this rule means a dot in a path can never cause a 403.
-- `/` or `/thelibrary`: 301 with a **relative** `Location` (`/thelibrary/`), so a proxied request never bounces to the `cloudfront.net` domain.
+- `/nutgraf/assets/*`, `/nutgraf/config.json`: pass through.
+- `/nutgraf/icons/*` and `/nutgraf/manifest.json`: pass through. The tab icon (SVG, with a 32 px PNG for browsers without SVG favicons), the iPhone home-screen icon, and the web manifest with its 192, 512 and maskable icons (see `scripts/icons.sh`).
+- `/nutgraf/about.html`, `/nutgraf/privacy.html`, `/nutgraf/terms.html`: pass through. Public static pages (no user data) that Google requires as the OAuth app's home page, privacy policy and terms before it can be published to production.
+- Any other path under `/nutgraf/`: rewrite to `/nutgraf/index.html`. No extension guessing: sender URLs use opaque IDs, but this rule means a dot in a path can never cause a 403.
+- `/` or `/nutgraf`: 301 with a **relative** `Location` (`/nutgraf/`), so a proxied request never bounces to the `cloudfront.net` domain.
+- `/thelibrary` and everything under it (the app's path until 2026-10-12): 301 to the same path under `/nutgraf/`, query string as received, so bookmarks and the old home-screen icon keep working. `infra/test/spa-function.test.ts` runs the function against sample requests.
 - Anything else: 404.
 
 Response headers policy on both behaviors: CSP (section 8), `X-Robots-Tag: noindex, nofollow`, HSTS, `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`.
 
-### The Amplify rule
+### The Amplify rules
 
-Inserted first in the `sandip.dev` app's custom rules; existing rules (www to apex) are preserved and backed up to `scratch/amplify-rules-backup-<ts>.json` first:
+Inserted first in the `sandip.dev` app's custom rules; existing rules (www to apex) are preserved and backed up to `scratch/amplify-rules-backup-<ts>.json` first. Two rules since 2026-10-12: the app's path, and its old one, which the distribution answers with a 301 to the new path.
 
 ```json
+{ "source": "/nutgraf/<*>", "target": "https://<app-distribution>.cloudfront.net/nutgraf/<*>", "status": "200" }
 { "source": "/thelibrary/<*>", "target": "https://<app-distribution>.cloudfront.net/thelibrary/<*>", "status": "200" }
 ```
 
-`scripts/amplify-proxy.ts` reads the distribution domain from stack outputs, shows a diff (`--dry-run`, the default), applies with `--apply`, and `--remove` takes it out. It never touches other rules.
+`scripts/amplify-proxy.ts` reads the distribution domain from stack outputs, shows a diff (`--dry-run`, the default), applies with `--apply`, and `--remove` takes them out. It never touches other rules.
 
-**Live since 2026-10-09** (approved by Sandip), targeting `dg0r0gfgrfwem.cloudfront.net`. If the distribution is ever replaced, rerun `pnpm amplify-proxy --apply`.
+**Live since 2026-10-09** (approved by Sandip), targeting `dg0r0gfgrfwem.cloudfront.net`; the `/nutgraf/<*>` rule since 2026-10-12. If the distribution is ever replaced, rerun `pnpm amplify-proxy --apply`.
 
 **Spike result (2026-10-09): every check passed through `https://sandip.dev/thelibrary`, no fallback needed.** Deep links serve the shell, one CSP and the `X-Robots-Tag` arrive, missing assets 404, encoded query strings and dotted paths arrive intact, the `Authorization` header and a custom header both arrive, POST/PATCH/PUT/DELETE bodies arrive, API responses are not cached, a 3 MB response works, and the root site carries none of our headers. Amplify already redirects `/thelibrary` to `/thelibrary/`.
 
@@ -148,7 +150,7 @@ Through the proxy the app runs on the `https://sandip.dev` origin, so anything o
 
 ### Crawlers
 
-`X-Robots-Tag` on every app response, `<meta name="robots" content="noindex,nofollow">` in the shell, and `Disallow: /thelibrary/` in the root site's `robots.txt` (currently 404; change belongs to the `sandip.dev` repo).
+`X-Robots-Tag` on every app response, `<meta name="robots" content="noindex,nofollow">` in the shell, and `Disallow: /nutgraf/` in the root site's `robots.txt` (currently 404; change belongs to the `sandip.dev` repo).
 
 ## 5. Data model
 
@@ -189,29 +191,29 @@ Every write that changes `state`, `rating` or `savedAt` recomputes all index key
 
 ## 6. API
 
-HTTP API, one route `ANY /thelibrary/api/{proxy+}` behind the Cognito JWT authorizer (issuer = user pool, audience = app client). One Node 24 Lambda with an explicit route table. All responses are JSON with `Cache-Control: no-store`.
+HTTP API, one route `ANY /nutgraf/api/{proxy+}` behind the Cognito JWT authorizer (issuer = user pool, audience = app client). One Node 24 Lambda with an explicit route table. All responses are JSON with `Cache-Control: no-store`.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/thelibrary/api/issues?view=unread\|all\|archived\|saved&shelf=news\|learning&topic=&sender=&cursor=&limit=` | Newest first; `saved` (#43) newest saved first, read or not, hiding no one. `sender` (up to 50 ids) and `topic` (up to 20) each take several, comma-separated, meaning any of them. Home views hide muted senders unless they are picked. Unread without a sender filter lists Must Read newsletters first; every list marks their issues `mustRead`. `shelf=news` also returns issues Claude has not sorted yet. |
-| GET | `/thelibrary/api/issues/{id}` | Metadata + sanitized HTML (from S3), and `position` when this is the issue Now reading points at and it is unfinished (#44). |
-| PATCH | `/thelibrary/api/issues/{id}` | `{ "state"?: "unread" \| "read" \| "archived", "shelf"?: "news" \| "learning", "saved"?: boolean }`. A shelf set here is Sandip's (`shelfSetBy: sandip`): neither Claude nor a sender setting moves it back. Saving (#43) takes the issue out of Unread whatever its state; archiving a saved issue also unsaves it, and an archived issue cannot be saved (400). |
-| POST | `/thelibrary/api/issues/{id}/rating` | `{ "value": 1 \| -1 \| 0 }` (0 clears) |
-| POST | `/thelibrary/api/issues/{id}/events` | `{ "type": "open" }`: logged, indexed by time for read history, and Now reading points at the issue (#44). `{ "type": "peek" }`: a peek left open 2 seconds (#56), logged and indexed the same way; Now reading stays put |
-| GET | `/thelibrary/api/now-reading` | Now reading (#44): `{ nowReading?: { issue, position, at } }`, empty once the issue is finished, archived, or rated after it was opened. |
-| PUT | `/thelibrary/api/now-reading` | `{ "id", "position" }` (0 to 1; 1 means finished), 204. A place in another issue moves Now reading back to it (an older window still open on it), unless that place is 1. 404 for an unknown issue. |
-| GET | `/thelibrary/api/history?day=YYYY-MM-DD` | Read history (#42): the issues read on that day in India (today by default), opened or peeked at (#56), each once at its latest read, latest first, with `openedAt` and `via` (`open` or `peek`, so History can say Opened or Read); and `previousDay` and `nextDay`, the nearest days with anything read, so paging skips empty days. 400 for anything but a real date. |
-| GET | `/thelibrary/api/issues/{id}/stories` | The issue's stories from the story index (#15), in order: `n`, `headline`, `summary`, `link` and `names` (when the story names any; no embeddings). Empty until the issue is split. For a tap on a row (#41). |
-| GET | `/thelibrary/api/issues/{id}/related` | `{ earlier, since, stories? }`: the closest stories from other issues, received before and after this one, closest first, each as its issue's row with a `similarity` and, inside a digest, the matching `story` (section 11). An issue with one story, or not split yet, has up to three each side in `earlier` and `since`; a digest has up to three for each of its stories in `stories` (`n`, `headline`, `earlier`, `since`), only those with any. Promos and muted newsletters are left out. Worked out at read time; nothing is stored. |
-| GET | `/thelibrary/api/search?q=&sort=best\|newest` | Search (#53, section 11): the issues that hold the query's words, then those only close in meaning, each group best match first or newest first, up to 50. Each hit carries `match` (`words`, `meaning` or `both`) and, inside a digest, the matching `story`'s headline; the response carries the query's `terms` as matched, for highlighting, and `byMeaning: false` when Titan was unavailable (words alone). Filtered mail, promos and muted newsletters are left out; archived issues are in. 400 for an empty `q` or one over 200 characters. |
-| GET | `/thelibrary/api/senders` | All senders with counts, mute state, unsubscribe link. |
-| GET | `/thelibrary/api/senders/{senderId}` | Sender + its issues. |
-| PATCH | `/thelibrary/api/senders/{senderId}` | `{ "muted"?, "mustRead"?, "shelf"?: "news" \| "learning" \| null }`, at least one. Setting `shelf` moves the sender's issues there (except ones Sandip moved); `null` hands them back to Claude's call. |
-| GET | `/thelibrary/api/topics` | The topic list. The web shows the News/Learning tabs once it is non-empty. |
-| GET | `/thelibrary/api/unread-counts` | Unread issues counted by sender, shelf and topic (muted senders included), for the numbers on the tabs, topic chips and sender picker, and `saved`, how many issues are saved (#43). The web works out every combination of filters from this one list. |
-| GET | `/thelibrary/api/summary` | The 20 most relevant unread News issues from the last two weeks, best first and at most three from one newsletter, each with a `scoreReason`, plus how many were scored. Scored at read time (section 11). The first call of the day logs the top 5 as the day's digest (`digestAt` says when); every call returns it (`digest`) with the success measure (`digestStats`), and the day in brief (`narrative`, #18) while it is less than a day old. |
-| POST | `/thelibrary/api/ingest` | Async "refresh now". |
-| GET | `/thelibrary/api/status` | Last ingest run, counts, the success measure (`digestStats`). |
+| GET | `/nutgraf/api/issues?view=unread\|all\|archived\|saved&shelf=news\|learning&topic=&sender=&cursor=&limit=` | Newest first; `saved` (#43) newest saved first, read or not, hiding no one. `sender` (up to 50 ids) and `topic` (up to 20) each take several, comma-separated, meaning any of them. Home views hide muted senders unless they are picked. Unread without a sender filter lists Must Read newsletters first; every list marks their issues `mustRead`. `shelf=news` also returns issues Claude has not sorted yet. |
+| GET | `/nutgraf/api/issues/{id}` | Metadata + sanitized HTML (from S3), and `position` when this is the issue Now reading points at and it is unfinished (#44). |
+| PATCH | `/nutgraf/api/issues/{id}` | `{ "state"?: "unread" \| "read" \| "archived", "shelf"?: "news" \| "learning", "saved"?: boolean }`. A shelf set here is Sandip's (`shelfSetBy: sandip`): neither Claude nor a sender setting moves it back. Saving (#43) takes the issue out of Unread whatever its state; archiving a saved issue also unsaves it, and an archived issue cannot be saved (400). |
+| POST | `/nutgraf/api/issues/{id}/rating` | `{ "value": 1 \| -1 \| 0 }` (0 clears) |
+| POST | `/nutgraf/api/issues/{id}/events` | `{ "type": "open" }`: logged, indexed by time for read history, and Now reading points at the issue (#44). `{ "type": "peek" }`: a peek left open 2 seconds (#56), logged and indexed the same way; Now reading stays put |
+| GET | `/nutgraf/api/now-reading` | Now reading (#44): `{ nowReading?: { issue, position, at } }`, empty once the issue is finished, archived, or rated after it was opened. |
+| PUT | `/nutgraf/api/now-reading` | `{ "id", "position" }` (0 to 1; 1 means finished), 204. A place in another issue moves Now reading back to it (an older window still open on it), unless that place is 1. 404 for an unknown issue. |
+| GET | `/nutgraf/api/history?day=YYYY-MM-DD` | Read history (#42): the issues read on that day in India (today by default), opened or peeked at (#56), each once at its latest read, latest first, with `openedAt` and `via` (`open` or `peek`, so History can say Opened or Read); and `previousDay` and `nextDay`, the nearest days with anything read, so paging skips empty days. 400 for anything but a real date. |
+| GET | `/nutgraf/api/issues/{id}/stories` | The issue's stories from the story index (#15), in order: `n`, `headline`, `summary`, `link` and `names` (when the story names any; no embeddings). Empty until the issue is split. For a tap on a row (#41). |
+| GET | `/nutgraf/api/issues/{id}/related` | `{ earlier, since, stories? }`: the closest stories from other issues, received before and after this one, closest first, each as its issue's row with a `similarity` and, inside a digest, the matching `story` (section 11). An issue with one story, or not split yet, has up to three each side in `earlier` and `since`; a digest has up to three for each of its stories in `stories` (`n`, `headline`, `earlier`, `since`), only those with any. Promos and muted newsletters are left out. Worked out at read time; nothing is stored. |
+| GET | `/nutgraf/api/search?q=&sort=best\|newest` | Search (#53, section 11): the issues that hold the query's words, then those only close in meaning, each group best match first or newest first, up to 50. Each hit carries `match` (`words`, `meaning` or `both`) and, inside a digest, the matching `story`'s headline; the response carries the query's `terms` as matched, for highlighting, and `byMeaning: false` when Titan was unavailable (words alone). Filtered mail, promos and muted newsletters are left out; archived issues are in. 400 for an empty `q` or one over 200 characters. |
+| GET | `/nutgraf/api/senders` | All senders with counts, mute state, unsubscribe link. |
+| GET | `/nutgraf/api/senders/{senderId}` | Sender + its issues. |
+| PATCH | `/nutgraf/api/senders/{senderId}` | `{ "muted"?, "mustRead"?, "shelf"?: "news" \| "learning" \| null }`, at least one. Setting `shelf` moves the sender's issues there (except ones Sandip moved); `null` hands them back to Claude's call. |
+| GET | `/nutgraf/api/topics` | The topic list. The web shows the News/Learning tabs once it is non-empty. |
+| GET | `/nutgraf/api/unread-counts` | Unread issues counted by sender, shelf and topic (muted senders included), for the numbers on the tabs, topic chips and sender picker, and `saved`, how many issues are saved (#43). The web works out every combination of filters from this one list. |
+| GET | `/nutgraf/api/summary` | The 20 most relevant unread News issues from the last two weeks, best first and at most three from one newsletter, each with a `scoreReason`, plus how many were scored. Scored at read time (section 11). The first call of the day logs the top 5 as the day's digest (`digestAt` says when); every call returns it (`digest`) with the success measure (`digestStats`), and the day in brief (`narrative`, #18) while it is less than a day old. |
+| POST | `/nutgraf/api/ingest` | Async "refresh now". |
+| GET | `/nutgraf/api/status` | Last ingest run, counts, the success measure (`digestStats`). |
 
 **Listing:** one picked sender reads that sender's index (`gsi3`); several filter the view's index with `senderId IN (...)`. Several topics add `topic IN (...)`. Otherwise query the view's index newest first with a `FilterExpression` excluding muted senders, and keep querying until `limit` items are collected or the index is exhausted. The cursor is built from the **last returned item's** keys (table keys + that index's keys), never from a `LastEvaluatedKey` after trimming. A malformed cursor is a 400. Unread without a sender filter is two such streams over the `UNREAD` index, read one after the other: Must Read senders (`senderId IN (...)`), then everyone else (`NOT IN` starred and muted). Its cursor names the stream it continues and wraps that stream's cursor.
 
@@ -229,7 +231,7 @@ HTTP API, one route `ANY /thelibrary/api/{proxy+}` behind the Cognito JWT author
 
 ## 8. Frontend
 
-- Preact 11, `preact-iso` for the location (`web/src/paths.ts` turns paths into screens and back), Vite 8 with `base: "/thelibrary/"`, plain CSS with light and dark tokens. Dev server on port 5173.
+- Preact 11, `preact-iso` for the location (`web/src/paths.ts` turns paths into screens and back), Vite 8 with `base: "/nutgraf/"`, plain CSS with light and dark tokens. Dev server on port 5173.
 - **Look (the redesign, 2026-10-11; `docs/features/redesign.md`, spec in `docs/mockups/redesign/`):** one identity on both devices. Since 2026-10-12 the app is Nutgraf, in Apple's type and colour: system fonts only (SF Pro Display for titles, SF Pro Text for body, controls and labels, New York for quotes), so no font files and no font requests. Every background is a token from the handoff's table; there is no blue. The logo is the folded page. Yellow is only ever the Machine's box, one CSS rule (`.ybox`) at three sizes. Dark is the default; the theme follows the system unless Library > Settings pins it on that device (`localStorage`, `data-theme` on `<html>`). Two layouts split at 760 px (`web/src/media.ts`).
 - **Phone (up to 760 px): four tabs** at the bottom (Today, Browse, Saved, Library), hidden while reading. The top of every screen is one title line, plus the filter sentence in Browse. **Continue** (#44) is a pill at the right of every header.
   - **Today** (`/today`, `web/src/phone/today.tsx`, `deck.tsx`): the Summary (#11) as a deck of cards, best first, with the day in brief (#18) as the first card until it is folded for the day. The five (#5) carry the yellow box. A card follows the finger and turns about its bottom edge; past 100 px or a flick it flies out: right is Relevant (it stays unread and leaves the deck), left is Irrelevant and archived with Undo; Later saves it; a tap opens it. `/today/list` is the same 20 as a ranked list, the five inside one frame; `/today/brief` is the whole brief.

@@ -1,4 +1,4 @@
-/** Runtime config written by CDK to /thelibrary/config.json at deploy time. */
+/** Runtime config written by CDK to /nutgraf/config.json at deploy time. */
 export interface AppConfig {
   stage: string;
   apiBase: string;
@@ -8,7 +8,7 @@ export interface AppConfig {
   mock?: boolean;
 }
 
-export const BASE = import.meta.env.BASE_URL.replace(/\/$/, ""); // "/thelibrary"
+export const BASE = import.meta.env.BASE_URL.replace(/\/$/, ""); // "/nutgraf"
 
 export async function loadConfig(): Promise<AppConfig> {
   if (import.meta.env.VITE_MOCK === "1") {

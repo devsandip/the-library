@@ -90,7 +90,7 @@ function setup(overrides: Partial<RepoPort> = {}) {
     opts: { query?: Record<string, string>; body?: unknown } = {},
   ) => {
     const res = (await handler({
-      rawPath: `/thelibrary/api${path}`,
+      rawPath: `/nutgraf/api${path}`,
       queryStringParameters: opts.query,
       body:
         opts.body === undefined

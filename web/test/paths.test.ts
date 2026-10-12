@@ -11,7 +11,7 @@ import {
   slug,
 } from "../src/paths.js";
 
-// Tests run with Vite's BASE_URL of "/", so BASE is "" here; in the app it is "/thelibrary".
+// Tests run with Vite's BASE_URL of "/", so BASE is "" here; in the app it is "/nutgraf".
 const query = (href: string) => Object.fromEntries(new URL(href, "https://x.test").searchParams);
 const at = (href: string) => {
   const u = new URL(href, "https://x.test");
