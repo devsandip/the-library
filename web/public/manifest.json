@@ -1,8 +1,8 @@
 {
   "name": "Nutgraf",
   "short_name": "Nutgraf",
-  "start_url": "/thelibrary/",
-  "scope": "/thelibrary/",
+  "start_url": "/nutgraf/",
+  "scope": "/nutgraf/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",

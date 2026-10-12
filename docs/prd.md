@@ -94,9 +94,9 @@ The Ken, Platformer, System Design Newsletter (Neo Kim), AlgoMaster, ByteByteGo,
   - Bedrock: Titan embeddings for ranking; Claude Haiku 5.5 for one-line summaries and topic tags
   - API Gateway + Lambda for the reader API
   - Static frontend on S3 + CloudFront; Cognito for single-user auth
-- **Hosting: `https://sandip.dev/thelibrary`** (path, not subdomain)
-  - Frontend must build and route with base path `/thelibrary/`; API under `/thelibrary/api/` or a separate API domain
-  - CloudFront path behavior for `/thelibrary*`; ACM cert must be in us-east-1 for CloudFront
+- **Hosting: `https://sandip.dev/nutgraf`** (path, not subdomain; `/thelibrary` until the rename on 2026-10-12, and its URLs redirect)
+  - Frontend must build and route with base path `/nutgraf/`; API under `/nutgraf/api/` or a separate API domain
+  - CloudFront path behavior for `/nutgraf*`; ACM cert must be in us-east-1 for CloudFront
   - `.dev` is HTTPS-only (HSTS preloaded), so no HTTP fallback
   - Cognito callback and sign-out URLs on this path
   - Private app on a public domain: add `noindex` and block crawlers for this path
