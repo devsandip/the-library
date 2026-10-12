@@ -40,8 +40,9 @@ function Tags({ issue, topic, saved }: { issue: IssueListItem; topic: boolean; s
 /**
  * One issue in a list: Browse, Saved, Today's list view and Library's pages. The newsletter (with
  * ★ for Must Read) and its age, the subject, Claude's line, and its state as tags. On the phone a
- * tap peeks inside and a double tap opens (#41), and a swipe rates (#13); every swipe also has a
- * button for VoiceOver. On the Mac a click opens the issue in the console.
+ * tap on the title opens the issue; a tap anywhere else peeks inside and a double tap opens (#41),
+ * and a swipe rates (#13); every swipe also has a button for VoiceOver. On the Mac a click opens
+ * the issue in the console.
  */
 export function Row({
   issue,
@@ -83,7 +84,11 @@ export function Row({
   const { route } = useLocation();
   const [peeking, setPeeking] = useState(false);
   const open = () => route(href);
-  const tap = useTapToPeek({ toggle: () => setPeeking((on) => !on), open });
+  const tap = useTapToPeek({
+    toggle: () => setPeeking((on) => !on),
+    open,
+    opensAt: (target) => target instanceof Element && target.closest(".row-title") !== null,
+  });
   usePeekRead(issue, peeking && !wide, onChange);
   const swipes = !wide && actions;
   const s = useSwipe(
