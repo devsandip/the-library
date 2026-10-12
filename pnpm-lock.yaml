@@ -156,18 +156,6 @@ importers:
 
   web:
     dependencies:
-      '@fontsource-variable/newsreader':
-        specifier: ^5.3.0
-        version: 5.3.0
-      '@fontsource/courier-prime':
-        specifier: ^5.3.0
-        version: 5.3.0
-      '@fontsource/ibm-plex-mono':
-        specifier: ^5.3.0
-        version: 5.3.0
-      '@fontsource/ibm-plex-sans':
-        specifier: ^5.3.0
-        version: 5.3.0
       preact:
         specifier: ^11.0.1
         version: 11.0.1(preact-render-to-string@6.8.0)
@@ -183,10 +171,10 @@ importers:
         version: link:../packages/core
       '@preact/preset-vite':
         specifier: ^2.10.6
-        version: 2.10.6(@babel/core@7.29.7)(preact@11.0.1)(vite@8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15))
+        version: 2.10.6(@babel/core@7.29.7)(preact@11.0.1)(vite@8.3.4)
       vite:
         specifier: ^8.3.4
-        version: 8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15)
+        version: 8.3.4
 
 packages:
 
@@ -632,18 +620,6 @@ packages:
   '@eslint/plugin-kit@0.7.3':
     resolution: {integrity: sha512-IkO+/KEUvwbVpiURZg+P7zF74z5Jxe0UgJxVni+RtoHQ6IZieXaO02kmadomap/q+l6bc/jdPGGqTjhuZnuz1Q==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
-
-  '@fontsource-variable/newsreader@5.3.0':
-    resolution: {integrity: sha512-rrzYi43qMpbzwuFtf9OkWH8sxAPVPcQQQEwXpPtwaKYeJ8yVg5aLs5kawmo1f2Q1t1M38TLmEKCkGVDsYwgdFw==}
-
-  '@fontsource/courier-prime@5.3.0':
-    resolution: {integrity: sha512-KIi1k4VG1Wv+/CGpb1AUpLkUuOAQA6zmvthqxOZGN0AV8BEgQgbK7qAtquv14zsBJAY1bb5BHIEbWVFLgENh0w==}
-
-  '@fontsource/ibm-plex-mono@5.3.0':
-    resolution: {integrity: sha512-eTgnZjZEGk1QtD3ZstF+Vclo2HLAni8YMy34/DxllwZvyz1lR/1RF/xTiAquOBO7MvqBx8D2Ig2WCPMVfdZu7Q==}
-
-  '@fontsource/ibm-plex-sans@5.3.0':
-    resolution: {integrity: sha512-CbE4CbbEEZJX860XyUiRpsksXIQR8Rp2XDva2VO53NJox9tVNtusrysd2x5YkUEY3ErQ66W1IiiQL8/wihhw5w==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -2359,14 +2335,6 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@fontsource-variable/newsreader@5.3.0': {}
-
-  '@fontsource/courier-prime@5.3.0': {}
-
-  '@fontsource/ibm-plex-mono@5.3.0': {}
-
-  '@fontsource/ibm-plex-sans@5.3.0': {}
-
   '@humanfs/core@0.19.2':
     dependencies:
       '@humanfs/types': 0.15.0
@@ -2412,19 +2380,19 @@ snapshots:
 
   '@oxc-project/types@0.153.0': {}
 
-  '@preact/preset-vite@2.10.6(@babel/core@7.29.7)(preact@11.0.1)(vite@8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15))':
+  '@preact/preset-vite@2.10.6(@babel/core@7.29.7)(preact@11.0.1)(vite@8.3.4)':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/plugin-transform-react-jsx': 7.29.7(@babel/core@7.29.7)
       '@babel/plugin-transform-react-jsx-development': 7.29.7(@babel/core@7.29.7)
-      '@prefresh/vite': 2.4.12(preact@11.0.1)(vite@8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15))
+      '@prefresh/vite': 2.4.12(preact@11.0.1)(vite@8.3.4)
       '@rollup/pluginutils': 5.4.0
       babel-plugin-transform-hook-names: 1.0.2(@babel/core@7.29.7)
       debug: 4.4.3
       magic-string: 0.30.21
       picocolors: 1.1.1
-      vite: 8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15)
-      vite-prerender-plugin: 0.5.14(vite@8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15))
+      vite: 8.3.4
+      vite-prerender-plugin: 0.5.14(vite@8.3.4)
       zimmerframe: 1.1.5
     transitivePeerDependencies:
       - preact
@@ -2441,7 +2409,7 @@ snapshots:
 
   '@prefresh/utils@1.2.1': {}
 
-  '@prefresh/vite@2.4.12(preact@11.0.1)(vite@8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15))':
+  '@prefresh/vite@2.4.12(preact@11.0.1)(vite@8.3.4)':
     dependencies:
       '@babel/core': 7.29.7
       '@prefresh/babel-plugin': 0.5.4(@babel/core@7.29.7)
@@ -2449,7 +2417,7 @@ snapshots:
       '@prefresh/utils': 1.2.1
       '@rollup/pluginutils': 4.2.1
       preact: 11.0.1(preact-render-to-string@6.8.0)
-      vite: 8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15)
+      vite: 8.3.4
     transitivePeerDependencies:
       - supports-color
 
@@ -3358,7 +3326,7 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
-  vite-prerender-plugin@0.5.14(vite@8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15)):
+  vite-prerender-plugin@0.5.14(vite@8.3.4):
     dependencies:
       kolorist: 1.8.0
       magic-string: 0.30.21
@@ -3366,7 +3334,17 @@ snapshots:
       simple-code-frame: 1.3.0
       source-map: 0.7.6
       stack-trace: 1.0.0
-      vite: 8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15)
+      vite: 8.3.4
+
+  vite@8.3.4:
+    dependencies:
+      lightningcss: 1.33.0
+      picomatch: 4.0.7
+      postcss: 8.5.29
+      rolldown: 1.2.13
+      tinyglobby: 0.2.17
+    optionalDependencies:
+      fsevents: 2.3.3
 
   vite@8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15):
     dependencies:

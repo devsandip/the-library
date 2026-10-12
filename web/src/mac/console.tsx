@@ -40,14 +40,14 @@ const TABS: { id: QueueTab; label: string }[] = [
 const typing = (t: EventTarget | null) =>
   t instanceof HTMLElement && Boolean(t.closest("input, textarea, select, [contenteditable]"));
 
-/** The 24 px logo: the yellow box round a typewriter L, then the name. */
+/** The 24 px logo: the folded page (a corner turned down over an n), then the wordmark. */
 function Logo() {
   return (
-    <a class="logo" href={queueHref("news")} aria-label="The Library: News">
+    <a class="logo" href={queueHref("news")} aria-label="Nutgraf: News">
       <span class="logo-tile" aria-hidden="true">
-        <span class="ybox" />L
+        <span class="logo-fold" />n
       </span>
-      <span class="logo-name">The Library</span>
+      <span class="logo-name">nutgraf</span>
     </a>
   );
 }

@@ -17,12 +17,12 @@ function synth(stage: "dev" | "prod") {
 describe("prod stack: hosting", () => {
   const t = synth("prod");
 
-  it("routes /thelibrary/api/* to the HTTP API with caching off and auth headers forwarded", () => {
+  it("routes /nutgraf/api/* to the HTTP API with caching off and auth headers forwarded", () => {
     t.hasResourceProperties("AWS::CloudFront::Distribution", {
       DistributionConfig: Match.objectLike({
         CacheBehaviors: [
           Match.objectLike({
-            PathPattern: "/thelibrary/api/*",
+            PathPattern: "/nutgraf/api/*",
             AllowedMethods: Match.arrayWith(["PATCH", "POST", "DELETE"]),
             CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad", // CachingDisabled
             OriginRequestPolicyId: "b689b0a8-53d0-40ab-baf2-68738e2966ac", // AllViewerExceptHostHeader
@@ -35,14 +35,14 @@ describe("prod stack: hosting", () => {
   it("serves the SPA through a viewer-request function", () => {
     t.hasResourceProperties("AWS::CloudFront::Function", {
       FunctionConfig: Match.objectLike({ Runtime: "cloudfront-js-2.0" }),
-      FunctionCode: Match.stringLikeRegexp("/thelibrary/index.html"),
+      FunctionCode: Match.stringLikeRegexp("/nutgraf/index.html"),
     });
   });
 
   it("lets the public about/privacy/terms pages bypass the sign-in shell", () => {
     for (const page of ["about", "privacy", "terms"]) {
       t.hasResourceProperties("AWS::CloudFront::Function", {
-        FunctionCode: Match.stringLikeRegexp(`uri === "/thelibrary/${page}.html"`),
+        FunctionCode: Match.stringLikeRegexp(`uri === "/nutgraf/${page}.html"`),
       });
     }
   });
@@ -216,8 +216,8 @@ describe("auth and API (prod)", () => {
       GenerateSecret: false,
       AllowedOAuthFlows: ["code"],
       AllowedOAuthScopes: ["openid", "email"],
-      CallbackURLs: Match.arrayWith(["https://sandip.dev/thelibrary/auth/callback"]),
-      LogoutURLs: Match.arrayWith(["https://sandip.dev/thelibrary/"]),
+      CallbackURLs: Match.arrayWith(["https://sandip.dev/nutgraf/auth/callback"]),
+      LogoutURLs: Match.arrayWith(["https://sandip.dev/nutgraf/"]),
       EnableTokenRevocation: true,
     });
   });
@@ -228,7 +228,7 @@ describe("auth and API (prod)", () => {
       IdentitySource: ["$request.header.Authorization"],
     });
     t.hasResourceProperties("AWS::ApiGatewayV2::Route", {
-      RouteKey: "ANY /thelibrary/api/{proxy+}",
+      RouteKey: "ANY /nutgraf/api/{proxy+}",
       AuthorizationType: "JWT",
     });
     t.resourceCountIs("AWS::ApiGatewayV2::Route", 1);

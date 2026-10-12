@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Hosting checks from docs/architecture.md section 4.
 #
-#   scripts/check-hosting.sh                                   # through https://sandip.dev/thelibrary
-#   scripts/check-hosting.sh https://dxxxx.cloudfront.net/thelibrary   # the app distribution directly
+#   scripts/check-hosting.sh                                 # through https://sandip.dev/nutgraf
+#   scripts/check-hosting.sh https://dxxxx.cloudfront.net/nutgraf   # the app distribution directly
 #
 # Echo checks (ECHO=1, only while the R2 echo stub was deployed) proved that methods, query
 # strings, bodies and auth headers survive the proxy chain. Default now checks the real API's auth.
 set -uo pipefail
 
-BASE="${1:-https://sandip.dev/thelibrary}"
+BASE="${1:-https://sandip.dev/nutgraf}"
 BASE="${BASE%/}"
 ORIGIN="$(printf '%s' "$BASE" | sed -E 's#^(https://[^/]+).*#\1#')"
 ECHO="${ECHO:-0}"
@@ -28,15 +28,32 @@ echo "Shell and routing"
 loc="$(curl -sI "$BASE" | tr -d '\r' | awk 'tolower($1)=="location:"{print $2}')"
 code="$(status "$BASE")"
 check "no-slash path redirects to the slash path ($code -> $loc)" \
-  '[[ "$code" =~ ^30[178]$ ]] && [[ "$loc" == "/thelibrary/" || "$loc" == "$ORIGIN/thelibrary/" ]]'
+  '[[ "$code" =~ ^30[178]$ ]] && [[ "$loc" == "/nutgraf/" || "$loc" == "$ORIGIN/nutgraf/" ]]'
+# The app was at /thelibrary until 2026-10-12: its URLs move, with a 301, to the same path and
+# query parameters. Followed to where they end: Amplify first adds the slash to a bare
+# /thelibrary, and CloudFront may hand the parameters over in another order.
+canon() {
+  local q=""
+  [[ "$1" == *\?* ]] && q="$(printf '%s' "${1#*\?}" | tr '&' '\n' | sort | paste -sd '&' -)"
+  printf '%s?%s' "${1%%\?*}" "$q"
+}
+code="$(status "$ORIGIN/thelibrary/today")"
+check "an old URL answers with a permanent redirect ($code)" '[[ "$code" == 301 ]]'
+for p in "/thelibrary:/nutgraf/" "/thelibrary/:/nutgraf/" "/thelibrary/browse?kind=news&topic=ai-llms:/nutgraf/browse?kind=news&topic=ai-llms"; do
+  from="${p%%:*}" to="${p#*:}"
+  read -r code url < <(curl -sL -o /dev/null -w '%{http_code} %{url_effective}' "$ORIGIN$from")
+  url="${url#"$ORIGIN"}"
+  check "$from ends at $to ($code $url)" \
+    '[[ "$code" == 200 ]] && [[ "$(canon "$url")" == "$(canon "$to")" ]]'
+done
 for p in "/" "/x/y" "/senders/a.b" "/auth/callback?code=abc&state=xyz"; do
-  check "GET $p serves the shell" '[[ "$(status "$BASE$p")" == 200 ]] && curl -s "$BASE$p" | grep -q "<title>The Library</title>"'
+  check "GET $p serves the shell" '[[ "$(status "$BASE$p")" == 200 ]] && curl -s "$BASE$p" | grep -q "<title>Nutgraf</title>"'
 done
 check "exactly one CSP header" '[[ "$(header "$BASE/" content-security-policy | wc -l | tr -d " ")" == 1 ]]'
 check "CSP keeps scripts to self" 'header "$BASE/" content-security-policy | grep -q "script-src '"'"'self'"'"'"'
 check "X-Robots-Tag noindex" 'header "$BASE/" x-robots-tag | grep -qi noindex'
 check "index.html is not cacheable" 'header "$BASE/" cache-control | grep -qi no-cache'
-asset="$(curl -s "$BASE/" | grep -oE '/thelibrary/assets/[^"]+\.js' | head -1)"
+asset="$(curl -s "$BASE/" | grep -oE '/nutgraf/assets/[^"]+\.js' | head -1)"
 check "hashed asset is immutable ($asset)" '[[ -n "$asset" ]] && header "$ORIGIN$asset" cache-control | grep -qi immutable'
 code="$(status "$BASE/assets/nope-123.js")"
 check "missing asset is 404/403 without redirect ($code)" '[[ "$code" == 404 || "$code" == 403 ]]'
@@ -44,7 +61,7 @@ check "config.json served" '[[ "$(status "$BASE/config.json")" == 200 ]]'
 for page in about privacy terms; do
   check "public $page page loads without sign-in" '[[ "$(status "$BASE/$page.html")" == 200 ]] && ! curl -s "$BASE/$page.html" | grep -q "/src/main\|assets/index-"'
 done
-for icon in favicon.svg:image/svg+xml favicon-32.png:image/png apple-touch-icon.png:image/png; do
+for icon in icons/favicon.svg:image/svg+xml icons/favicon-32.png:image/png icons/apple-touch-icon.png:image/png icons/icon-512.png:image/png manifest.json:application/json; do
   check "${icon%%:*} is served as ${icon#*:}" '[[ "$(status "$BASE/${icon%%:*}")" == 200 ]] && header "$BASE/${icon%%:*}" content-type | grep -qi "${icon#*:}"'
 done
 check "privacy page states the Gmail scope" 'curl -s "$BASE/privacy.html" | grep -q "gmail.readonly"'
@@ -52,7 +69,7 @@ check "privacy page states the Gmail scope" 'curl -s "$BASE/privacy.html" | grep
 if [[ "$ECHO" == 1 ]]; then
   echo "API chain (echo stub)"
   r="$(curl -s "$BASE/api/echo/a.b?c=a%2Bb%40c%2Fd&z=1" -H 'authorization: Bearer t1' -H 'x-library-auth: t1')"
-  check "path with a dot arrives" '[[ "$(json rawPath <<<"$r")" == "/thelibrary/api/echo/a.b" ]]'
+  check "path with a dot arrives" '[[ "$(json rawPath <<<"$r")" == "/nutgraf/api/echo/a.b" ]]'
   check "encoded query string arrives intact" '[[ "$(json rawQueryString <<<"$r")" == "c=a%2Bb%40c%2Fd&z=1" ]]'
   check "Authorization header arrives" '[[ "$(json authorizationHash <<<"$r")" == "$(sha12 "Bearer t1")" ]]'
   check "custom x-library-auth header arrives" '[[ "$(json customAuthHash <<<"$r")" == "$(sha12 t1)" ]]'

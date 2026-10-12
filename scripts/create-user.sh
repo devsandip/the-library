@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Create the one Cognito user for The Library. Cognito emails a temporary password; signing in
-# at https://sandip.dev/thelibrary/ then asks for a new password and an authenticator app (TOTP).
+# at https://sandip.dev/nutgraf/ then asks for a new password and an authenticator app (TOTP).
 #
 #   AWS_PROFILE=admin pnpm create-user                 # dev.sandip@gmail.com
 #   AWS_PROFILE=admin pnpm create-user you@example.com
@@ -48,5 +48,5 @@ aws cognito-idp admin-create-user --region "$REGION" --user-pool-id "$POOL" \
   --desired-delivery-mediums EMAIL >/dev/null
 
 echo "Invitation sent to $EMAIL (check spam for no-reply@verificationemail.com)."
-echo "Sign in at https://sandip.dev/thelibrary/ with the temporary password, set your own,"
+echo "Sign in at https://sandip.dev/nutgraf/ with the temporary password, set your own,"
 echo "then scan the QR code with an authenticator app."

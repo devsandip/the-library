@@ -52,7 +52,7 @@ export class Auth extends Construct {
       userInvitation: {
         emailSubject: "The Library: your temporary password",
         emailBody:
-          "Sign in at https://sandip.dev/thelibrary/ with {username} and the temporary password {####}. You will set your own password and add an authenticator app.",
+          "Sign in at https://sandip.dev/nutgraf/ with {username} and the temporary password {####}. You will set your own password and add an authenticator app.",
       },
       deletionProtection: true,
       removalPolicy: RemovalPolicy.RETAIN,

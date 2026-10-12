@@ -1,6 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- The typewriter L (Courier Prime 700) inside the Machine's yellow box (the redesign). -->
-  <rect width="512" height="512" fill="#0C0D0E"/>
-  <path fill="none" stroke="#FFD21F" stroke-width="17.5" d="M101.75 174V101.75H174M338 101.75H410.25V174M410.25 338V410.25H338M174 410.25H101.75V338"/>
-  <path fill="#E9E7E2" transform="translate(179 333.5) scale(0.1306 -0.1306)" d="M800 1084Q800 1042 793.5 1020.0Q787 998 774.0 990.0Q761 982 737 982H519V215H870V527Q870 561 900.5 575.5Q931 590 1002 590Q1049 590 1074.5 583.5Q1100 577 1110.0 564.0Q1120 551 1120 527V65Q1120 31 1105.0 15.5Q1090 0 1055 0H123Q99 0 86.0 8.0Q73 16 66.5 38.0Q60 60 60 102Q60 144 66.5 166.0Q73 188 86.0 196.5Q99 205 123 205H269V982H123Q99 982 86.0 990.0Q73 998 66.5 1020.0Q60 1042 60 1084Q60 1126 66.5 1148.0Q73 1170 86.0 1178.5Q99 1187 123 1187H737Q761 1187 774.0 1178.5Q787 1170 793.5 1148.0Q800 1126 800 1084Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <!-- The folded page (Nutgraf, option 1e): square, no rounding; iOS masks the home-screen icon itself.
+       The n is SF Pro Display 700 at 64 px (opsz 64), outlined, 22 px from the left, 18 px from the bottom. -->
+  <rect width="120" height="120" fill="#000000"/>
+  <path fill="#FFD60A" d="M74 0L120 46H82A8 8 0 0 1 74 38Z"/>
+  <path fill="#FFFFFF" transform="translate(22 94.1875) scale(0.03125 -0.03125)" d="M95 0V1072H387V895.5H393Q434.5 988 516.5 1041Q598.5 1094 720 1094Q896.5 1094 993 987.2Q1089.5 880.5 1089.5 692V0H797.5V631.5Q797.5 736.5 748.2 794.2Q699 852 600.5 852Q535.5 852 487.5 822.2Q439.5 792.5 413.2 739.5Q387 686.5 387 616V0Z"/>
 </svg>

@@ -74,9 +74,9 @@ function NotFound() {
   return (
     <section class="lib-page">
       <h1 class="page-title">Nothing here.</h1>
-      <p class="empty-text">That link does not lead anywhere in the Library.</p>
+      <p class="empty-text">That link does not lead anywhere in Nutgraf.</p>
       <a class="btn line" href={`${BASE}/`}>
-        Back to the Library
+        Back to Nutgraf
       </a>
     </section>
   );
@@ -203,11 +203,11 @@ export function App() {
     );
   }, []);
 
-  if (state.kind === "loading") return <p class="boot">Opening the Library…</p>;
+  if (state.kind === "loading") return <p class="boot">Opening Nutgraf…</p>;
   if (state.kind === "error") {
     return (
       <main class="boot">
-        <p>The Library could not start: {state.message}</p>
+        <p>Nutgraf could not start: {state.message}</p>
         <button type="button" class="btn fill" onClick={() => location.reload()}>
           Try again
         </button>
