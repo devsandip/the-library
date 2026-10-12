@@ -279,3 +279,40 @@ Append-only session log. Newest entry at the bottom.
 - Rows read or saved stay in place, faded, until the view changes (RET-10).
 - A newsletter wider than the column is scaled down with CSS `zoom`, so its layout survives.
 - On the Mac, `/library` lands on the News queue; Library's pages open from ⌘K.
+
+## 2026-10-12: Nutgraf: the Apple look, the folded page, and sandip.dev/nutgraf (#73 to #76)
+
+**Did:**
+
+- Built the second Claude Design handoff in #73. It kept every layout from #66 and changed three things:
+  - the name is Nutgraf (the handoff spells it Nurgraf; Sandip confirmed Nutgraf, and the copy under `docs/mockups/redesign/` is corrected);
+  - the look is Apple's: the tokens exactly as the handoff's "Backgrounds (exact)" table, SF Pro and New York from the system (the four `@fontsource` packages are removed), 11 px tabular labels, no blue;
+  - the logo is the folded page. The icon SVGs are drawn from SF Pro's own `n`, so they need no font, and `pnpm icons` renders the PNGs into `web/public/icons/`. A web manifest is new, and a pinned theme also sets `theme-color`.
+- #74: a tap on a row's title opens the issue; the rest of the row still peeks (Sandip asked for it).
+- #75: moved the app to `/nutgraf/` (`BASE_PATH`, the API route, Cognito's URLs, the S3 prefix, Vite's base, the manifest). The CloudFront function answers every `/thelibrary/*` URL with a 301 to the same path and query parameters, and `infra/test/spa-function.test.ts` runs it against sample requests. Before merging, `pnpm amplify-proxy --apply` added the `/nutgraf/<*>` rule on sandip.dev (backup: `scratch/amplify-rules-backup-2026-10-12T04-03-51-247Z.json` in the main checkout).
+- #75's Deploy (run 38202272444) deployed prod but failed 2 of 32 hosting checks that were too strict: Amplify adds the slash to a bare `/thelibrary` before our 301, and CloudFront reorders query parameters. #76 makes the check follow each old URL to where it ends.
+- Deployed #75's branch to dev first; `pnpm test:int` passed (46). Unit tests: 360.
+- Merged #73, #74, #75, #76 and #68 on Sandip's word.
+
+**State now:**
+
+- Prod runs 2f9acc3 (#76); Deploy run 38203184707 passed check, dev and prod, with every hosting check. Main is at c100f00 (#68) plus this docs pull request.
+- Live at https://sandip.dev/nutgraf/, in the new look; every `/thelibrary` URL redirects there. Checked in mock mode and by following old URLs on prod. Nobody has used it on a real iPhone.
+- Internal names keep "library": the repository, the stacks, the SSM paths, the Cognito domain and the storage keys.
+- The about, privacy and terms pages still say The Library, as Google's consent screen does.
+- #72 (one line in `docs/features/redesign.md`) is still open and needs updating from main.
+
+**Next:**
+
+- Sandip deletes the home-screen icon and adds it again from `https://sandip.dev/nutgraf/`, then does the real-iPhone pass against `docs/features/redesign.md`, Open. File what breaks as issues.
+- Sandip, on Google's OAuth consent screen (Branding): point the home page, privacy and terms links at `/nutgraf/`, and rename the app to Nutgraf. Then rename the about, privacy and terms pages in `web/public/`.
+- Read a weekday's day in brief and its cost (`narrative done` in the ingest logs), carried from last session.
+- Then #19 (how a story evolved), as the Timeline tab, from `closestStories` in `packages/core/src/related.ts`.
+
+**Decisions:**
+
+- The name is Nutgraf, not the handoff's Nurgraf.
+- Three pull requests in order: the look, the title tap, the address. The address waited because it touches the API, Cognito and sandip.dev's Amplify rules.
+- The 301s come from the app's CloudFront function, not an Amplify redirect rule, so they live in the CDK code and are tested; Amplify proxies both paths.
+- The manifest is `manifest.json`, not `.webmanifest`, so S3 serves it as JSON whatever the deployment's content-type table knows.
+- Internal names keep "library": renaming stacks or SSM paths would rebuild resources for no visible gain.
