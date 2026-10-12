@@ -1,6 +1,6 @@
 # The Library: Journal
 
-Last refreshed: 2026-10-11 14:44
+Last refreshed: 2026-10-11 17:44
 Latest entry: [2026-10-11-1444-today-browse-and-the-console.md](entries/2026-10-11-1444-today-browse-and-the-console.md)
 
 A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Live at https://sandip.dev/thelibrary/.
@@ -31,7 +31,7 @@ Since 2026-10-11 both devices have one look, from a Claude Design redesign brief
 
 ## Weekly summaries
 
-None yet. The first, 2026-W41, is due on Monday 2026-10-12.
+- [2026-W41: from a brief to a redesign](weekly/2026-W41-summary.md)
 
 ## Working hypotheses
 
