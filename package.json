@@ -16,6 +16,7 @@
     "amplify-proxy": "tsx scripts/amplify-proxy.ts",
     "check-hosting": "bash scripts/check-hosting.sh",
     "sync-main": "bash scripts/sync-main.sh",
+    "track": "bash scripts/track.sh",
     "icons": "bash scripts/icons.sh",
     "deploy": "pnpm --filter @library/web build && pnpm cdk deploy -c stage=prod --require-approval never",
     "seed-dev": "tsx scripts/seed-dev.ts",

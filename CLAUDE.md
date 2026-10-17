@@ -13,3 +13,12 @@ Only GitHub Actions deploys prod, and only from main (`docs/features/pipeline.md
 - **After every merge, run `pnpm sync-main`**, so the main checkout matches main.
 - **Dev is disposable.** Deploying a branch to dev (`pnpm cdk deploy -c stage=dev`) to run the integration tests before opening its pull request is fine.
 - **Prod data jobs run after their code is deployed**, from a laptop with `AWS_PROFILE=admin` (`pnpm reprocess`, `pnpm enrich`, backfills).
+
+## Tracking work
+
+All work is on the GitHub project [Nutgraf](https://github.com/users/devsandip/projects/10): one card per issue or pull request.
+
+- **Every new issue and pull request goes on it** the moment it is opened: `pnpm track <number> <status> [track]`.
+- **Status** is where the work is: Backlog, Up next, In progress, In review (an open pull request, or built and waiting for Sandip), Waiting (blocked on time, data or access), Done.
+- **Track** is the part of the app: Reading, Sorting, Stories, Briefings, Agentic, Ops.
+- **Move the issue as the work moves**: In progress when work starts, In review when its pull request opens, Done when it merges or closes. A pull request goes on as In review with the issue's track.
