@@ -29,6 +29,7 @@
     "topics": "tsx scripts/topics.ts",
     "enrich": "tsx scripts/enrich.ts",
     "stories": "tsx scripts/stories.ts",
+    "shelves": "tsx scripts/shelves.ts",
     "jev:score": "tsx scripts/jev-score.ts",
     "narrative": "tsx scripts/narrative.ts",
     "history-backfill": "tsx scripts/history-backfill.ts"

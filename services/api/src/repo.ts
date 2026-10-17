@@ -1531,6 +1531,7 @@ export class DynamoRepo implements RepoPort, CorpusSource, SearchSource, Related
       lastError: (res.Item?.lastError as string | null | undefined) ?? null,
       lastEnrich: res.Item?.lastEnrich as StatusResponse["lastEnrich"],
       lastStories: res.Item?.lastStories as StatusResponse["lastStories"],
+      lastShelves: res.Item?.lastShelves as StatusResponse["lastShelves"],
     };
   }
 

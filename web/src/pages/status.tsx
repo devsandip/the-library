@@ -29,6 +29,7 @@ export function Status({ wide }: { wide: boolean }) {
   const run = s?.lastRunStats;
   const enrich = s?.lastEnrich;
   const stories = s?.lastStories;
+  const shelves = s?.lastShelves;
 
   return (
     <Page
@@ -107,6 +108,22 @@ export function Status({ wide }: { wide: boolean }) {
                 <>
                   <dt>Story error</dt>
                   <dd class="irr">{stories.errorSamples[0]}</dd>
+                </>
+              )}
+            </>
+          )}
+          {shelves && (
+            <>
+              <dt>Shelves</dt>
+              <dd>
+                Jev shelved {shelves.shelved} stories, {shelves.learning} on Learning
+                {shelves.deferred > 0 && `, ${shelves.deferred} left for the next run`}
+                {`, ${shelves.errors} errors`}
+              </dd>
+              {shelves.errorSamples.length > 0 && (
+                <>
+                  <dt>Shelf error</dt>
+                  <dd class="irr">{shelves.errorSamples[0]}</dd>
                 </>
               )}
             </>

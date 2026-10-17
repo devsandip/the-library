@@ -23,6 +23,8 @@ export interface IngestProps {
 }
 
 export const gmailParamName = (stage: Stage) => `/thelibrary/${stage}/gmail/oauth`;
+/** TypeSafe's key for Jev (#81). Sandip stores it by hand; dev has none. */
+export const jevParamName = (stage: Stage) => `/thelibrary/${stage}/jev/api-key`;
 
 export class Ingest extends Construct {
   readonly fn: NodejsFunction;
@@ -31,6 +33,7 @@ export class Ingest extends Construct {
     super(scope, id);
     const stack = Stack.of(this);
     const param = gmailParamName(props.stage);
+    const jevParam = jevParamName(props.stage);
 
     this.fn = nodeFunction(this, "Fn", {
       entry: "services/ingest/src/handler.ts",
@@ -43,6 +46,7 @@ export class Ingest extends Construct {
         TABLE_NAME: props.table.tableName,
         BUCKET_NAME: props.content.bucketName,
         GMAIL_PARAM: param,
+        JEV_PARAM: jevParam,
         STAGE: props.stage,
         NODE_OPTIONS: "--enable-source-maps",
       },
@@ -54,9 +58,9 @@ export class Ingest extends Construct {
       new PolicyStatement({
         effect: Effect.ALLOW,
         actions: ["ssm:GetParameter"],
-        resources: [
-          `arn:${stack.partition}:ssm:${stack.region}:${stack.account}:parameter${param}`,
-        ],
+        resources: [param, jevParam].map(
+          (name) => `arn:${stack.partition}:ssm:${stack.region}:${stack.account}:parameter${name}`,
+        ),
       }),
     );
 

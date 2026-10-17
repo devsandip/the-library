@@ -1,18 +1,21 @@
 import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
-import type { EnrichStats, StoryStats } from "@library/core/types";
+import type { EnrichStats, ShelfStats, StoryStats } from "@library/core/types";
 import { Bedrock } from "./bedrock.js";
 import { archiveOldNews, enrich, proposeTopics } from "./enrich.js";
 import { Gmail, type GmailCredentials } from "./gmail.js";
 import { ingest } from "./ingest.js";
+import { Jev } from "./jev.js";
 import { writeNarrative } from "./narrative.js";
 import { reprocess } from "./reprocess.js";
 import { rebuildSenders } from "./senders.js";
+import { shelveStories } from "./shelves.js";
 import { Store } from "./store.js";
 import { indexStories, relinkStories } from "./stories.js";
 
-const { TABLE_NAME, BUCKET_NAME, GMAIL_PARAM, STAGE } = process.env;
+const { TABLE_NAME, BUCKET_NAME, GMAIL_PARAM, JEV_PARAM, STAGE } = process.env;
 
 let gmail: Gmail | undefined;
+let jev: Jev | undefined;
 const store = new Store(TABLE_NAME!, BUCKET_NAME!);
 const bedrock = new Bedrock();
 const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
@@ -25,6 +28,28 @@ async function getGmail(): Promise<Gmail> {
   gmail = new Gmail(JSON.parse(res.Parameter!.Value!) as GmailCredentials);
   return gmail;
 }
+
+/** The key is Sandip's, stored in SSM by hand; dev has none, so shelving fails there. */
+async function getJev(): Promise<Jev> {
+  if (jev) return jev;
+  const res = await new SSMClient({}).send(
+    new GetParameterCommand({ Name: JEV_PARAM, WithDecryption: true }),
+  );
+  jev = new Jev(res.Parameter!.Value!);
+  return jev;
+}
+
+const shelfFailed = (err: Error): ShelfStats => ({
+  checked: 0,
+  shelved: 0,
+  learning: 0,
+  unsure: 0,
+  deferred: 0,
+  errors: 1,
+  errorSamples: [err.message],
+  inputTokens: 0,
+  durationMs: 0,
+});
 
 /** CloudWatch embedded metric: one data point per clean run, for the staleness alarm. */
 function emitSucceeded() {
@@ -60,6 +85,8 @@ export interface IngestEvent {
   proposeTopics?: { days?: number; apply?: boolean; replace?: boolean };
   /** Split stored issues into stories (`pnpm stories`); `relink` only recomputes event links. */
   stories?: { days?: number; force?: boolean; relink?: boolean };
+  /** Jev shelves stored stories (`pnpm shelves`); `force` asks again about the ones it shelved. */
+  shelves?: { days?: number; force?: boolean };
   /** Write today's narrative now (`pnpm narrative`); `force` even if the last one is recent. */
   narrative?: { force?: boolean };
   /** Index opens logged before read history existed (`pnpm history-backfill`). */
@@ -90,6 +117,16 @@ export async function handler(event: IngestEvent = {}) {
       deadline: started + 8.5 * 60_000,
     });
     console.log(JSON.stringify({ level: "info", msg: "stories done", ...stats }));
+    return stats;
+  }
+  if (event.shelves) {
+    const stats = await shelveStories(store, getJev, {
+      sinceIso: daysAgo(event.shelves.days ?? 30),
+      force: event.shelves.force === true,
+      concurrency: 8,
+      deadline: started + 9 * 60_000,
+    });
+    console.log(JSON.stringify({ level: "info", msg: "shelves done", ...stats }));
     return stats;
   }
   if (event.historyBackfill) {
@@ -176,6 +213,12 @@ export async function handler(event: IngestEvent = {}) {
     durationMs: 0,
   }));
   console.log(JSON.stringify({ level: "info", msg: "stories done", ...storied }));
+  // Then Jev shelves the new stories (#81). Nothing reads the shelf yet; it never fails the run.
+  const shelved = await shelveStories(store, getJev, {
+    sinceIso: daysAgo(14),
+    deadline: started + 8.75 * 60_000,
+  }).catch(shelfFailed);
+  console.log(JSON.stringify({ level: "info", msg: "shelves done", ...shelved }));
   // Then today's narrative (#18), when the day's News has moved on. It never fails the run either.
   await writeNarrative(store, bedrock, { deadline: started + 9 * 60_000 })
     .then((told) => console.log(JSON.stringify({ level: "info", msg: "narrative done", ...told })))
@@ -184,7 +227,7 @@ export async function handler(event: IngestEvent = {}) {
         JSON.stringify({ level: "error", msg: "narrative failed", error: String(err) }),
       ),
     );
-  await store.putIngestState(stats, enriched, storied);
+  await store.putIngestState(stats, enriched, storied, shelved);
   // A run with errors fails the invocation so the alarm fires. What was stored stays stored,
   // and async retries are off, so this is one failed run, not three.
   if (stats.errors > 0) throw new Error(`ingest finished with ${stats.errors} errors`);

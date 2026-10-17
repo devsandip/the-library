@@ -921,6 +921,17 @@ export class MockLibraryApi implements LibraryApi {
         embedTokens: 900,
         durationMs: 21_000,
       },
+      lastShelves: {
+        checked: 14,
+        shelved: 14,
+        learning: 3,
+        unsure: 1,
+        deferred: 0,
+        errors: 0,
+        errorSamples: [],
+        inputTokens: 8600,
+        durationMs: 4_000,
+      },
     };
   }
 }
