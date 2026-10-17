@@ -80,7 +80,11 @@ export class Jev implements DecisionPort {
   }
 }
 
-/** What Learning means (Sandip, 2026-10-12): craft, not shelf life. */
+/**
+ * What Learning means (Sandip, 2026-10-12): craft, not shelf life. How to use a tool, or how it
+ * works, is Learning; that it launched is News, even when it is a new kind of tool (2026-10-17).
+ * Rewordings scored no better; see docs/features/story-shelves.md.
+ */
 export const CRAFT =
   "Builds the reader's craft: product management, system design, software engineering, " +
   "how to build with AI, startup and business strategy. How-tos, explanations of how a system " +
@@ -92,19 +96,22 @@ export const NOT_CRAFT =
   "politics, the industry's moves and people. Also essays on culture, society or life, and " +
   "consumer tech, even when they stay worth reading.";
 
-/** The two phrasings scored side by side until one is chosen (#81). */
-export const SHELF_QUESTIONS: Record<"shelf" | "craft", Question> = {
-  shelf: {
-    type: "choice",
-    question: "Which shelf does this story belong on, for this reader?",
-    criteria: { learning: CRAFT, news: NOT_CRAFT },
-  },
+/**
+ * The one question every story gets. A choice between the two shelves scored worse against
+ * Sandip's labels than this yes or no (#81).
+ */
+export const SHELF_QUESTIONS: Record<"craft", Question> = {
   craft: {
     type: "noul",
     question: "Does this story build the reader's craft?",
     criteria: { true: CRAFT, false: NOT_CRAFT },
   },
 };
+
+/** Answers in this band are shelved by 0.5 and listed for Sandip to settle. */
+export const UNSURE = { from: 0.4, to: 0.6 } as const;
+
+export const isUnsure = (p: number) => p >= UNSURE.from && p < UNSURE.to;
 
 export function storyState(s: { publication: string; headline: string; summary: string }) {
   return [

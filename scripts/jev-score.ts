@@ -5,7 +5,7 @@
  * The file is a list of stories: { n, publication, headline, summary, label, guess?, issueShelf? },
  * where label is Sandip's ("news" or "learning"), guess is Claude's before he looked, and
  * issueShelf is the shelf Haiku gave the whole issue. Prints accuracy and calibration for each
- * phrasing in SHELF_QUESTIONS, beside those two baselines, and writes Jev's answers to
+ * question in SHELF_QUESTIONS (add a rewording there to compare), beside those two baselines, and writes Jev's answers to
  * <file>.jev.json. Reads the key from SSM; prints no key and stores nothing in the table.
  */
 import { readFileSync, writeFileSync } from "node:fs";

@@ -4,6 +4,7 @@ import {
   JEV_URL,
   Jev,
   SHELF_QUESTIONS,
+  isUnsure,
   learningProbability,
   storyState,
 } from "../src/jev.js";
@@ -104,5 +105,11 @@ describe("storyState", () => {
     });
     expect(s).toContain("senior product manager");
     expect(s).toContain("Newsletter: ByteByteGo\nHeadline: Caches\nSummary: How they fail.");
+  });
+});
+
+describe("isUnsure", () => {
+  it("covers 0.4 up to, not including, 0.6", () => {
+    expect([0.39, 0.4, 0.5, 0.59, 0.6].map(isUnsure)).toEqual([false, true, true, true, false]);
   });
 });

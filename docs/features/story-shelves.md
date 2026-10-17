@@ -5,7 +5,7 @@ News or Learning for each story instead of each issue, where Learning means craf
 ## What exists so far
 
 - **A Jev client** (`services/ingest/src/jev.ts`): one call carries the story and the questions, and comes back with a probability per option. Not wired into ingest yet.
-- **The question**, in two phrasings scored side by side: a choice between Learning (`CRAFT`) and News (`NOT_CRAFT`), and a yes or no on "does this story build the reader's craft?". Jev reads the reader line enrichment uses, the newsletter's name, and the story's headline and summary from the story index (#15).
+- **The question**, a yes or no: "does this story build the reader's craft?", with `CRAFT` and `NOT_CRAFT` as the two sides. Jev reads the reader line enrichment uses, the newsletter's name, and the story's headline and summary from the story index (#15). Answers from 0.4 up to 0.6 are unsure (`UNSURE`).
 - **A scoring script**: `AWS_PROFILE=admin pnpm jev:score <labels.json>` runs Jev on labelled stories and prints agreement and calibration beside two baselines: Claude's guesses and the shelf Haiku gave the whole issue. It stores nothing in the table.
 
 ## Decisions
@@ -13,6 +13,8 @@ News or Learning for each story instead of each issue, where Learning means craf
 - **Learning means craft** (Sandip, 2026-10-12): product management, system design, engineering, building with AI, startup strategy; how-tos, case studies, frameworks, interviews about the work. Essays on culture or life are News, however long they stay worth reading.
 - **The unit is the story** (Sandip, 2026-10-12), so a craft essay inside a TLDR digest can reach Learning while the digest stays in News.
 - **Jev makes the call** (Sandip, 2026-10-12). It runs on TypeSafe's API, not Bedrock. The key is in SSM at `/thelibrary/prod/jev/api-key`, stored by Sandip; code reads it when it runs and never prints it.
+- **Launch is News, how to use it is Learning** (Sandip, 2026-10-17). "OpenAI launched a Jev rival" is News, and so is the story of Jev's own launch; how to use Jev, or how it works, is Learning. In his words, Learning stays relevant for two to three years and News is purely informational. The original wording already makes this split (below), so it stays.
+- **One question, no second round** (2026-10-17). Sandip suggested more questions for the unsure band; two rewordings and a second round scored no better (Ruled out). The unsure band goes to Sandip instead.
 - **The yes or no phrasing leads** (2026-10-17, against Sandip's labels). It agreed on 56 of 59 to the choice phrasing's 54, and its uncertain middle holds the hard calls. The choice phrasing was confidently wrong once: a book-club announcement from Product Talk at 0.85. Against Claude's guesses the order was the other way round, which is why the labels came first.
 
 ## Jev's API (learned 2026-10-17)
@@ -27,9 +29,17 @@ News or Learning for each story instead of each issue, where Learning means craf
 - **2026-10-17, the same 59 against Sandip's labels** (18 Learning, 41 News). He checked the ten Claude marked unsure and moved three to News: a benchmark of Jev's retrieval, Checkly's rewrite in Go, and Product Talk's book club. Agreement: the yes or no phrasing 56 of 59, the choice phrasing 54, Claude's guesses 56, Haiku's issue shelf 51.
 - **The yes or no phrasing's bands:** below 0.4, 38 stories, one Learning; 0.4 to 0.6, 8 stories, half Learning, six of them ones Claude had marked unsure; 0.6 and up, 13 stories, all Learning. Outside the middle band it was right on 50 of 51.
 - **2026-10-17, every stored story (2,713), the yes or no phrasing, no labels.** 84% below 0.4, 7% between 0.4 and 0.6, 9% from 0.6. Since 1 October about 70 stories a day arrive: about 9 or 10 would be Learning (0.5 and up) and about 5 would land in the 0.4 to 0.6 band (under 3 in 0.45 to 0.55). Most Learning comes from inside digests: TLDR Dev 130 of 382 stories, TLDR Data 52 of 136, TLDR IT 30 of 315, beside ByteByteGo 52 of 62 and the System Design newsletters nearly all. The Ken, The Juggernaut, Pirate Wires, WSJ and Fortune have none or one. TLDR Dev also holds half the uncertain band (91 of 187). 1.3 million input tokens, about 5 cents; a run took about 12 minutes at six calls at a time.
+- **2026-10-17, 29 stories about Jev and its rivals**, labelled by Sandip's split (11 Learning: use cases, how it works; 18 News: launches, adoption, benchmarks). The original question got all 29 right, several only just (0.50 to 0.52). Haiku's issue shelf got 17.
 - **Caveats.** 59 stories is a small sample, weighted toward mixed newsletters. Sandip corrected Claude's guesses rather than labelling blind, so the labels lean Claude's way, which flatters Claude's 56. Jev's answers move a little between runs (up to 0.03 on the same story).
+
+## Ruled out
+
+- **A second round for the unsure band** (2026-10-17): "still useful in two to three years?" and "does it explain how or why, rather than report that something happened?", averaged with round one. On the 59 and the 29 together it scored 83 of 88, to the original's 85. The extra answers move with the first: where round one is unsure, so are they.
+- **Writing the two-to-three-year test into the question** (2026-10-17): 58 of 59 but 26 of 29, 84 of 88 in all. It pulled the how-to-use-Jev stories down ("Jev verifies 10-K extraction" from 0.52 to 0.37).
+- **The choice phrasing** (2026-10-17): 54 of 59, and confidently wrong once.
 
 ## Open
 
-- The cutoffs. Proposed: Learning from 0.6, News below 0.4, and the middle band shelved by 0.5 but listed for Sandip to settle, each settled call becoming a label (#26).
+- The cutoffs. Proposed: Learning from 0.6, News below 0.4, and the unsure band shelved by 0.5 but listed for Sandip to settle, each settled call becoming a label (#26).
+- If the unsure band needs to shrink, the next thing to try is more text per story, not more questions: Jev sees a 45-word summary, and for an essay that is thin.
 - #81 steps 3 to 5: Jev in ingest and the backfill, Learning listing stories, and the brief and archive rule following stories.
