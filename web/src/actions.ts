@@ -1,22 +1,31 @@
-import type { IssueListItem, Shelf } from "@library/core/types";
+import type { IssueListItem, Rating, Shelf } from "@library/core/types";
 import { useApp } from "./context.js";
-import { swipeChange, undoOf, type SwipeChange } from "./gesture.js";
 import { useLibrary } from "./library.js";
 import { useToast } from "./components/toast.js";
 
-export type IssueChange = SwipeChange & Partial<Pick<IssueListItem, "shelf">>;
+export type IssueChange = Partial<Pick<IssueListItem, "rating" | "state" | "savedAt" | "shelf">>;
+
+/** The fields to put back so a change is undone (rule 4: rating, archive and saved together). */
+export function undoOf(issue: IssueListItem, change: IssueChange): IssueChange {
+  return {
+    ...("rating" in change ? { rating: issue.rating } : {}),
+    ...("state" in change ? { state: issue.state } : {}),
+    ...("savedAt" in change ? { savedAt: issue.savedAt } : {}),
+    ...("shelf" in change ? { shelf: issue.shelf } : {}),
+  };
+}
 
 /**
- * What a reader can do to an issue from any view: the deck, a row, the reader, the Mac's keys.
- * Each change shows at once, goes to the API, comes back if the API refuses it, and offers Undo
- * where the copy says so. Undo puts back the rating, the archive state and the saved state
- * together (business rules 3 and 4).
+ * What a reader can do to an issue from any view: the deck, the reader, the Mac's keys. Each
+ * change shows at once, goes to the API, comes back if the API refuses it, and offers Undo where
+ * the copy says so. Undo puts back the rating, the archive state and the saved state together
+ * (business rules 3 and 4).
  */
 export interface IssueActions {
-  /** Relevant; again clears it. The issue stays unread. */
-  relevant: (issue: IssueListItem, opts?: { quiet?: boolean }) => void;
-  /** Irrelevant and archived (which also unsaves); again puts both back. */
-  irrelevant: (issue: IssueListItem) => void;
+  /** Thumbs up: it was useful. Again clears it. Nothing else changes: it stays unread. */
+  useful: (issue: IssueListItem, opts?: { quiet?: boolean }) => void;
+  /** Thumbs down: it was not useful. Again clears it. It is not archived. */
+  notUseful: (issue: IssueListItem, opts?: { quiet?: boolean }) => void;
   /** Save for later, or take it off Saved. Saving takes an issue out of Unread. */
   save: (issue: IssueListItem) => void;
   /** Archive, or bring it back to the inbox as read. */
@@ -28,8 +37,6 @@ export interface IssueActions {
 export function useIssueActions(opts: {
   /** Shows a change on screen (and puts it back). */
   patch: (id: string, change: IssueChange) => void;
-  /** On lists that leave archived issues out: hide the row, or bring it back on Undo. */
-  hide?: (id: string, gone: boolean) => void;
 }): IssueActions {
   const { api } = useApp();
   const { counts, nowReading } = useLibrary();
@@ -48,22 +55,14 @@ export function useIssueActions(opts: {
     if ("state" in c || "rating" in c) nowReading.reload();
   };
 
-  const show = (issue: IssueListItem, c: IssueChange, gone: boolean) => {
-    opts.patch(issue.id, c);
-    if (opts.hide && "state" in c) opts.hide(issue.id, gone);
-  };
-
   /** Apply a change; with `text`, say so, and with `undoable`, offer Undo. */
   const apply = (issue: IssueListItem, c: IssueChange, text?: string, undoable = true) => {
-    const back: IssueChange = {
-      ...undoOf(issue, c),
-      ...("shelf" in c ? { shelf: issue.shelf } : {}),
-    };
-    show(issue, c, c.state === "archived");
+    const back = undoOf(issue, c);
+    opts.patch(issue.id, c);
     const sent = send(issue.id, c).then(
       () => true,
       (err: Error) => {
-        show(issue, back, false);
+        opts.patch(issue.id, back);
         toast.say(`Not saved: ${err.message}`);
         return false;
       },
@@ -75,14 +74,14 @@ export function useIssueActions(opts: {
         ? {
             label: "Undo",
             run: () => {
-              show(issue, back, false);
+              opts.patch(issue.id, back);
               // Undo waits for the change to land, then reverses it.
               void sent.then(async (ok) => {
                 if (!ok) return;
                 try {
                   await send(issue.id, back);
                 } catch (err) {
-                  show(issue, c, c.state === "archived");
+                  opts.patch(issue.id, c);
                   toast.say(`Undo failed: ${(err as Error).message}`);
                 }
               });
@@ -92,29 +91,16 @@ export function useIssueActions(opts: {
     );
   };
 
+  /** A thumb sets the rating, or clears it when it is already that way. */
+  const thumb = (issue: IssueListItem, value: Rating, quiet = false) => {
+    const clear = issue.rating === value;
+    const text = clear ? "Thumb cleared" : value === 1 ? "Useful" : "Not useful";
+    apply(issue, { rating: clear ? undefined : value }, quiet ? undefined : text, false);
+  };
+
   return {
-    relevant: (issue, o) => {
-      if (issue.rating === 1) {
-        apply(issue, { rating: undefined });
-        return;
-      }
-      const c = swipeChange(issue, "right")!;
-      const text = o?.quiet
-        ? undefined
-        : issue.state === "unread"
-          ? "Relevant · it stays unread"
-          : "Relevant";
-      apply(issue, c, text, false);
-    },
-    irrelevant: (issue) => {
-      const c = swipeChange(issue, "left");
-      if (!c) {
-        // Already Irrelevant and archived: the button again takes both back.
-        apply(issue, { rating: undefined, state: "read" }, "Back in the inbox");
-        return;
-      }
-      apply(issue, c, c.state ? "Irrelevant · archived" : "Irrelevant");
-    },
+    useful: (issue, o) => thumb(issue, 1, o?.quiet),
+    notUseful: (issue, o) => thumb(issue, -1, o?.quiet),
     save: (issue) => {
       if (issue.state === "archived") return;
       const saving = issue.savedAt === undefined;

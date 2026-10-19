@@ -21,6 +21,7 @@ import {
 } from "../sentence.js";
 import { Word } from "../phone/browse.js";
 import { FiveStats } from "../phone/today.js";
+import { ThumbIcon } from "../components/icons.js";
 import { Peek, usePeekRead } from "../components/peek.js";
 import { Empty, Failed, LoadMore, Skeleton } from "../components/ui.js";
 
@@ -422,8 +423,18 @@ function QueueRow({
           <span class="qrow-meta label">
             {i.publication}
             {i.mustRead && " ★"} · {i.readMinutes} min · {age(i.receivedAt)}
-            {i.rating === 1 && <span class="rel"> · ✓</span>}
-            {i.rating === -1 && <span class="irr"> · ✕</span>}
+            {i.rating === 1 && (
+              <span class="rel" title="Useful">
+                {" · "}
+                <ThumbIcon size={11} />
+              </span>
+            )}
+            {i.rating === -1 && (
+              <span class="irr" title="Not useful">
+                {" · "}
+                <ThumbIcon down size={11} />
+              </span>
+            )}
             {i.savedAt && " · saved"}
           </span>
           <span class="qrow-title">{i.subject}</span>

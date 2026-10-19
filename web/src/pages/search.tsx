@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { useLocation } from "preact-iso";
 import type { SearchResponse, SearchSort } from "@library/core/types";
-import { useIssueActions, type IssueChange } from "../actions.js";
+import type { IssueChange } from "../actions.js";
 import { useApp } from "../context.js";
 import { patchIssue } from "../data.js";
 import { useAsync } from "../hooks.js";
@@ -53,7 +53,6 @@ export function Search({ q, sort, wide }: { q: string; sort: SearchSort; wide: b
       last.current = { ...last.current, items: patchIssue(last.current.items, id, change) };
   };
   // A result stays a result when it is archived: the row shows what changed.
-  const actions = useIssueActions({ patch });
   const items = data?.items ?? [];
   const byWords = items.filter((i) => i.match !== "meaning");
   const byMeaning = items.filter((i) => i.match === "meaning");
@@ -66,7 +65,6 @@ export function Search({ q, sort, wide }: { q: string; sort: SearchSort; wide: b
           key={i.id}
           issue={i}
           href={href(i)}
-          actions={actions}
           onChange={patch}
           wide={wide}
           found={{ terms: data?.terms ?? [], story: i.story?.headline }}

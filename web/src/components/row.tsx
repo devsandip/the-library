@@ -1,13 +1,11 @@
 import { useState } from "preact/hooks";
 import { useLocation } from "preact-iso";
 import type { IssueListItem } from "@library/core/types";
-import type { IssueActions } from "../actions.js";
-import { swipeChange } from "../gesture.js";
 import { age, clockTime } from "../format.js";
 import { clickInPlace } from "../nav.js";
 import { Highlight } from "./highlight.js";
 import { Peek, usePeekRead, useTapToPeek } from "./peek.js";
-import { SwipeUnder, useSwipe } from "./swipe.js";
+import { ThumbIcon } from "./icons.js";
 
 /** What a search found in a row (#53): the words to mark, and the digest's story that matched. */
 export interface Found {
@@ -15,11 +13,21 @@ export interface Found {
   story?: string;
 }
 
-/** The row's state as tags: topic · ✓ Relevant · Saved · Read. */
+/** The row's state as tags: topic · Useful · Saved · Read. */
 function Tags({ issue, topic, saved }: { issue: IssueListItem; topic: boolean; saved: boolean }) {
   const tags: preact.JSX.Element[] = [];
-  if (issue.rating === 1) tags.push(<span class="rel">✓ Relevant</span>);
-  if (issue.rating === -1) tags.push(<span class="irr">✕ Irrelevant</span>);
+  if (issue.rating === 1)
+    tags.push(
+      <span class="rel">
+        <ThumbIcon size={12} /> Useful
+      </span>,
+    );
+  if (issue.rating === -1)
+    tags.push(
+      <span class="irr">
+        <ThumbIcon down size={12} /> Not useful
+      </span>,
+    );
   if (saved && issue.savedAt !== undefined) tags.push(<span>Saved</span>);
   if (issue.state === "read") tags.push(<span>Read</span>);
   if (issue.state === "archived") tags.push(<span>Archived</span>);
@@ -40,15 +48,13 @@ function Tags({ issue, topic, saved }: { issue: IssueListItem; topic: boolean; s
 /**
  * One issue in a list: Browse, Saved, Today's list view and Library's pages. The newsletter (with
  * ★ for Must Read) and its age, the subject, Claude's line, and its state as tags. On the phone a
- * tap on the title opens the issue; a tap anywhere else peeks inside and a double tap opens (#41),
- * and a swipe rates (#13); every swipe also has a button for VoiceOver. On the Mac a click opens
- * the issue in the console.
+ * tap on the title opens the issue; a tap anywhere else peeks inside and a double tap opens (#41).
+ * Rows do not swipe (2026-10-19): the thumbs are in the reader. On the Mac a click opens the
+ * issue in the console.
  */
 export function Row({
   issue,
   href,
-  actions,
-  leaves = false,
   onChange,
   dim = false,
   rank,
@@ -62,10 +68,6 @@ export function Row({
   issue: IssueListItem;
   /** Where opening it goes. */
   href: string;
-  /** Rating, saving and archiving: swipes on the phone, plus hidden buttons for VoiceOver. */
-  actions?: IssueActions;
-  /** A left swipe collapses the row away (lists that leave archived issues out). */
-  leaves?: boolean;
   /** Tells the list what a peek changed (#56). */
   onChange?: (id: string, change: Partial<IssueListItem>) => void;
   /** Read or saved this session: it stays in place, faded, until the view changes (RET-10). */
@@ -90,19 +92,6 @@ export function Row({
     opensAt: (target) => target instanceof Element && target.closest(".row-title") !== null,
   });
   usePeekRead(issue, peeking && !wide, onChange);
-  const swipes = !wide && actions;
-  const s = useSwipe(
-    swipes
-      ? {
-          right: swipeChange(issue, "right")
-            ? () => actions.relevant(issue, { quiet: true })
-            : undefined,
-          left: swipeChange(issue, "left") ? () => actions.irrelevant(issue) : undefined,
-          leaves: leaves && issue.state !== "archived",
-        }
-      : undefined,
-    tap.release,
-  );
   const peekId = `peek-${issue.id}`;
 
   const meta = (
@@ -160,28 +149,10 @@ export function Row({
 
   return (
     <li
-      class={`row-item${swipes ? " swipe" : ""}${peeking ? " peeking" : ""}${tap.pressed ? " pressed" : ""}${dim && !peeking ? " dim" : ""}`}
-      {...s.rowProps}
+      class={`row-item${peeking ? " peeking" : ""}${tap.pressed ? " pressed" : ""}${dim && !peeking ? " dim" : ""}`}
     >
-      {swipes && <SwipeUnder />}
-      <div class="row-face" ref={s.face}>
+      <div class="row-face">
         {link}
-        {swipes && (
-          // VoiceOver's equivalent of the swipes and the peek.
-          <span class="sr-only">
-            <button type="button" onClick={() => actions.relevant(issue)}>
-              Relevant
-            </button>
-            <button type="button" onClick={() => actions.irrelevant(issue)}>
-              Irrelevant and archive
-            </button>
-            {issue.state !== "archived" && (
-              <button type="button" onClick={() => actions.save(issue)}>
-                {issue.savedAt ? "Take off Saved" : "Save for later"}
-              </button>
-            )}
-          </span>
-        )}
         {peeking && !wide && <Peek issue={issue} id={peekId} onOpen={open} />}
       </div>
     </li>

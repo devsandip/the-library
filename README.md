@@ -1,6 +1,6 @@
 # Nutgraf
 
-A private, single-user newsletter reader. It was called The Library until 2026-10-12; the repository, the stacks and the AWS resources keep that name. It pulls newsletters from Gmail every two hours, shows them in one clean list, and records Relevant/Irrelevant ratings that Phase 2 uses to rank what comes first.
+A private, single-user newsletter reader. It was called The Library until 2026-10-12; the repository, the stacks and the AWS resources keep that name. It pulls newsletters from Gmail every two hours, shows them in one clean list, and records a thumbs up or down (was it useful?) that Phase 2 uses to rank what comes first.
 
 Live at **https://sandip.dev/nutgraf/** (behind Cognito sign-in with an authenticator app). Every old `https://sandip.dev/thelibrary/...` URL redirects to the same place there.
 

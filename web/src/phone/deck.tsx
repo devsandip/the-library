@@ -6,11 +6,11 @@ import {
   directionLock,
   EDGE_PX,
   labelOpacity,
+  reducedMotion,
   swipeDecision,
   TAP_PX,
   type SwipeWay,
 } from "../gesture.js";
-import { reducedMotion } from "../components/swipe.js";
 
 /** The fly-out and the spring back. */
 const MOTION_MS = 250;
@@ -19,10 +19,11 @@ const FADE_MS = 120;
 const FLICK_WINDOW_MS = 100;
 
 /**
- * Today's top card under the finger (the redesign, 1c-1). It follows the finger, turning about
- * its bottom edge, with no transition while dragging; the swipe labels fade in with the distance.
- * Let go past 100 px (or with a flick) and it flies out, then the action applies and the next card
- * shows with no transition. Under that, it springs back. Less than 6 px of movement is a tap.
+ * Today's top card under the finger (the redesign, 1c-1). A swipe only moves through the deck: it
+ * rates nothing. The card follows the finger, turning about its bottom edge, with no transition
+ * while dragging; the label for that way fades in with the distance. Let go past 100 px (or with
+ * a flick) and it flies out, then the deck moves and the new card shows with no transition. Under
+ * that, or a way with no card to go to, it springs back. Less than 6 px of movement is a tap.
  * Drags that start on a button, or within 20 px of the screen's edges, are not the card's.
  */
 export function SwipeCard({
@@ -32,8 +33,8 @@ export function SwipeCard({
   class: cls = "",
   children,
 }: {
-  /** The words that show as the card leans each way. */
-  labels: { right: string; left: string };
+  /** The words that show as the card leans each way; a way without one springs back. */
+  labels: { right?: string; left?: string };
   onSwipe: (way: SwipeWay) => void;
   onTap?: () => void;
   class?: string;
@@ -132,7 +133,7 @@ export function SwipeCard({
     const first = [...d.trail, end].find((p) => end.t - p.t <= FLICK_WINDOW_MS)!;
     const speed = end.t > first.t ? (end.x - first.x) / (end.t - first.t) : 0;
     const way = swipeDecision(d.dx, CARD_COMMIT_PX, speed);
-    if (way) leave(way);
+    if (way && labels[way]) leave(way);
     else show(0, `transform ${MOTION_MS}ms cubic-bezier(.2,.8,.2,1)`);
   };
 

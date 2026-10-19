@@ -38,14 +38,11 @@ export function useTapToPeek(actions: {
 
   return {
     pressed,
-    /** A press that turned into a scroll or a swipe is not a tap. */
-    release: () => {
-      if (timer.current === undefined) setPressed(false);
-    },
     props: {
       onPointerDown: (e: PointerEvent) => {
         if (e.button === 0) setPressed(true);
       },
+      // A press that turned into a scroll is not a tap.
       onPointerCancel: () => {
         if (timer.current === undefined) setPressed(false);
       },

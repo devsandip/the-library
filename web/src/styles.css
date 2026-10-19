@@ -275,6 +275,33 @@ p {
   border-color: var(--ink-3);
 }
 
+/* The thumbs (was it useful?): an icon alone, green or red when on. In a line of text the icon
+   sits on the baseline like a letter. */
+.thumb-icon {
+  flex: none;
+}
+
+.label .thumb-icon,
+.row-tags .thumb-icon {
+  vertical-align: -0.12em;
+}
+
+.btn.thumb {
+  padding: 0;
+}
+
+.btn.line.on.rel {
+  border-color: var(--rel);
+  color: var(--rel);
+  background: var(--rel-bg);
+}
+
+.btn.line.on.irr {
+  border-color: var(--irr);
+  color: var(--irr);
+  background: var(--irr-bg);
+}
+
 .btn.sm {
   height: 38px;
   padding: 0 14px;
@@ -633,16 +660,9 @@ select.btn {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--on-ink);
+  background: var(--ink);
   opacity: 0;
   pointer-events: none;
-}
-
-.card-flag.right {
-  background: var(--rel);
-}
-
-.card-flag.left {
-  background: var(--irr);
 }
 
 .card-label {
@@ -712,6 +732,10 @@ select.btn {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   margin-top: 12px;
+}
+
+.card-buttons.thumbs {
+  grid-template-columns: 44px 44px 1fr 1fr;
 }
 
 .brief-threads {
@@ -819,14 +843,9 @@ select.btn {
   border-bottom: 1px solid var(--line);
 }
 
-.row-item.collapsing {
-  transition: height 200ms ease-in;
-}
-
 .row-face {
   position: relative;
   background: var(--bg);
-  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .row {
@@ -896,46 +915,6 @@ mark {
   text-decoration-color: var(--box);
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
-}
-
-/* Swipe (#13): the row slides with the finger over what letting go would do. */
-.swipe {
-  touch-action: pan-y;
-}
-
-.swipe-under {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-  font: 600 11px/1 var(--font-text);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.swipe-under span {
-  visibility: hidden;
-}
-
-.row-item[data-swipe="right"] .swipe-under {
-  background: var(--rel-bg);
-  color: var(--rel);
-}
-
-.row-item[data-swipe="left"] .swipe-under {
-  background: var(--irr-bg);
-  color: var(--irr);
-}
-
-.row-item[data-swipe="right"] .swipe-rel,
-.row-item[data-swipe="left"] .swipe-irr {
-  visibility: visible;
-}
-
-.row-item[data-swipe] .row-face {
-  box-shadow: 0 0 0 1px var(--line);
 }
 
 /* ---------- the peek (#41) ---------- */
@@ -1431,8 +1410,7 @@ dialog {
   left: 0;
   right: 0;
   bottom: 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
   gap: 6px;
   padding: 8px 12px calc(8px + var(--safe-bottom));
   background: var(--bg);
@@ -1440,6 +1418,8 @@ dialog {
 }
 
 .act {
+  flex: 1 1 0;
+  min-width: 0;
   height: 44px;
   padding: 0 2px;
   border-radius: 6px;
@@ -1454,6 +1434,13 @@ dialog {
 
 .act.on {
   background: var(--raised);
+}
+
+.act.thumb {
+  flex: 0 0 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .act.on.rel {
@@ -2590,7 +2577,6 @@ dialog {
     transition-duration: 0ms !important;
   }
 
-  .row-face,
   .card.top {
     transition: opacity 120ms ease !important;
   }

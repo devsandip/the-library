@@ -2,7 +2,6 @@ import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import { useLocation } from "preact-iso";
 import type { SenderListItem } from "@library/core/types";
-import { useIssueActions } from "../actions.js";
 import { useApp } from "../context.js";
 import { tally } from "../data.js";
 import { clock, dateShort } from "../format.js";
@@ -69,7 +68,7 @@ export function Word({
 
 /**
  * Browse (P2): every unread issue, News or Learning, Must Read first with ★. The sentence on top
- * is the filter bar. A tap peeks, a double tap opens, a swipe rates (#13, #41).
+ * is the filter bar. A tap peeks, a double tap opens (#41).
  */
 export function Browse({ filters }: { filters: BrowseFilters }) {
   const { api } = useApp();
@@ -97,10 +96,6 @@ export function Browse({ filters }: { filters: BrowseFilters }) {
         })
       : new Promise<never>(() => undefined),
   );
-  const actions = useIssueActions({
-    patch: list.patch,
-    hide: filters.show === "archived" ? undefined : list.hide,
-  });
   useScrollMemory(list.status === "ok");
 
   const f = tally(lib.counts.data, senderList, {
@@ -187,8 +182,6 @@ export function Browse({ filters }: { filters: BrowseFilters }) {
             key={i.id}
             issue={i}
             href={issueHref(i.id)}
-            actions={actions}
-            leaves={filters.show !== "archived"}
             onChange={list.patch}
             dim={list.kept.has(i.id) || stale(i)}
           />

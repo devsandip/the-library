@@ -37,8 +37,6 @@ export function steady<T extends { id: string }>(
 
 /** The rows each list showed last, by list, so Back finds them where they were. */
 const shown = new Map<string, IssueListItem[]>();
-/** Rows swiped away this session, by list: archived, waiting out the Undo. */
-const goneBy = new Map<string, Set<string>>();
 
 /**
  * A paged list of issues with its rows held in place (see `steady`). `key` names the view (its
@@ -47,24 +45,19 @@ const goneBy = new Map<string, Set<string>>();
 export function useIssueList(key: string, load: (cursor?: string) => Promise<IssueListResponse>) {
   const first = useAsync(() => load(), [key], `list:${key}`);
   const [more, setMore] = useState<{ items: IssueListItem[]; cursor?: string; loading: boolean }>();
-  const [gone, setGone] = useState<Set<string>>(() => goneBy.get(key) ?? new Set());
   const lastKey = useRef(key);
 
   // A different view: forget how the last one looked.
   useEffect(() => {
     if (lastKey.current === key) return;
     shown.delete(lastKey.current);
-    goneBy.delete(lastKey.current);
     lastKey.current = key;
     setMore(undefined);
-    setGone(new Set());
   }, [key]);
 
   useOnRefresh(() => {
     shown.delete(key);
-    goneBy.delete(key);
     setMore(undefined);
-    setGone(new Set());
     first.reload();
   });
 
@@ -99,23 +92,14 @@ export function useIssueList(key: string, load: (cursor?: string) => Promise<Iss
     const s = shown.get(key);
     if (s) shown.set(key, patchIssue(s, id, change));
   };
-  const hide = (id: string, on: boolean) =>
-    setGone((cur) => {
-      const next = new Set(cur);
-      if (on) next.add(id);
-      else next.delete(id);
-      goneBy.set(key, next);
-      return next;
-    });
 
   return {
     status: first.status,
     error: first.error,
     reload: first.reload,
-    items: items.filter((i) => !gone.has(i.id)),
+    items,
     kept,
     patch,
-    hide,
     hasMore: Boolean(cursor),
     loadingMore: more?.loading ?? false,
     loadMore,

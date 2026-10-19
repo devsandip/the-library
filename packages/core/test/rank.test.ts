@@ -99,7 +99,7 @@ describe("rank", () => {
     expect(mustAhead).toBeGreaterThan(130);
   });
 
-  it("five Irrelevant ratings sink a sender", () => {
+  it("five thumbs down sink a sender", () => {
     let sunk = 0;
     for (let d = 1; d <= 200; d++) {
       const ranked = rank(
@@ -151,7 +151,7 @@ describe("rank", () => {
     expect(ranked[0]!.reason).toBe("Close to your interest in product management");
   });
 
-  it("an Irrelevant rating pushes similar issues down", () => {
+  it("a thumbs down pushes similar issues down", () => {
     const c = (id: string, v: number[]): RankCandidate => ({
       id,
       senderId: "s",
@@ -171,7 +171,7 @@ describe("rank", () => {
     expect(ranked.map((r) => r.id)).toEqual(["elsewhere", "like-the-dud"]);
   });
 
-  it("explains a Relevant-rated newsletter and a Relevant-rated look-alike", () => {
+  it("explains a newsletter found useful and a look-alike of a useful issue", () => {
     const ranked = rank(
       input({
         candidates: [
@@ -189,8 +189,8 @@ describe("rank", () => {
       }),
     );
     const reason = (id: string) => ranked.find((r) => r.id === id)!.reason;
-    expect(reason("fav")).toBe("You rated this newsletter Relevant 9 times");
-    expect(reason("twin")).toBe('Like "Rate limiting", which you rated Relevant');
+    expect(reason("fav")).toBe("You found this newsletter useful 9 times");
+    expect(reason("twin")).toBe('Like "Rate limiting", which you found useful');
   });
 
   it("names the interest an issue stands out on, not a rated issue every newsletter resembles", () => {
