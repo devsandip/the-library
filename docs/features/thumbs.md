@@ -2,6 +2,17 @@
 
 The Relevant and Irrelevant idea is gone. Sandip: "Its not working." A thumbs up says an issue was useful, a thumbs down says it was not. On the phone, swiping left and right only moves through Today's cards.
 
+## Why
+
+Ratings had stalled. Prod on 2026-10-19 held 12 ratings in ten days (7 Relevant, 5 Irrelevant), 11 of them from 2026-10-10 to 2026-10-12 and none from 2026-10-13 to 2026-10-18, though the day's five were logged on three of those days. Of the 29 issues in the digests so far, 6 were rated Relevant and 23 never rated, so the success measure (#5) had almost nothing to count and the ranking learned from a dozen ratings.
+
+Two things in the design fit those numbers:
+
+- **Relevant asked what the ranking already guesses** (does this match my interests?) rather than what only the reader knows: did reading it pay off? Useful asks that.
+- **A swipe did two jobs.** On Today's deck a swipe was the way past a card, and both ways were verdicts: right was Relevant, left was Irrelevant and archived the issue. Moving on meant judging, and a no also threw the issue away.
+
+So swipes now only move, and thumbs only judge.
+
 ## What it does
 
 - **Today's deck.** Left is the next card, right the one before. From the first card, right goes back to the day's brief; from the brief, left goes on to the card the deck was on. At the last card, and at the first with no brief, the card springs back. The progress line counts from the card on top ("Card 3 of 20"), and the hints under the deck name the ways that go somewhere.

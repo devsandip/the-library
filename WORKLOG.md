@@ -341,3 +341,33 @@ Append-only session log. Newest entry at the bottom.
 
 - A Deploy that fails on a flaky test gets its failed jobs re-run, never a deploy by hand; the test is fixed in its own pull request.
 - No `#` in anything sent to TickTick.
+
+## 2026-10-19: Jev for story shelves, work on a GitHub project, and thumbs instead of Relevant (#86 to #89)
+
+**Did:**
+
+- #86: all work is tracked on the GitHub project Nutgraf (project 10). `pnpm track <n> <status> [track]` sets a card's status (Backlog, Up next, In progress, In review, Waiting, Done) and track (Reading, Sorting, Stories, Briefings, Agentic, Ops).
+- #81 settled: Learning means craft, the story is the unit, and Jev (TypeSafe's decision model) sorts. Jev was scored against Sandip's labels and he accepted the accuracy. #87 shipped the Jev client and the scoring script.
+- #88 (open): Jev shelves every new story after ingest, and `pnpm shelves` runs the backfill. CI passes. It was updated from main after #89.
+- #89 shipped: a thumbs up or down for whether an issue was useful replaces Relevant and Irrelevant. Swipes on Today only move between cards (back to the brief from the first). Thumbs down no longer archives. The phone's reader gets Archive for digests, rows stop swiping, and the Mac's keys are Y and N. Deploy run 39206115951 passed check, dev and prod.
+- The rating numbers on prod, for the why: 12 ratings in ten days, none from 2026-10-13 to 2026-10-18, and 6 of the 29 digest issues rated Relevant with 23 never rated.
+
+**State now:**
+
+- Prod runs 8b8f643 (#89).
+- Open: #88 (waits for ship) and this handoff's pull request.
+- #81's step 4 waits on three answers from Sandip. Does reading a Learning story mark the story or its issue? Do Learning stories expire? Do thumbs rate the story or its issue? (That last one was about swipes until #89.)
+- #85 (Haiku 5.5) is Waiting: the account has no access yet.
+
+**Next:**
+
+- Ship #88. After its deploy, run `AWS_PROFILE=admin pnpm shelves --days 60` and repeat until it reports 0 deferred (about 2,700 stories, about 5 cents). Then run `pnpm track 88 Done Stories`.
+- Sandip tries the new deck and thumbs on his iPhone (#82).
+- Around 2026-10-26, read Status's "X of Y useful" line to see whether the thumbs get used (#5).
+
+**Decisions:**
+
+- Thumbs mean useful or not useful. Relevant asked what the ranking already guesses. And a swipe both rated and cleared a card, so moving on meant judging.
+- The stored rating stays `1` or `-1`, so past ratings keep training the ranking. Only `DigestStats` changed fields, to `useful` and `notUseful`.
+- A thumb changes only the rating. Swipes only move. Later saves the issue and moves on.
+- Story shelves use the field `shelf`, as issues do, rather than #81's `kind`. Each environment has its own Jev key, and dev has none.
