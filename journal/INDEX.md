@@ -1,7 +1,7 @@
 # Nutgraf: Journal
 
-Last refreshed: 2026-10-19 11:40
-Latest entry: [2026-10-19-1140-thumbs-instead-of-relevant.md](entries/2026-10-19-1140-thumbs-instead-of-relevant.md)
+Last refreshed: 2026-10-19 11:35
+Latest entry: [2026-10-19-1135-thumbs-instead-of-relevant.md](entries/2026-10-19-1135-thumbs-instead-of-relevant.md)
 
 A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Called The Library until 2026-10-12. Live at https://sandip.dev/nutgraf/.
 
@@ -23,7 +23,7 @@ Since 2026-10-19 the thumbs ask one thing: was it useful? Relevant and Irrelevan
 
 ## Recent entries
 
-- [2026-10-19 11:40: Thumbs instead of Relevant](entries/2026-10-19-1140-thumbs-instead-of-relevant.md)
+- [2026-10-19 11:35: Thumbs instead of Relevant](entries/2026-10-19-1135-thumbs-instead-of-relevant.md)
 - [2026-10-12 09:51: Nutgraf](entries/2026-10-12-0951-nutgraf.md)
 - [2026-10-11 14:44: Today, Browse and the console](entries/2026-10-11-1444-today-browse-and-the-console.md)
 - [2026-10-11 13:53: A redesign, briefed without the old screens](entries/2026-10-11-1353-ux-redesign-brief.md)
