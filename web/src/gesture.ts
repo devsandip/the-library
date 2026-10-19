@@ -1,12 +1,8 @@
-import type { IssueListItem } from "@library/core/types";
-
 export type SwipeWay = "right" | "left";
 
-/** Browse rows commit past this many pixels (#13, the redesign). */
-export const ROW_COMMIT_PX = 90;
-/** Today's deck commits a card past this many pixels. */
+/** Today's deck moves to the next or previous card past this many pixels. */
 export const CARD_COMMIT_PX = 100;
-/** Movement before a row decides whether the finger is swiping it or scrolling the list. */
+/** Movement before a card decides whether the finger is swiping it or scrolling the page. */
 export const LOCK_PX = 8;
 /** Less movement than this is a tap on a deck card. */
 export const TAP_PX = 6;
@@ -33,7 +29,7 @@ export function swipeDecision(dx: number, threshold: number, speed: number): Swi
 }
 
 /**
- * Whether a drag that has moved (dx, dy) is the row's (sideways) or the list's (a scroll), once
+ * Whether a drag that has moved (dx, dy) is the card's (sideways) or the page's (a scroll), once
  * it has moved far enough to tell; undefined until then.
  */
 export function directionLock(dx: number, dy: number): "x" | "y" | undefined {
@@ -49,31 +45,19 @@ export function cardTransform(dx: number): string {
 /** How strongly a swipe label shows, from the drag distance. */
 export const labelOpacity = (dx: number) => Math.min(1, Math.abs(dx) / 100);
 
-export type SwipeChange = Partial<Pick<IssueListItem, "rating" | "state" | "savedAt">>;
+export const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
- * What a swipe changes: right rates Relevant; left rates Irrelevant and archives, which also takes
- * a saved issue off the Saved list (#43). Undefined when it would change nothing, so a second
- * swipe the same way does nothing.
+ * Where Today's deck goes on a swipe: left is the next card, right the one before. Position -1 is
+ * the day's brief, which sits before the first card when there is one. Undefined at either end,
+ * where the card springs back.
  */
-export function swipeChange(
-  issue: Pick<IssueListItem, "rating" | "state" | "savedAt">,
+export function deckStep(
+  at: number,
   way: SwipeWay,
-): SwipeChange | undefined {
-  if (way === "right") return issue.rating === 1 ? undefined : { rating: 1 };
-  const change: SwipeChange = {
-    ...(issue.rating === -1 ? {} : { rating: -1 }),
-    ...(issue.state === "archived" ? {} : { state: "archived" }),
-    ...(issue.state !== "archived" && issue.savedAt !== undefined ? { savedAt: undefined } : {}),
-  };
-  return Object.keys(change).length ? change : undefined;
-}
-
-/** The fields to put back so a change is undone (rule 4: rating, archive and saved together). */
-export function undoOf(issue: IssueListItem, change: SwipeChange): SwipeChange {
-  return {
-    ...("rating" in change ? { rating: issue.rating } : {}),
-    ...("state" in change ? { state: issue.state } : {}),
-    ...("savedAt" in change ? { savedAt: issue.savedAt } : {}),
-  };
+  cards: number,
+  brief: boolean,
+): number | undefined {
+  const to = way === "left" ? at + 1 : at - 1;
+  return to >= cards || to < (brief ? -1 : 0) ? undefined : to;
 }

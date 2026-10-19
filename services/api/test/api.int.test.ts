@@ -473,8 +473,8 @@ describe("API on dev", () => {
     expect(status.body.digestStats).toEqual({
       days: 1,
       shown: digest.length,
-      relevant: 1,
-      irrelevant: 0,
+      useful: 1,
+      notUseful: 0,
     });
     await call("POST", `/issues/${digest[0]}/rating`, { body: { value: 0 } });
 

@@ -10,6 +10,7 @@ import { useOpenIssue } from "../reader.js";
 import { KIND_WORD } from "../sentence.js";
 import { NewsletterFrame } from "../components/newsletter-frame.js";
 import { isWebLink } from "../components/peek.js";
+import { Thumbs } from "../components/thumbs.js";
 import { namesLine, RelatedList } from "../components/story.js";
 import { Failed, Skeleton } from "../components/ui.js";
 
@@ -29,8 +30,8 @@ function fromLabel(path: string | undefined): string {
 /**
  * Reading an issue on the phone (P4): a way back and the original on top, the issue's header,
  * then the newsletter's own page, never recoloured, scaled to the column. The action bar at the
- * bottom: Relevant, Irrelevant (which archives), Save, and the stories (or Archive, for a single
- * story). A story opens as a sheet over the page.
+ * bottom: thumbs up and down (was it useful?), Save, Archive, and the stories of a digest. A story
+ * opens as a sheet over the page.
  */
 export function Reader({ id, story, deep }: { id: string; story?: number; deep?: Deep }) {
   const { route } = useLocation();
@@ -138,22 +139,7 @@ export function Reader({ id, story, deep }: { id: string; story?: number; deep?:
       </div>
 
       <div class="action-bar" role="toolbar" aria-label="Issue actions">
-        <button
-          type="button"
-          class={`act${d.rating === 1 ? " on rel" : ""}`}
-          aria-pressed={d.rating === 1}
-          onClick={() => actions.relevant(d, { quiet: true })}
-        >
-          ✓ Relevant
-        </button>
-        <button
-          type="button"
-          class={`act${d.rating === -1 ? " on irr" : ""}`}
-          aria-pressed={d.rating === -1}
-          onClick={() => actions.irrelevant(d)}
-        >
-          ✕ Irrelevant
-        </button>
+        <Thumbs issue={d} actions={actions} class="act thumb" />
         <button
           type="button"
           class={`act${saved ? " on" : ""}`}
@@ -163,18 +149,17 @@ export function Reader({ id, story, deep }: { id: string; story?: number; deep?:
         >
           {saved ? "Saved" : "Save"}
         </button>
-        {digest ? (
+        <button
+          type="button"
+          class={`act${archived ? " on" : ""}`}
+          aria-pressed={archived}
+          onClick={() => actions.archive(d)}
+        >
+          {archived ? "Archived" : "Archive"}
+        </button>
+        {digest && (
           <button type="button" class="act" onClick={() => openStory(1)}>
             Stories {stories.length}
-          </button>
-        ) : (
-          <button
-            type="button"
-            class={`act${archived ? " on" : ""}`}
-            aria-pressed={archived}
-            onClick={() => actions.archive(d)}
-          >
-            {archived ? "Archived" : "Archive"}
           </button>
         )}
       </div>

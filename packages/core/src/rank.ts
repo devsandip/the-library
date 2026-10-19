@@ -183,13 +183,13 @@ export function normalCdf(z: number): number {
  */
 export function rank(input: RankInput): Ranked[] {
   const { candidates, senders, interests, rated, now, day } = input;
-  const relevant = rated.filter((r) => r.rating === 1);
+  const useful = rated.filter((r) => r.rating === 1);
   const liked = centroid([
     ...interests.map((i) => ({
       vector: i.vector,
       weight: INTEREST_PSEUDO_COUNT / interests.length,
     })),
-    ...relevant.map((r) => ({ vector: r.vector, weight: ratingWeight(r.ratedAt, now) })),
+    ...useful.map((r) => ({ vector: r.vector, weight: ratingWeight(r.ratedAt, now) })),
   ]);
   const disliked = centroid(
     rated
@@ -226,8 +226,8 @@ export function rank(input: RankInput): Ranked[] {
   const means = { sender: avg("sender"), topic: avg("topic"), fresh: avg("fresh") };
   const closest = closestAnchor(candidates, [
     ...interests.map((i) => ({ text: `Close to your interest in ${i.name}`, vector: i.vector })),
-    ...relevant.map((r) => ({
-      text: `Like "${clip(r.subject, 60)}", which you rated Relevant`,
+    ...useful.map((r) => ({
+      text: `Like "${clip(r.subject, 60)}", which you found useful`,
       vector: r.vector,
     })),
   ]);
@@ -244,7 +244,7 @@ export function rank(input: RankInput): Ranked[] {
 }
 
 /**
- * For each candidate, the interest or Relevant-rated issue it is unusually close to, judged
+ * For each candidate, the interest or thumbed-up issue it is unusually close to, judged
  * against the other candidates (a z-score per anchor). Raw cosines would always name a rated
  * issue: newsletters sit closer to one another than to a one-line interest.
  */
@@ -317,7 +317,7 @@ function reasonFor(
     if (k === "sender") {
       const up = sender?.up ?? 0;
       const down = sender?.down ?? 0;
-      if (up > 0 && up >= down) return `You rated this newsletter Relevant ${times(up)}`;
+      if (up > 0 && up >= down) return `You found this newsletter useful ${times(up)}`;
       if (sender?.mustRead) return "From a Must Read newsletter";
       if (up + down === 0) return "Trying a newsletter you haven't rated yet";
       continue;

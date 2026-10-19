@@ -1,6 +1,5 @@
 import { useState } from "preact/hooks";
 import type { IssueListItem, SenderPatch, Shelf } from "@library/core/types";
-import { useIssueActions } from "../actions.js";
 import { useApp } from "../context.js";
 import { patchIssue } from "../data.js";
 import { age } from "../format.js";
@@ -104,8 +103,6 @@ export function Newsletter({ slug, wide }: { slug: string; wide: boolean }) {
   const [error, setError] = useState<string>();
   const patch = (issueId: string, change: Partial<IssueListItem>) =>
     sender.set((d) => ({ ...d, issues: patchIssue(d.issues, issueId, change) }));
-  // This page lists archived issues too, so swiped rows stay.
-  const actions = useIssueActions({ patch });
   const href = openHref(wide);
 
   const update = async (p: SenderPatch) => {
@@ -154,7 +151,7 @@ export function Newsletter({ slug, wide }: { slug: string; wide: boolean }) {
       back="Newsletters"
       backTo={newslettersHref()}
       wide={wide}
-      sub={`${s.issueCount} ${s.issueCount === 1 ? "issue" : "issues"} · ${s.up} Relevant · ${s.down} Irrelevant`}
+      sub={`${s.issueCount} ${s.issueCount === 1 ? "issue" : "issues"} · ${s.up} useful · ${s.down} not useful`}
     >
       <p class="sender-addr label">{s.addresses.join(", ")}</p>
       <div class="sender-actions">
@@ -214,7 +211,6 @@ export function Newsletter({ slug, wide }: { slug: string; wide: boolean }) {
             key={i.id}
             issue={i}
             href={href(i)}
-            actions={actions}
             onChange={patch}
             wide={wide}
             showPublication={false}

@@ -3,9 +3,9 @@ import { age, clock, narrativeLine, reasonCode, reasonLine, shortDate } from "..
 import { digestLine } from "../src/pages/status.js";
 
 describe("digestLine", () => {
-  it("states the share rated Relevant against the aim", () => {
-    expect(digestLine({ days: 4, shown: 20, relevant: 7, irrelevant: 3 })).toBe(
-      "Today's five, last 14 days: 7 of 20 rated Relevant (35%), 3 Irrelevant. The aim is 60%.",
+  it("states the share found useful against the aim", () => {
+    expect(digestLine({ days: 4, shown: 20, useful: 7, notUseful: 3 })).toBe(
+      "Today's five, last 14 days: 7 of 20 useful (35%), 3 not useful. The aim is 60%.",
     );
   });
 });
@@ -46,8 +46,8 @@ describe("the mono meta lines", () => {
 
 describe("ranking reasons", () => {
   it("names the newsletter on the card", () => {
-    expect(reasonLine("You rated this newsletter Relevant 4 times", "The Ken")).toBe(
-      "You rated The Ken Relevant 4 times",
+    expect(reasonLine("You found this newsletter useful 4 times", "The Ken")).toBe(
+      "You found The Ken useful 4 times",
     );
     expect(reasonLine("Close to your interest in AI", "The Ken")).toBe(
       "Close to your interest in AI",
@@ -56,15 +56,15 @@ describe("ranking reasons", () => {
 
   it("shortens to the Mac's codes", () => {
     expect(reasonCode("From a Must Read newsletter", "AI & LLMs")).toBe("Must Read · AI & LLMs");
-    expect(reasonCode("You rated this newsletter Relevant 4 times", "AI")).toBe("4× Relevant");
-    expect(reasonCode("You rated this newsletter Relevant twice", undefined)).toBe("2× Relevant");
+    expect(reasonCode("You found this newsletter useful 4 times", "AI")).toBe("4× Useful");
+    expect(reasonCode("You found this newsletter useful twice", undefined)).toBe("2× Useful");
     expect(reasonCode("Trying a newsletter you haven't rated yet", "AI")).toBe(
       "Exploring · not rated yet",
     );
     expect(reasonCode("Close to your interest in system design", "AI")).toBe(
       "Interest · system design",
     );
-    expect(reasonCode('Like "Postgres at scale", which you rated Relevant', "Tech")).toBe(
+    expect(reasonCode('Like "Postgres at scale", which you found useful', "Tech")).toBe(
       "Matches · Tech",
     );
     expect(reasonCode("Just in", undefined)).toBe("Just in");

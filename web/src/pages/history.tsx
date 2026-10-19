@@ -1,7 +1,6 @@
 import { useLocation } from "preact-iso";
 import { isReaderDay, readerDay } from "@library/core/days";
 import type { HistoryItem } from "@library/core/types";
-import { useIssueActions } from "../actions.js";
 import { useApp } from "../context.js";
 import { patchIssue } from "../data.js";
 import { dayLine, shortDay } from "../format.js";
@@ -26,7 +25,6 @@ export function History({ day: asked, wide }: { day?: string; wide: boolean }) {
   useScrollMemory(history.status === "ok");
   const patch = (id: string, change: Partial<HistoryItem>) =>
     history.set((d) => ({ ...d, items: patchIssue(d.items, id, change) }));
-  const actions = useIssueActions({ patch });
   const items = history.data?.items ?? [];
   const before = history.data?.previousDay;
   const after = history.data?.nextDay;
@@ -85,7 +83,6 @@ export function History({ day: asked, wide }: { day?: string; wide: boolean }) {
             key={i.id}
             issue={i}
             href={href(i)}
-            actions={actions}
             onChange={patch}
             wide={wide}
             read={{ at: i.openedAt, via: i.via }}

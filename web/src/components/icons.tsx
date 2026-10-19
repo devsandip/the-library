@@ -58,3 +58,15 @@ export function SearchIcon({ size = 20 }: { size?: number }) {
     </svg>
   );
 }
+
+/** Thumbs up (it was useful), or with `down`, thumbs down. */
+export function ThumbIcon({ down = false, size = 20 }: { down?: boolean; size?: number }) {
+  return (
+    <svg {...base} width={size} height={size} class="thumb-icon">
+      <g transform={down ? "rotate(180 12 12)" : undefined}>
+        <path d="M7 10v11" />
+        <path d="M15 5.9 14 10h5.8a2 2 0 0 1 1.9 2.6l-2.3 8a2 2 0 0 1-1.9 1.4H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.8a2 2 0 0 0 1.8-1.1L12 2a3.1 3.1 0 0 1 3 3.9Z" />
+      </g>
+    </svg>
+  );
+}
