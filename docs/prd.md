@@ -24,7 +24,6 @@ A private, single-user web reader that ingests my newsletters daily, ranks them 
 
 - Product name: **The Library**
 - Light *Person of Interest* touches, never at the cost of readability:
-  - Thumbs are labeled **Relevant** and **Irrelevant**
   - Top-ranked items get the Machine's **yellow box** (a thin yellow corner-bracket frame)
   - Empty state: *"No new numbers."*
 - Visual style: clean, dark-friendly, typography first. The theme is a garnish, not a costume.
@@ -67,16 +66,16 @@ A private, single-user web reader that ingests my newsletters daily, ranks them 
 - Ranking must be explainable in the UI in one line ("Because you liked 4 Platformer issues", "Matches: AI, startups")
 
 ### 3. Read
-- Today: the ranked unread News with publication, subject, one-line summary, reason-for-rank, date. On the phone a deck of cards (the day in brief first, the top 5 in the yellow box); on the Mac the top of the News queue. Everything else unread is in Browse (redesign, 2026-10-11, `docs/features/redesign.md`)
+- Today: the ranked unread News with publication, subject, one-line summary, reason-for-rank, date. On the phone a deck of cards (the day in brief first, the top 5 in the yellow box), swiped left for the next card and right for the one before; on the Mac the top of the News queue. Everything else unread is in Browse (redesign, 2026-10-11, `docs/features/redesign.md`)
 - Issue view: clean, readable rendering of the newsletter; fast on mobile
-- Actions per issue: Relevant (thumbs up), Irrelevant (thumbs down), mark read, archive, open original
+- Actions per issue: thumbs up (it was useful), thumbs down (it was not), mark read, archive, open original. A thumb changes nothing else: thumbs down does not archive. Until 2026-10-19 the thumbs were Relevant and Irrelevant, and swipes gave them; swipes now only move through Today's deck (`docs/features/thumbs.md`).
 - Filters: unread / all, by sender, by topic
 - News and Learning: two shelves (a word in Browse's filter sentence on the phone, two queues on the Mac). Claude decides per issue with one test, "would this still be worth reading in three months?", and I can move any issue or set a newsletter to always land in one tab. Claude also tags one topic per issue (tap it to filter), archives promos, and unread news archives itself after a week (except Must Read).
 - Per-sender view with a "mute sender" action and a visible unsubscribe link
 - Must Read: I star the newsletters I never want to miss; their unread issues come first
 
 ### 4. Learn
-- Relevant/Irrelevant ratings update ranking for the next refresh; no manual weights for me to tune
+- Thumbs up and down update ranking for the next refresh; no manual weights for me to tune
 - Implicit signals (opened, time on page) can be logged but should not override explicit thumbs in v1
 
 ## Keep list (seed priors)

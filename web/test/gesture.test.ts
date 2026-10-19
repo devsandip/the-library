@@ -1,27 +1,23 @@
 import { describe, expect, it } from "vitest";
-import type { IssueListItem } from "@library/core/types";
 import {
   CARD_COMMIT_PX,
   cardTransform,
+  deckStep,
   directionLock,
   labelOpacity,
-  ROW_COMMIT_PX,
-  swipeChange,
   swipeDecision,
-  undoOf,
 } from "../src/gesture.js";
 
 describe("swipeDecision", () => {
-  it("commits a row past 90 px and a card past 100 px, either way", () => {
-    expect(swipeDecision(90, ROW_COMMIT_PX, 0)).toBe("right");
-    expect(swipeDecision(-90, ROW_COMMIT_PX, 0)).toBe("left");
+  it("commits a card past 100 px, either way", () => {
+    expect(swipeDecision(100, CARD_COMMIT_PX, 0)).toBe("right");
     expect(swipeDecision(99, CARD_COMMIT_PX, 0)).toBeUndefined();
     expect(swipeDecision(-100, CARD_COMMIT_PX, 0)).toBe("left");
   });
 
   it("springs back from a slow, short drag", () => {
-    expect(swipeDecision(60, ROW_COMMIT_PX, 0.1)).toBeUndefined();
-    expect(swipeDecision(0, ROW_COMMIT_PX, 2)).toBeUndefined();
+    expect(swipeDecision(60, CARD_COMMIT_PX, 0.1)).toBeUndefined();
+    expect(swipeDecision(0, CARD_COMMIT_PX, 2)).toBeUndefined();
   });
 
   it("commits a quick flick the way it was dragged", () => {
@@ -52,48 +48,15 @@ describe("the card under the finger", () => {
   });
 });
 
-describe("swipeChange", () => {
-  it("right rates Relevant and leaves the state alone", () => {
-    expect(swipeChange({ state: "unread" }, "right")).toEqual({ rating: 1 });
-    expect(swipeChange({ state: "read", rating: -1 }, "right")).toEqual({ rating: 1 });
+describe("deckStep", () => {
+  it("goes left to the next card and right to the one before", () => {
+    expect(deckStep(3, "left", 20, false)).toBe(4);
+    expect(deckStep(3, "right", 20, false)).toBe(2);
   });
 
-  it("left rates Irrelevant and archives", () => {
-    expect(swipeChange({ state: "unread" }, "left")).toEqual({ rating: -1, state: "archived" });
-  });
-
-  it("a second swipe the same way does nothing", () => {
-    expect(swipeChange({ state: "unread", rating: 1 }, "right")).toBeUndefined();
-    expect(swipeChange({ state: "archived", rating: -1 }, "left")).toBeUndefined();
-  });
-
-  it("left on a saved issue also takes it off the Saved list", () => {
-    const savedAt = "2026-10-10T10:00:00.000Z";
-    expect(swipeChange({ state: "read", savedAt }, "left")).toEqual({
-      rating: -1,
-      state: "archived",
-      savedAt: undefined,
-    });
-  });
-
-  it("only sends what changes", () => {
-    expect(swipeChange({ state: "unread", rating: -1 }, "left")).toEqual({ state: "archived" });
-    expect(swipeChange({ state: "archived" }, "left")).toEqual({ rating: -1 });
-  });
-});
-
-describe("undoOf", () => {
-  it("puts back the rating, the state and the saved state together (rule 4)", () => {
-    const issue = {
-      state: "read",
-      savedAt: "2026-10-10T10:00:00.000Z",
-    } as IssueListItem;
-    const change = swipeChange(issue, "left")!;
-    expect(undoOf(issue, change)).toEqual({
-      rating: undefined,
-      state: "read",
-      savedAt: "2026-10-10T10:00:00.000Z",
-    });
-    expect(undoOf({ ...issue, rating: -1 }, { rating: 1 })).toEqual({ rating: -1 });
+  it("stops at the last card, and at the first unless there is a brief", () => {
+    expect(deckStep(19, "left", 20, true)).toBeUndefined();
+    expect(deckStep(0, "right", 20, false)).toBeUndefined();
+    expect(deckStep(0, "right", 20, true)).toBe(-1);
   });
 });

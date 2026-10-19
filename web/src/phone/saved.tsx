@@ -1,4 +1,3 @@
-import { useIssueActions } from "../actions.js";
 import { useApp } from "../context.js";
 import { useLibrary } from "../library.js";
 import { useIssueList } from "../list.js";
@@ -16,7 +15,6 @@ export function Saved() {
   const { api } = useApp();
   const { counts } = useLibrary();
   const list = useIssueList(savedHref(), (cursor) => api.listIssues({ view: "saved", cursor }));
-  const actions = useIssueActions({ patch: list.patch, hide: list.hide });
   useScrollMemory(list.status === "ok");
   const total = counts.data?.saved;
 
@@ -42,8 +40,6 @@ export function Saved() {
             key={i.id}
             issue={i}
             href={issueHref(i.id)}
-            actions={actions}
-            leaves
             savedTag={false}
             onChange={list.patch}
             dim={list.kept.has(i.id) || i.savedAt === undefined}

@@ -8,14 +8,14 @@ import { Failed, Skeleton } from "../components/ui.js";
 import { Page } from "./page.js";
 
 /**
- * The success measure in a line (#5): of the five, over the last 14 days, how many were rated
- * Relevant. The aim is 3 in 5.
+ * The success measure in a line (#5): of the five, over the last 14 days, how many got a thumbs
+ * up (useful). The aim is 3 in 5.
  */
 export function digestLine(s: DigestStats): string {
-  const pct = Math.round((100 * s.relevant) / s.shown);
+  const pct = Math.round((100 * s.useful) / s.shown);
   return (
-    `Today's five, last 14 days: ${s.relevant} of ${s.shown} rated Relevant (${pct}%), ` +
-    `${s.irrelevant} Irrelevant. The aim is 60%.`
+    `Today's five, last 14 days: ${s.useful} of ${s.shown} useful (${pct}%), ` +
+    `${s.notUseful} not useful. The aim is 60%.`
   );
 }
 

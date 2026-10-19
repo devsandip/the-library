@@ -21,6 +21,7 @@ import {
 import { useOpenIssue } from "../reader.js";
 import { useTheme } from "../theme.js";
 import { health } from "../phone/library-home.js";
+import { ThumbIcon } from "../components/icons.js";
 import { NewsletterFrame } from "../components/newsletter-frame.js";
 import { ContinueItem } from "../components/now-reading.js";
 import { isWebLink } from "../components/peek.js";
@@ -161,11 +162,11 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
         }
         if (!issue || !actions) return false;
         switch (k) {
-          case "r":
-            actions.relevant(issue);
+          case "y":
+            actions.useful(issue);
             return true;
-          case "x":
-            actions.irrelevant(issue);
+          case "n":
+            actions.notUseful(issue);
             return true;
           case "s":
             if (issue.state === "archived") toast.say("Archived issues cannot be saved");
@@ -288,8 +289,8 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
             <span>J/K issues</span>
             <span>[ ] stories</span>
             <span>Space peek</span>
-            <span>R relevant</span>
-            <span>X irrelevant</span>
+            <span>Y useful</span>
+            <span>N not useful</span>
             <span>S save</span>
             <span>E archive</span>
             <span>U undo</span>
@@ -407,6 +408,7 @@ function MacReader({
     run: () => void,
     tone = "",
     disabled = false,
+    icon?: preact.ComponentChildren,
   ) => (
     <button
       type="button"
@@ -417,6 +419,7 @@ function MacReader({
       onClick={run}
     >
       <span class="k">{k}</span>
+      {icon}
       {label}
     </button>
   );
@@ -440,8 +443,24 @@ function MacReader({
         </p>
       )}
       <div class="keybtns" role="toolbar" aria-label="Issue actions">
-        {key("R", "Relevant", d.rating === 1, () => actions.relevant(d), "rel")}
-        {key("X", "Irrelevant", d.rating === -1, () => actions.irrelevant(d), "irr")}
+        {key(
+          "Y",
+          "Useful",
+          d.rating === 1,
+          () => actions.useful(d),
+          "rel",
+          false,
+          <ThumbIcon size={14} />,
+        )}
+        {key(
+          "N",
+          "Not useful",
+          d.rating === -1,
+          () => actions.notUseful(d),
+          "irr",
+          false,
+          <ThumbIcon down size={14} />,
+        )}
         {key("S", saved ? "Saved" : "Save", saved, () => actions.save(d), "", archived)}
         {key("E", archived ? "Archived" : "Archive", archived, () => actions.archive(d))}
         {key("M", (d.shelf ?? "news") === "news" ? "To Learning" : "To News", false, () =>

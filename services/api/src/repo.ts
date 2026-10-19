@@ -1401,7 +1401,7 @@ export class DynamoRepo implements RepoPort, CorpusSource, SearchSource, Related
 
   /**
    * The success measure (#5): of the issues in the last 14 days' digests (each counted once),
-   * how many are rated Relevant and Irrelevant by now. The PRD's aim: 3 of every 5 Relevant.
+   * how many have a thumbs up (useful) and a thumbs down by now. The PRD's aim: 3 of every 5 up.
    */
   private async digestStats(now = Date.now()): Promise<DigestStats> {
     const digests = await this.batchGet(recentDays(now, DIGEST_DAYS).map(digestKey), ["ids"]);
@@ -1410,8 +1410,8 @@ export class DynamoRepo implements RepoPort, CorpusSource, SearchSource, Related
     return {
       days: digests.length,
       shown: ids.length,
-      relevant: rated.filter((i) => i.rating === 1).length,
-      irrelevant: rated.filter((i) => i.rating === -1).length,
+      useful: rated.filter((i) => i.rating === 1).length,
+      notUseful: rated.filter((i) => i.rating === -1).length,
     };
   }
 

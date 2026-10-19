@@ -6,6 +6,7 @@
 export type IssueState = "unread" | "read" | "archived" | "filtered";
 /** States a reader can move an issue to. */
 export type ReaderState = Exclude<IssueState, "filtered">;
+/** Thumbs up (it was useful) or thumbs down (it was not). */
 export type Rating = 1 | -1;
 /** Saved (#43) is its own queue: saved issues leave Unread, whatever their state. */
 export type View = "unread" | "all" | "archived" | "saved";
@@ -184,12 +185,11 @@ export interface DigestStats {
   days: number;
   /** Issues those digests held, each counted once. */
   shown: number;
-  /** Of those, rated Relevant and Irrelevant by now. */
-  relevant: number;
-  irrelevant: number;
+  /** Of those, given a thumbs up (useful) and a thumbs down (not useful) by now. */
+  useful: number;
+  notUseful: number;
 }
 
-/** GET /summary: the most relevant unread News, best first, each with a `scoreReason`. */
 /** One thread of today's narrative (#18): connected stories told as one paragraph. */
 export interface NarrativeThread {
   title: string;
@@ -208,6 +208,7 @@ export interface Narrative {
   newsletters: number;
 }
 
+/** GET /summary: the most relevant unread News, best first, each with a `scoreReason`. */
 export interface SummaryResponse {
   items: IssueListItem[];
   /** Unread News issues from the last two weeks that were scored. */

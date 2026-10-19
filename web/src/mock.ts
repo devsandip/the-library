@@ -494,8 +494,8 @@ function digestStats(): DigestStats {
   return {
     days: 3 + (mockDigest ? 1 : 0),
     shown: 15 + today.length,
-    relevant: 7 + today.filter((i) => i.rating === 1).length,
-    irrelevant: 3 + today.filter((i) => i.rating === -1).length,
+    useful: 7 + today.filter((i) => i.rating === 1).length,
+    notUseful: 3 + today.filter((i) => i.rating === -1).length,
   };
 }
 
@@ -803,7 +803,7 @@ export class MockLibraryApi implements LibraryApi {
       const up = senders.find((x) => x.senderId === i.senderId)?.up ?? 0;
       const reason =
         up > 0
-          ? `You rated this newsletter Relevant ${up === 1 ? "once" : up === 2 ? "twice" : `${up} times`}`
+          ? `You found this newsletter useful ${up === 1 ? "once" : up === 2 ? "twice" : `${up} times`}`
           : sender > 0.5
             ? "From a Must Read newsletter"
             : topic > 0.5

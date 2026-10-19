@@ -122,7 +122,7 @@ export const percent = (share: number) => Math.round(share * 100);
 
 /**
  * Why an issue ranks where it does, in plain words with the newsletter named: the ranking says
- * "You rated this newsletter Relevant 4 times"; the card says "You rated The Ken Relevant 4 times".
+ * "You found this newsletter useful 4 times"; the card says "You found The Ken useful 4 times".
  */
 export function reasonLine(reason: string, publication: string): string {
   return reason.replace("this newsletter", publication);
@@ -136,12 +136,12 @@ export function reasonCode(reason: string | undefined, topic: string | undefined
   const withTopic = (code: string) => (topic ? `${code} · ${topic}` : code);
   if (!reason) return topic ?? "";
   if (reason === "From a Must Read newsletter") return withTopic("Must Read");
-  const rated = /^You rated this newsletter Relevant (once|twice|(\d+) times)$/.exec(reason);
-  if (rated) return `${rated[1] === "once" ? 1 : rated[1] === "twice" ? 2 : rated[2]}× Relevant`;
+  const rated = /^You found this newsletter useful (once|twice|(\d+) times)$/.exec(reason);
+  if (rated) return `${rated[1] === "once" ? 1 : rated[1] === "twice" ? 2 : rated[2]}× Useful`;
   if (reason === "Trying a newsletter you haven't rated yet") return "Exploring · not rated yet";
   const interest = /^Close to your interest in (.+)$/.exec(reason);
   if (interest) return `Interest · ${interest[1]}`;
-  if (/^Like ".*", which you rated Relevant$/.test(reason)) return withTopic("Matches");
+  if (/^Like ".*", which you found useful$/.test(reason)) return withTopic("Matches");
   if (reason === "Just in") return withTopic("Just in");
   if (reason === "Among the newest") return withTopic("Newest");
   return reason;
