@@ -10,7 +10,7 @@ import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import type { ITopic } from "aws-cdk-lib/aws-sns";
 import { Construct } from "constructs";
 import type { Stage } from "./config.js";
-import { nodeFunction } from "./functions.js";
+import { bedrockModels, nodeFunction } from "./functions.js";
 
 export interface IngestProps {
   stage: Stage;
@@ -64,22 +64,8 @@ export class Ingest extends Construct {
       }),
     );
 
-    // Enrichment (keep in step with MODELS in services/ingest/src/bedrock.ts): Claude Haiku 4.5,
-    // or 5.5 once the account has it, through US cross-region inference profiles, which may run in
-    // any US region; and Titan Text Embeddings V2 in this region.
-    this.fn.addToRolePolicy(
-      new PolicyStatement({
-        effect: Effect.ALLOW,
-        actions: ["bedrock:InvokeModel"],
-        resources: [
-          `arn:${stack.partition}:bedrock:${stack.region}:${stack.account}:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0`,
-          `arn:${stack.partition}:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0`,
-          `arn:${stack.partition}:bedrock:${stack.region}:${stack.account}:inference-profile/us.anthropic.claude-haiku-5-5`,
-          `arn:${stack.partition}:bedrock:*::foundation-model/anthropic.claude-haiku-5-5`,
-          `arn:${stack.partition}:bedrock:${stack.region}::foundation-model/amazon.titan-embed-text-v2:0`,
-        ],
-      }),
-    );
+    // Enrichment, the story index and the day in brief: Claude and Titan.
+    this.fn.addToRolePolicy(bedrockModels(this));
 
     if (props.stage !== "prod") return;
 

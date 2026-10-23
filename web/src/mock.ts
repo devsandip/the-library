@@ -26,6 +26,9 @@ import type {
   Shelf,
   StatusResponse,
   SummaryResponse,
+  Timeline,
+  TimelinePoint,
+  TimelineResponse,
   Topic,
   TopicListResponse,
   UnreadCount,
@@ -605,6 +608,9 @@ function namesIn(text: string): { names?: string[] } {
   return names.length ? { names } : {};
 }
 
+/** Timelines written in mock mode (#19), by "<issueId>#<n>". */
+const timelines = new Map<string, Timeline>();
+
 export class MockLibraryApi implements LibraryApi {
   async listIssues(opts: ListIssuesOptions): Promise<IssueListResponse> {
     await delay();
@@ -744,6 +750,58 @@ export class MockLibraryApi implements LibraryApi {
   async stories(id: string): Promise<IssueStoriesResponse> {
     await delay(250);
     return mockStories(find(id));
+  }
+
+  async timeline(id: string, n: number): Promise<TimelineResponse> {
+    await delay();
+    const timeline = timelines.get(`${id}#${n}`);
+    return timeline ? { timeline } : {};
+  }
+
+  /** A stand-in for Claude's timeline (#19): the story's related stories, one point each. */
+  async writeTimeline(id: string, n: number): Promise<TimelineResponse> {
+    const started = Date.now();
+    const me = find(id);
+    const own = mockStories(me).stories;
+    const story = own.find((s) => s.n === n);
+    if (!story) throw new Error("issue has no such story");
+    const related = await this.related(id);
+    const near = own.length > 1 ? related.stories?.find((s) => s.n === n) : related;
+    const others = near ? [...near.earlier, ...near.since] : [];
+    await delay(2600);
+    if (!others.length)
+      return { none: "Nothing close in your newsletters from the last four weeks." };
+    const points: TimelinePoint[] = [
+      ...others.map((i) => ({
+        at: i.receivedAt,
+        text: `${(i.story?.headline ?? i.summary ?? i.subject).replace(/\.$/, "")}.`,
+        sources: [
+          { issueId: i.id, publication: i.publication, ...(i.story ? { story: i.story } : {}) },
+        ],
+      })),
+      {
+        at: me.receivedAt,
+        text: `${story.headline}.`,
+        sources: [
+          {
+            issueId: id,
+            publication: me.publication,
+            ...(own.length > 1 ? { story: { n, headline: story.headline } } : {}),
+          },
+        ],
+        current: true as const,
+      },
+    ].sort((a, b) => a.at.localeCompare(b.at));
+    const timeline: Timeline = {
+      gist: "A stand-in from mock mode: the story's related stories, one point each, oldest first.",
+      points,
+      at: new Date().toISOString(),
+      stories: points.length,
+      ms: Date.now() - started,
+      cents: 0.4,
+    };
+    timelines.set(`${id}#${n}`, timeline);
+    return { timeline };
   }
 
   /**

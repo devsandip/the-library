@@ -18,6 +18,7 @@ import {
   senderIdentity,
   storyKey,
   storyRef,
+  timelineKey,
   TOPICS_KEY,
   vectorBytes,
 } from "@library/core";
@@ -34,6 +35,7 @@ import type {
   SenderListResponse,
   StatusResponse,
   SummaryResponse,
+  TimelineResponse,
   TopicListResponse,
   UnreadCountsResponse,
 } from "@library/core/types";
@@ -744,6 +746,91 @@ describe("API on dev", () => {
       await ddb.send(
         new DeleteCommand({ TableName: stack.tableName, Key: storyKey("fx-lenny", 1) }),
       );
+    }
+  });
+
+  it("how this evolved: written only when asked, by Claude, and kept for the event (#19)", async () => {
+    // fx-tldr's first story (the search test's) is the one being read. Three other newsletters
+    // carry the steps around it, an hour apart: a preview, the launch, and the airlines' answer.
+    const titan = new TitanEmbedder();
+    const steps: [string, string, string, string?][] = [
+      [
+        "fx-pragmatic",
+        "OpenAI previews a travel agent to a small group of testers",
+        "Testers can ask the agent to plan a trip, but booking flights and hotels is not switched on yet.",
+      ],
+      [
+        "fx-lenny",
+        "OpenAI's new agents book flights and hotels for travellers",
+        "The agents plan trips, compare fares and make bookings on their own.",
+        storyRef("fx-tldr", 1),
+      ],
+      [
+        "fx-platformer",
+        "Airlines cut off OpenAI's booking agents over fare scraping",
+        "Two airlines say the travel agents scrape their fares and have blocked them from booking.",
+      ],
+    ];
+    for (const [id, headline, summary, eventId] of steps) {
+      const issue = (await getItem(id))!;
+      const vector = await titan.embed([headline, summary, "OpenAI"].join("\n\n"));
+      await ddb.send(
+        new PutCommand({
+          TableName: stack.tableName,
+          Item: {
+            ...storyKey(id, 1),
+            id,
+            n: 1,
+            senderId: issue.senderId,
+            receivedAt: issue.receivedAt,
+            headline,
+            summary,
+            names: ["OpenAI"],
+            eventId: eventId ?? storyRef(id, 1),
+            vector: vectorBytes(vector),
+            dims: vector.length,
+            gsi1pk: "STORIES",
+            gsi1sk: `${issue.receivedAt as string}#${storyRef(id, 1)}`,
+          },
+        }),
+      );
+    }
+    const path = "/issues/fx-tldr/stories/1/timeline";
+    try {
+      expect(await call("GET", path)).toEqual({ status: 200, body: {} });
+      expect((await call("GET", "/issues/fx-tldr/stories/9/timeline")).status).toBe(404);
+
+      const written = await call<TimelineResponse>("POST", path);
+      expect(written.status).toBe(200);
+      const t = written.body.timeline!;
+      expect(t.points.length).toBeGreaterThanOrEqual(2);
+      expect(t.points.map((p) => p.at)).toEqual(t.points.map((p) => p.at).sort());
+      const sources = t.points.flatMap((p) => p.sources.map((s) => s.issueId));
+      expect(new Set(sources)).toContain("fx-pragmatic");
+      for (const id of sources) {
+        expect(["fx-pragmatic", "fx-lenny", "fx-tldr", "fx-platformer"]).toContain(id);
+      }
+      const here = t.points.filter((p) => p.current);
+      expect(here).toHaveLength(1);
+      expect(here[0]!.sources.map((s) => s.issueId)).toContain("fx-tldr");
+      expect(t.cents).toBeGreaterThan(0);
+
+      // Kept: read back free, and from another story of the same event too.
+      expect((await call<TimelineResponse>("GET", path)).body).toEqual({ timeline: t });
+      const other = await call<TimelineResponse>("GET", "/issues/fx-lenny/stories/1/timeline");
+      expect(other.body).toEqual({ timeline: t });
+    } finally {
+      await Promise.all([
+        ...steps.map(([id]) =>
+          ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: storyKey(id, 1) })),
+        ),
+        ddb.send(
+          new DeleteCommand({
+            TableName: stack.tableName,
+            Key: timelineKey(storyRef("fx-tldr", 1)),
+          }),
+        ),
+      ]);
     }
   });
 

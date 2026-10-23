@@ -155,6 +155,54 @@ export interface RelatedResponse {
   stories?: RelatedStory[];
 }
 
+/** A story one point of a timeline draws on (#19). */
+export interface TimelineSource {
+  issueId: string;
+  publication: string;
+  /** The story inside a digest, which the point opens at; absent for an issue that is one story. */
+  story?: { n: number; headline: string };
+}
+
+/** One step in how a story evolved (#19). */
+export interface TimelinePoint {
+  /** When the newsletters first carried it: the earliest of its stories. */
+  at: string;
+  /** What happened, in one sentence. */
+  text: string;
+  /** The stories it draws on, oldest first. */
+  sources: TimelineSource[];
+  /** The story the timeline was written from is one of them. */
+  current?: true;
+}
+
+/**
+ * How a story evolved (#19): Claude's account of the story's closest stories in the reader's
+ * newsletters over the last weeks, in date order. Kept for the story's event.
+ */
+export interface Timeline {
+  /** How the story moved, in one sentence. */
+  gist: string;
+  /** Oldest first. */
+  points: TimelinePoint[];
+  /** When it was written. */
+  at: string;
+  /** How many stories Claude read for it, the story itself included. */
+  stories: number;
+  /** How long the call took, and what it cost. */
+  ms: number;
+  cents: number;
+}
+
+/**
+ * GET /issues/{id}/stories/{n}/timeline: the timeline kept for the story's event, if one was
+ * written. POST writes it, or writes it again, and answers the same way; when nothing in the
+ * newsletters is close enough to tell, there is no timeline and `none` says so.
+ */
+export interface TimelineResponse {
+  timeline?: Timeline;
+  none?: string;
+}
+
 /** Search's order (#53): best match first, or newest first. */
 export type SearchSort = "best" | "newest";
 

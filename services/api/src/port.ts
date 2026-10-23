@@ -16,6 +16,7 @@ import type {
   Shelf,
   StatusResponse,
   SummaryResponse,
+  TimelineResponse,
   Topic,
   UnreadCountsResponse,
   View,
@@ -73,10 +74,17 @@ export interface RelatedPort {
   related(id: string): Promise<RelatedResponse>;
 }
 
+/** How a story evolved (#19): the timeline kept for its event, or a new one written now. */
+export interface TimelinePort {
+  get(id: string, n: number): Promise<TimelineResponse>;
+  run(id: string, n: number): Promise<TimelineResponse>;
+}
+
 export interface Services {
   repo: RepoPort;
   search: SearchPort;
   related: RelatedPort;
+  timelines: TimelinePort;
   /** Fire-and-forget ingest run ("refresh now"). */
   startIngest(): Promise<void>;
 }
