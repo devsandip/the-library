@@ -6,15 +6,11 @@
  * for Phase 2 ranking. Runs after every ingest for new issues (retrying recent failures) and on
  * demand for the backlog (`pnpm enrich`). The topic list is proposed once (`pnpm topics`).
  */
-import { INTERESTS } from "@library/core";
+import { INTERESTS, READER } from "@library/core";
 import type { EnrichStats, Shelf, ShelfSetBy, Topic } from "@library/core/types";
 import type { ModelPort, ToolRequest } from "./bedrock.js";
 import { mapLimit } from "./ingest.js";
 import type { Store } from "./store.js";
-
-export const READER =
-  "The reader is a senior product manager interested in the tech industry, startups, AI, " +
-  "product management and system design, plus some general business news.";
 
 /** How much of an issue Claude reads: roughly the first 1,500 tokens. */
 const MAX_TEXT_CHARS = 6000;

@@ -4,9 +4,9 @@
  * matters to the reader and writes it as a few threads: a short paragraph each, with the issues
  * it came from. Not an agent: fixed steps and one call, about a cent.
  */
+import { READER } from "@library/core";
 import type { Narrative, NarrativeStats, NarrativeThread } from "@library/core/types";
 import { MODELS, type ModelPort, type ToolRequest } from "./bedrock.js";
-import { READER } from "./enrich.js";
 import type { Store } from "./store.js";
 
 /** The narrative covers News stories received in the last day. */

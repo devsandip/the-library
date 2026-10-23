@@ -29,6 +29,7 @@ type Handler = (svc: Services, req: Request, params: string[]) => Promise<Respon
 
 const ISSUE_ID = "([A-Za-z0-9_-]{1,64})";
 const SENDER_ID = "(s[0-9a-f]{12})";
+const STORY_N = "([1-9][0-9]?)";
 const VIEWS: readonly View[] = ["unread", "all", "archived", "saved"];
 const READER_STATES: readonly ReaderState[] = ["unread", "read", "archived"];
 const SHELVES: readonly Shelf[] = ["news", "learning"];
@@ -134,6 +135,17 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     method: "GET",
     pattern: new RegExp(`^/issues/${ISSUE_ID}/stories$`),
     handler: async (svc, _req, p) => ok(await svc.repo.stories(param(p, 0))),
+  },
+  {
+    method: "GET",
+    pattern: new RegExp(`^/issues/${ISSUE_ID}/stories/${STORY_N}/timeline$`),
+    handler: async (svc, _req, p) => ok(await svc.timelines.get(param(p, 0), Number(param(p, 1)))),
+  },
+  {
+    // Never on its own: only when the reader asks (one Claude call, about half a cent).
+    method: "POST",
+    pattern: new RegExp(`^/issues/${ISSUE_ID}/stories/${STORY_N}/timeline$`),
+    handler: async (svc, _req, p) => ok(await svc.timelines.run(param(p, 0), Number(param(p, 1)))),
   },
   {
     method: "GET",

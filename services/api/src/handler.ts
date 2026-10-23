@@ -2,12 +2,14 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 }
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { HttpError } from "./errors.js";
 import type { Services } from "./port.js";
+import { BedrockClaude } from "./claude.js";
 import { TitanEmbedder } from "./embed.js";
 import { DynamoRepo } from "./repo.js";
 import { API_PREFIX, route, type Request } from "./routes.js";
 import { CorpusCache } from "./corpus.js";
 import { Related } from "./related.js";
 import { Search } from "./search.js";
+import { Timelines } from "./timeline.js";
 
 type Event = APIGatewayProxyEventV2WithJWTAuthorizer;
 
@@ -96,6 +98,7 @@ export const handler = createHandler({
   repo,
   search: new Search(repo, new TitanEmbedder(), corpus),
   related: new Related(repo, corpus),
+  timelines: new Timelines(repo, corpus, new BedrockClaude()),
   startIngest: async () => {
     await lambda.send(
       new InvokeCommand({

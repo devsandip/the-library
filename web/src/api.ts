@@ -17,6 +17,7 @@ import type {
   Shelf,
   StatusResponse,
   SummaryResponse,
+  TimelineResponse,
   TopicListResponse,
   UnreadCountsResponse,
   View,
@@ -64,6 +65,10 @@ export interface LibraryApi {
   related(id: string): Promise<RelatedResponse>;
   /** The issue's stories from the story index, for a tap on its row (#41). */
   stories(id: string): Promise<IssueStoriesResponse>;
+  /** How a story evolved (#19): the timeline kept for its event, if one was written. */
+  timeline(id: string, n: number): Promise<TimelineResponse>;
+  /** Writes the story's timeline now: one Claude call, about half a cent. Only when asked. */
+  writeTimeline(id: string, n: number): Promise<TimelineResponse>;
   /** What the newsletters said (#53): by words, then by meaning. */
   search(q: string, sort: SearchSort): Promise<SearchResponse>;
   listSenders(): Promise<SenderListResponse>;
@@ -173,6 +178,18 @@ export class HttpLibraryApi implements LibraryApi {
   }
   stories(id: string) {
     return this.request<IssueStoriesResponse>("GET", `/issues/${encodeURIComponent(id)}/stories`);
+  }
+  timeline(id: string, n: number) {
+    return this.request<TimelineResponse>(
+      "GET",
+      `/issues/${encodeURIComponent(id)}/stories/${n}/timeline`,
+    );
+  }
+  writeTimeline(id: string, n: number) {
+    return this.request<TimelineResponse>(
+      "POST",
+      `/issues/${encodeURIComponent(id)}/stories/${n}/timeline`,
+    );
   }
   search(q: string, sort: SearchSort) {
     const query = new URLSearchParams({ q });
