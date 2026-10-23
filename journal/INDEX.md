@@ -1,13 +1,13 @@
 # Nutgraf: Journal
 
-Last refreshed: 2026-10-12 09:51
-Latest entry: [2026-10-12-0951-nutgraf.md](entries/2026-10-12-0951-nutgraf.md)
+Last refreshed: 2026-10-19 11:35
+Latest entry: [2026-10-19-1135-thumbs-instead-of-relevant.md](entries/2026-10-19-1135-thumbs-instead-of-relevant.md)
 
 A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Called The Library until 2026-10-12. Live at https://sandip.dev/nutgraf/.
 
 ## Where we are now
 
-The reader is live on both devices and does what the brief asked of Phase 1: ingest every two hours, clean reading, and Relevant and Irrelevant ratings by thumb or by swipe. Claude sorts every issue into News or Learning and a topic; rules archive promos and week-old news, and since 2026-10-11 keep account mail, like sign-in codes, out of the list.
+The reader is live on both devices and does what the brief asked of Phase 1: ingest every two hours, clean reading, and a thumbs up or down for whether an issue was useful. Claude sorts every issue into News or Learning and a topic; rules archive promos and week-old news, and since 2026-10-11 keep account mail, like sign-in codes, out of the list.
 
 Ranking runs when Today opens, and Today leads with the day in brief, written from the stories every issue is split into. Since 2026-10-11 search finds any issue or story in the archive, by its words or by what it means, and under every newsletter Related lists the closest stories from before and since; a digest lists them for each of its stories. Spend is about $5.50 a month, mostly Claude.
 
@@ -19,8 +19,11 @@ Since 2026-10-11 both devices have one look, from a Claude Design redesign brief
 
 Since 2026-10-12 the app is Nutgraf, at sandip.dev/nutgraf, and every /thelibrary link redirects there. A second handoff gave it Apple's type and colour (SF Pro, true black, no blue, yellow the one highlight) and a logo: a folded page over an n. A tap on a row's title opens the issue. The repository and the AWS resources keep the old name. None of the redesign has been tried on a real iPhone yet.
 
+Since 2026-10-19 the thumbs ask one thing: was it useful? Relevant and Irrelevant are gone. Ratings had stalled at 12 in ten days, none for six, and a swipe both rated a card and cleared it. Now a swipe on Today only moves to the next card or back, and a thumb changes nothing but the rating. Work is tracked on the GitHub project Nutgraf (#86). Jev, TypeSafe's decision model, is to sort each story into News or Learning (#81): its scoring script shipped (#87) and the step after ingest waits to merge (#88).
+
 ## Recent entries
 
+- [2026-10-19 11:35: Thumbs instead of Relevant](entries/2026-10-19-1135-thumbs-instead-of-relevant.md)
 - [2026-10-12 09:51: Nutgraf](entries/2026-10-12-0951-nutgraf.md)
 - [2026-10-11 14:44: Today, Browse and the console](entries/2026-10-11-1444-today-browse-and-the-console.md)
 - [2026-10-11 13:53: A redesign, briefed without the old screens](entries/2026-10-11-1353-ux-redesign-brief.md)
@@ -30,7 +33,6 @@ Since 2026-10-12 the app is Nutgraf, at sandip.dev/nutgraf, and every /thelibrar
 - [2026-10-10 19:49: Read history, and four more ideas](entries/2026-10-10-1949-read-history.md)
 - [2026-10-10 19:30: Stories, and the day in brief](entries/2026-10-10-1930-stories-and-the-day-in-brief.md)
 - [2026-10-10 19:29: The reader is live on the phone and the Mac](entries/2026-10-10-1929-reader-live-on-phone-and-mac.md)
-- [2026-10-10 19:28: Bootstrap, from a brief to a sorted inbox](entries/2026-10-10-1928-bootstrap.md)
 
 ## Weekly summaries
 
@@ -38,7 +40,8 @@ Since 2026-10-12 the app is Nutgraf, at sandip.dev/nutgraf, and every /thelibrar
 
 ## Working hypotheses
 
-- Ratings plus my five interests are enough to put things I would rate Relevant in the top 5 at least 3 times in 5 after two weeks (`docs/prd.md`; measured since 2026-10-10).
+- Thumbs plus my five interests are enough to put things I find useful in the top 5 at least 3 times in 5 after two weeks (`docs/prd.md`; measured since 2026-10-10, as Relevant until 2026-10-19).
+- A thumb that only judges, apart from the swipe that moves on, gets used where Relevant did not (2026-10-19).
 - The story, not the issue, is the right unit for following news across newsletters (#15).
 - Haiku is good enough for sorting, story splitting and the brief at about a cent an issue (`docs/architecture.md`, sections 11 and 12).
 - Brute-force similarity is enough at this volume for years; a vector index waits until a feature needs to search everything at once (`docs/features/story-index.md`).
@@ -46,10 +49,10 @@ Since 2026-10-12 the app is Nutgraf, at sandip.dev/nutgraf, and every /thelibrar
 
 ## Open questions
 
-- Will ranking hit the 60% aim once ratings exist (#5)?
+- Will ranking hit the 60% aim once thumbs are used? On 2026-10-19 the five stood at 6 of 29 useful, 23 not rated (#5).
 - How do the day in brief's threads and cost hold up on a weekday, with about 90 news stories?
 - Will Claude be able to merge its own pull requests, as I asked, or does auto mode keep treating it as self-approval?
-- Which decision model for the bounded calls: Claude, Jev or OpenAI Decisions (#27)?
+- Jev sorts story shelves (#81). Is it the model for the other bounded calls too (#27)?
 - What to do about `robots.txt` on `sandip.dev` (#7)?
 - When does the AWS account get Haiku 5.5?
 
@@ -78,3 +81,5 @@ Since 2026-10-12 the app is Nutgraf, at sandip.dev/nutgraf, and every /thelibrar
 - Self-hosted web fonts: system fonts only, so the app downloads none (2026-10-12).
 - An Amplify redirect rule for /thelibrary: the app's CloudFront function sends the 301s, in code and under test (2026-10-12).
 - Checking the old URLs for one hop and the same query order: Amplify adds the slash first and CloudFront reorders parameters, so the check follows each URL to where it ends (2026-10-12).
+- Relevant and Irrelevant, given by swipe: 12 ratings in ten days and none for six, so a thumbs up or down for whether it was useful, and swipes only move through the deck (2026-10-19).
+- Swipes on list rows: rows are not cards, and a swipe no longer rates (2026-10-19).
