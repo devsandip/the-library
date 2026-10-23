@@ -145,6 +145,27 @@ describe("data and ingest", () => {
     expect((ingest!.Resource as unknown[]).length).toBe(5);
   });
 
+  it("ingest reads its Gmail token and the Jev key, and nothing else in SSM (#81)", () => {
+    const t = synth("prod");
+    const policies = Object.values(t.findResources("AWS::IAM::Policy"));
+    const ssm = policies
+      .flatMap(
+        (p) => p.Properties.PolicyDocument.Statement as { Action: unknown; Resource: unknown }[],
+      )
+      .filter((st) => JSON.stringify(st.Action).includes("ssm:"));
+    expect(ssm).toHaveLength(1);
+    expect(ssm[0]!.Action).toBe("ssm:GetParameter");
+    const resources = JSON.stringify(ssm[0]!.Resource);
+    expect(resources).toContain(":parameter/thelibrary/prod/gmail/oauth");
+    expect(resources).toContain(":parameter/thelibrary/prod/jev/api-key");
+    expect((ssm[0]!.Resource as unknown[]).length).toBe(2);
+    t.hasResourceProperties("AWS::Lambda::Function", {
+      Environment: {
+        Variables: Match.objectLike({ JEV_PARAM: "/thelibrary/prod/jev/api-key" }),
+      },
+    });
+  });
+
   it("prod schedule: every 2h 06-22 IST, no retries, enabled", () => {
     synth("prod").hasResourceProperties("AWS::Scheduler::Schedule", {
       ScheduleExpression: "cron(0 6-22/2 * * ? *)",

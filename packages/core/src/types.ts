@@ -358,6 +358,26 @@ export interface StoryStats {
   durationMs: number;
 }
 
+/** Who decided a story's shelf (#81): Jev, or Sandip moving it. */
+export type StoryShelfSetBy = "jev" | "sandip";
+
+/** One run of story shelving (#81): Jev reads each new story and picks News or Learning. */
+export interface ShelfStats {
+  /** Stories without a shelf yet (or all of Jev's, when forced). */
+  checked: number;
+  shelved: number;
+  /** Of those shelved, how many went to Learning (Jev at 0.5 or more). */
+  learning: number;
+  /** Of those shelved, how many Jev answered between 0.4 and 0.6. */
+  unsure: number;
+  /** Not started before the run's time budget ran out; picked up by the next run. */
+  deferred: number;
+  errors: number;
+  errorSamples: string[];
+  inputTokens: number;
+  durationMs: number;
+}
+
 /** One narrative check (#18): whether a new version was written, and if not, why. */
 export interface NarrativeStats {
   written: boolean;
@@ -379,6 +399,7 @@ export interface StatusResponse {
   lastError?: string | null;
   lastEnrich?: EnrichStats;
   lastStories?: StoryStats;
+  lastShelves?: ShelfStats;
   digestStats?: DigestStats;
 }
 

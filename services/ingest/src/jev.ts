@@ -108,7 +108,7 @@ export const SHELF_QUESTIONS: Record<"craft", Question> = {
   },
 };
 
-/** Answers in this band are shelved by 0.5 and listed for Sandip to settle. */
+/** Unsure answers. They are shelved by 0.5 like the rest; the stored probability finds them later. */
 export const UNSURE = { from: 0.4, to: 0.6 } as const;
 
 export const isUnsure = (p: number) => p >= UNSURE.from && p < UNSURE.to;

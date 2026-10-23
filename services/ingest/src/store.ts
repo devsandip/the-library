@@ -45,6 +45,8 @@ import type {
   Rating,
   Shelf,
   ShelfSetBy,
+  ShelfStats,
+  StoryShelfSetBy,
   StoryStats,
   Topic,
 } from "@library/core/types";
@@ -53,6 +55,7 @@ import type { Classification, EnrichCandidate } from "./enrich.js";
 import { mapLimit } from "./ingest.js";
 import type { SenderFields, SenderPlan, StoredIssue, StoredSender } from "./senders.js";
 import type { StoredNarrative, StoryText } from "./narrative.js";
+import type { ShelfCandidate } from "./shelves.js";
 import type { NewStory, StoredStory } from "./stories.js";
 
 type Newsletter = Extract<ProcessedMessage, { kind: "newsletter" }>;
@@ -496,6 +499,7 @@ export class Store {
     stats: IngestStats,
     enrichStats?: EnrichStats,
     storyStats?: StoryStats,
+    shelfStats?: ShelfStats,
   ): Promise<void> {
     await this.ddb.send(
       new PutCommand({
@@ -507,6 +511,7 @@ export class Store {
           lastError: stats.errors ? stats.errorSamples.join("; ") : null,
           lastEnrich: enrichStats,
           lastStories: storyStats,
+          lastShelves: shelfStats,
         },
       }),
     );
@@ -962,6 +967,57 @@ export class Store {
       names: (i.names as string[] | undefined) ?? [],
       eventId: (i.eventId as string | undefined) ?? storyRef(i.id as string, i.n as number),
     }));
+  }
+
+  /** Stories received since `fromIso`, oldest first, with what Jev reads and who shelved them. */
+  async storyShelves(fromIso: string): Promise<ShelfCandidate[]> {
+    const items = await this.queryStories(
+      fromIso,
+      "9999-12-31T23:59:59.999Z",
+      "headline, summary, shelfSetBy",
+    );
+    return items.map((i) => ({
+      issueId: i.id as string,
+      n: i.n as number,
+      receivedAt: i.receivedAt as string,
+      headline: i.headline as string,
+      summary: i.summary as string,
+      shelfSetBy: i.shelfSetBy as StoryShelfSetBy | undefined,
+    }));
+  }
+
+  /**
+   * Jev's shelf for one story, with its probability of Learning. Never over a move by Sandip;
+   * returns false when the story was moved or is gone.
+   */
+  async putStoryShelf(
+    issueId: string,
+    n: number,
+    shelf: { shelf: Shelf; learning: number; model: string },
+  ): Promise<boolean> {
+    try {
+      await this.ddb.send(
+        new UpdateCommand({
+          TableName: this.table,
+          Key: storyKey(issueId, n),
+          UpdateExpression:
+            "SET shelf = :s, learning = :p, shelfSetBy = :jev, shelfModel = :m, shelvedAt = :at",
+          ConditionExpression:
+            "attribute_exists(pk) AND (attribute_not_exists(shelfSetBy) OR shelfSetBy = :jev)",
+          ExpressionAttributeValues: {
+            ":s": shelf.shelf,
+            ":p": shelf.learning,
+            ":jev": "jev",
+            ":m": shelf.model,
+            ":at": new Date().toISOString(),
+          },
+        }),
+      );
+      return true;
+    } catch (err) {
+      if ((err as { name?: string }).name === "ConditionalCheckFailedException") return false;
+      throw err;
+    }
   }
 
   private async queryStories(fromIso: string, toIso: string, extra: string) {
