@@ -35,7 +35,9 @@ export class Api extends Construct {
       entry: "services/api/src/handler.ts",
       logRemoval: RemovalPolicy.DESTROY,
       memorySize: 512,
-      timeout: Duration.seconds(15),
+      // Most answers take milliseconds. A timeline (#19) is one Claude call of 4 to 9 seconds,
+      // after a corpus read of about 3 on a cold start; HTTP API waits at most 30.
+      timeout: Duration.seconds(28),
       environment: {
         TABLE_NAME: props.table.tableName,
         BUCKET_NAME: props.content.bucketName,

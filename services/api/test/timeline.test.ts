@@ -187,6 +187,19 @@ describe("Timelines", () => {
     expect(claude.callTool).toHaveBeenCalledTimes(1);
   });
 
+  it("marks one point current when Claude cites the story twice: the latest", async () => {
+    const { timelines } = setup({
+      points: [
+        { text: "The launch is announced.", stories: ["2", "3"] },
+        { text: "FlyDubai bans the attacker.", stories: ["3"] },
+        { text: "The attacker is charged.", stories: ["4"] },
+      ],
+      gist: "Twice cited.",
+    });
+    const { timeline } = await timelines.run("wsj", 2);
+    expect(timeline!.points.map((p) => p.current ?? false)).toEqual([false, true, false]);
+  });
+
   it("makes no call when nothing is close", async () => {
     const { timelines, claude, store } = setup(answer);
     expect(await timelines.run("verge", 1)).toEqual({ none: NOTHING_CLOSE });

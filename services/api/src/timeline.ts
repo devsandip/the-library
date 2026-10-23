@@ -141,7 +141,7 @@ export function timelineRequest(items: TimelineItem[]): ToolRequest {
       "- points: the steps in this story's own development, oldest first, at most 8. A point is " +
         "one development: what happened, in one plain sentence of at most 25 words, with the " +
         "names and numbers the stories give. Several newsletters reporting the same development " +
-        "make one point, with all their ids. The READING story is one of the points.",
+        "make one point, with all their ids. Exactly one point cites the READING story.",
       "- Leave out every story that is not part of this development: other news about the same " +
         "company or person, the same field, a similar product. When in doubt, leave it out. If " +
         "no other story is part of it, give only the READING story's point.",
@@ -200,7 +200,8 @@ const clean = (v: unknown, max: number) =>
 
 /**
  * Claude's tool input, checked. A point needs text and at least one known story; its date is the
- * earliest of its stories, never Claude's, and the points are put in that order.
+ * earliest of its stories, never Claude's, and the points are put in that order. If Claude cites
+ * the story being read in more than one point, the latest of them is the current one.
  */
 export function parseTimeline(
   input: unknown,
@@ -239,9 +240,15 @@ export function parseTimeline(
       },
     ];
   });
+  points.sort((a, b) => a.at.localeCompare(b.at));
+  const current = points.findLastIndex((p) => p.current);
   return {
     gist: clean(o.gist, 400),
-    points: points.sort((a, b) => a.at.localeCompare(b.at)),
+    points: points.map((p, k) => {
+      if (!p.current || k === current) return p;
+      const { current: _, ...rest } = p;
+      return rest;
+    }),
   };
 }
 
