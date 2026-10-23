@@ -81,6 +81,10 @@ function setup(overrides: Partial<RepoPort> = {}) {
     related: {
       related: vi.fn(async () => ({ earlier: [{ ...issue, similarity: 0.41 }], since: [] })),
     },
+    timelines: {
+      get: vi.fn(async () => ({})),
+      run: vi.fn(async () => ({ none: "Nothing close." })),
+    },
     startIngest: vi.fn(async () => undefined),
   };
   const handler = createHandler(svc);
@@ -212,6 +216,21 @@ describe("routing and validation", () => {
     const res = await setup().call("GET", "/issues", { query });
     expect(res.status).toBe(400);
     expect(res.body.error).toContain(msg);
+  });
+
+  it("reads a story's kept timeline, and writes one only on POST (#19)", async () => {
+    const { call, svc } = setup();
+    const kept = await call("GET", "/issues/abc123/stories/2/timeline");
+    expect(kept).toMatchObject({ status: 200, body: {} });
+    expect(svc.timelines.get).toHaveBeenCalledWith("abc123", 2);
+    expect(svc.timelines.run).not.toHaveBeenCalled();
+    const ran = await call("POST", "/issues/abc123/stories/12/timeline");
+    expect(ran).toMatchObject({ status: 200, body: { none: "Nothing close." } });
+    expect(svc.timelines.run).toHaveBeenCalledWith("abc123", 12);
+    for (const n of ["0", "100", "x"]) {
+      expect((await call("GET", `/issues/abc123/stories/${n}/timeline`)).status).toBe(404);
+    }
+    expect((await call("DELETE", "/issues/abc123/stories/2/timeline")).status).toBe(405);
   });
 
   it("serves an issue's stories", async () => {

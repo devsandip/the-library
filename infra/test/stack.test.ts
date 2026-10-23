@@ -124,7 +124,7 @@ describe("data and ingest", () => {
     });
   });
 
-  it("ingest may call Haiku 4.5 or 5.5 (any US region) and Titan; the API, Titan alone (#53)", () => {
+  it("ingest and the API may call Haiku 4.5 or 5.5 (any US region) and Titan (#53, #19)", () => {
     const policies = Object.values(synth("prod").findResources("AWS::IAM::Policy"));
     const statements = policies.flatMap(
       (p) => p.Properties.PolicyDocument.Statement as { Action: unknown; Resource: unknown }[],
@@ -132,14 +132,8 @@ describe("data and ingest", () => {
     const bedrock = statements.filter((st) => JSON.stringify(st.Action).includes("bedrock:"));
     expect(bedrock).toHaveLength(2);
     expect(bedrock.every((st) => st.Action === "bedrock:InvokeModel")).toBe(true);
-    const [ingest, api] = [...bedrock].sort((a, b) =>
-      Array.isArray(a.Resource) && !Array.isArray(b.Resource) ? -1 : 1,
-    );
-    expect(Array.isArray(api!.Resource)).toBe(false);
-    expect(JSON.stringify(api!.Resource)).toContain(
-      "::foundation-model/amazon.titan-embed-text-v2:0",
-    );
-    expect(JSON.stringify(api!.Resource)).not.toContain("anthropic");
+    const [ingest, api] = bedrock;
+    expect(api!.Resource).toEqual(ingest!.Resource);
     const resources = JSON.stringify(ingest!.Resource);
     expect(resources).toContain(":inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0");
     expect(resources).toContain(
@@ -149,6 +143,27 @@ describe("data and ingest", () => {
     expect(resources).toContain(":bedrock:*::foundation-model/anthropic.claude-haiku-5-5");
     expect(resources).toContain("::foundation-model/amazon.titan-embed-text-v2:0");
     expect((ingest!.Resource as unknown[]).length).toBe(5);
+  });
+
+  it("ingest reads its Gmail token and the Jev key, and nothing else in SSM (#81)", () => {
+    const t = synth("prod");
+    const policies = Object.values(t.findResources("AWS::IAM::Policy"));
+    const ssm = policies
+      .flatMap(
+        (p) => p.Properties.PolicyDocument.Statement as { Action: unknown; Resource: unknown }[],
+      )
+      .filter((st) => JSON.stringify(st.Action).includes("ssm:"));
+    expect(ssm).toHaveLength(1);
+    expect(ssm[0]!.Action).toBe("ssm:GetParameter");
+    const resources = JSON.stringify(ssm[0]!.Resource);
+    expect(resources).toContain(":parameter/thelibrary/prod/gmail/oauth");
+    expect(resources).toContain(":parameter/thelibrary/prod/jev/api-key");
+    expect((ssm[0]!.Resource as unknown[]).length).toBe(2);
+    t.hasResourceProperties("AWS::Lambda::Function", {
+      Environment: {
+        Variables: Match.objectLike({ JEV_PARAM: "/thelibrary/prod/jev/api-key" }),
+      },
+    });
   });
 
   it("prod schedule: every 2h 06-22 IST, no retries, enabled", () => {

@@ -10,7 +10,7 @@ import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import type { ITopic } from "aws-cdk-lib/aws-sns";
 import { Construct } from "constructs";
 import type { Stage } from "./config.js";
-import { nodeFunction } from "./functions.js";
+import { bedrockModels, nodeFunction } from "./functions.js";
 
 export interface IngestProps {
   stage: Stage;
@@ -23,6 +23,8 @@ export interface IngestProps {
 }
 
 export const gmailParamName = (stage: Stage) => `/thelibrary/${stage}/gmail/oauth`;
+/** TypeSafe's key for Jev (#81). Sandip stores it by hand; dev has none. */
+export const jevParamName = (stage: Stage) => `/thelibrary/${stage}/jev/api-key`;
 
 export class Ingest extends Construct {
   readonly fn: NodejsFunction;
@@ -31,6 +33,7 @@ export class Ingest extends Construct {
     super(scope, id);
     const stack = Stack.of(this);
     const param = gmailParamName(props.stage);
+    const jevParam = jevParamName(props.stage);
 
     this.fn = nodeFunction(this, "Fn", {
       entry: "services/ingest/src/handler.ts",
@@ -43,6 +46,7 @@ export class Ingest extends Construct {
         TABLE_NAME: props.table.tableName,
         BUCKET_NAME: props.content.bucketName,
         GMAIL_PARAM: param,
+        JEV_PARAM: jevParam,
         STAGE: props.stage,
         NODE_OPTIONS: "--enable-source-maps",
       },
@@ -54,28 +58,14 @@ export class Ingest extends Construct {
       new PolicyStatement({
         effect: Effect.ALLOW,
         actions: ["ssm:GetParameter"],
-        resources: [
-          `arn:${stack.partition}:ssm:${stack.region}:${stack.account}:parameter${param}`,
-        ],
+        resources: [param, jevParam].map(
+          (name) => `arn:${stack.partition}:ssm:${stack.region}:${stack.account}:parameter${name}`,
+        ),
       }),
     );
 
-    // Enrichment (keep in step with MODELS in services/ingest/src/bedrock.ts): Claude Haiku 4.5,
-    // or 5.5 once the account has it, through US cross-region inference profiles, which may run in
-    // any US region; and Titan Text Embeddings V2 in this region.
-    this.fn.addToRolePolicy(
-      new PolicyStatement({
-        effect: Effect.ALLOW,
-        actions: ["bedrock:InvokeModel"],
-        resources: [
-          `arn:${stack.partition}:bedrock:${stack.region}:${stack.account}:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0`,
-          `arn:${stack.partition}:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0`,
-          `arn:${stack.partition}:bedrock:${stack.region}:${stack.account}:inference-profile/us.anthropic.claude-haiku-5-5`,
-          `arn:${stack.partition}:bedrock:*::foundation-model/anthropic.claude-haiku-5-5`,
-          `arn:${stack.partition}:bedrock:${stack.region}::foundation-model/amazon.titan-embed-text-v2:0`,
-        ],
-      }),
-    );
+    // Enrichment, the story index and the day in brief: Claude and Titan.
+    this.fn.addToRolePolicy(bedrockModels(this));
 
     if (props.stage !== "prod") return;
 
