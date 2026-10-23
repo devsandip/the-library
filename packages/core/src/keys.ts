@@ -25,6 +25,8 @@ export const storyKey = (id: string, n: number) => ({
   pk: `ISSUE#${id}`,
   sk: `STORY#${String(n).padStart(2, "0")}`,
 });
+/** How an event's story evolved (#19), kept for the event so its other stories open it free. */
+export const timelineKey = (eventId: string) => ({ pk: `TIMELINE#${eventId}`, sk: "META" });
 
 export const INDEX = {
   /** INBOX (unread + read) | ARCHIVE | SENDERS | STORIES | OPENS */

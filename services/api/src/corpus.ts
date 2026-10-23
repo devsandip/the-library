@@ -49,6 +49,8 @@ export interface Corpus {
   candidates: StoryCandidate[];
   /** Headlines by "<issueId>#<n>". */
   headlines: Map<string, string>;
+  /** Every story by "<issueId>#<n>", for its words (#19). */
+  storiesByKey: Map<string, CorpusStory>;
   /** How many stories each issue was split into. */
   storyCount: Map<string, number>;
 }
@@ -62,6 +64,7 @@ export function buildCorpus(read: { issues: CorpusIssue[]; stories: CorpusStory[
   const stories: StoryVector[] = [];
   const candidates: StoryCandidate[] = [];
   const headlines = new Map<string, string>();
+  const storiesByKey = new Map<string, CorpusStory>();
   const storyCount = new Map<string, number>();
   for (const s of read.stories) {
     const issue = issues.get(s.id);
@@ -78,9 +81,10 @@ export function buildCorpus(read: { issues: CorpusIssue[]; stories: CorpusStory[
       });
     }
     headlines.set(`${s.id}#${s.n}`, s.headline);
+    storiesByKey.set(`${s.id}#${s.n}`, s);
     storyCount.set(s.id, (storyCount.get(s.id) ?? 0) + 1);
   }
-  return { issues, docs, stories, candidates, headlines, storyCount };
+  return { issues, docs, stories, candidates, headlines, storiesByKey, storyCount };
 }
 
 /** The corpus, read at most once per `ttlMs`. A failed read is not kept: the next call tries again. */

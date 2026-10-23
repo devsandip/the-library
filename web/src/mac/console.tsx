@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { useLocation } from "preact-iso";
 import type { IssueDetailResponse, IssueStory, Narrative } from "@library/core/types";
 import type { IssueActions } from "../actions.js";
+import { useApp } from "../context.js";
 import { storyRelated, tally, useRelated, useStories } from "../data.js";
 import { clock, dateShort, narrativeLine } from "../format.js";
 import { useLibrary } from "../library.js";
@@ -20,12 +21,14 @@ import {
 } from "../paths.js";
 import { useOpenIssue } from "../reader.js";
 import { useTheme } from "../theme.js";
+import { elapsed, timelineState, useElapsed, useTimeline, writeTimeline } from "../timeline.js";
 import { health } from "../phone/library-home.js";
 import { ThumbIcon } from "../components/icons.js";
 import { NewsletterFrame } from "../components/newsletter-frame.js";
 import { ContinueItem } from "../components/now-reading.js";
 import { isWebLink } from "../components/peek.js";
 import { namesLine, RelatedList } from "../components/story.js";
+import { TimelinePanel } from "../components/timeline.js";
 import { useToast } from "../components/toast.js";
 import { Failed, Skeleton } from "../components/ui.js";
 import { QueuePane, useQueue } from "./queue.js";
@@ -61,6 +64,7 @@ function Logo() {
  */
 export function Console({ screen, page }: { screen: Screen; page?: preact.ComponentChildren }) {
   const { route } = useLocation();
+  const { api } = useApp();
   const lib = useLibrary();
   const toast = useToast();
   const panes = useMedia(PANES);
@@ -159,6 +163,15 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
           case "u":
             if (!toast.undo()) toast.say("Nothing to undo");
             return true;
+          case "l": {
+            // How this evolved (#19): written only when asked, so L is the asking.
+            if (!st.selected || !stories.length) return false;
+            const t = timelineState(st.selected, n);
+            if (t.status === "kept") toast.say("Kept: the timeline is under the story");
+            else if (t.status !== "writing") writeTimeline(api, st.selected, n);
+            if (!st.panes) setIndexOpen(true);
+            return true;
+          }
         }
         if (!issue || !actions) return false;
         switch (k) {
@@ -261,7 +274,7 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
                   publication={queue.items.find((q) => q.issue.id === selected)?.issue.publication}
                   n={storyN}
                   onPick={(n) => select(selected, n)}
-                  onOpen={(id) => route(queueHref(tab, filters, id))}
+                  onOpen={(id, n) => route(queueHref(tab, filters, id, n))}
                   onClose={panes ? undefined : () => setIndexOpen(false)}
                 />
               ) : (
@@ -288,6 +301,7 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
           <span class="keys">
             <span>J/K issues</span>
             <span>[ ] stories</span>
+            <span>L timeline</span>
             <span>Space peek</span>
             <span>Y useful</span>
             <span>N not useful</span>
@@ -487,9 +501,36 @@ function MacReader({
   );
 }
 
+/** The key grid's L row (M1): write the story's timeline (#19), or how it stands. */
+function TimelineKeys({ id, n }: { id: string; n: number }) {
+  const { state, write } = useTimeline(id, n);
+  const secs = useElapsed(state.status === "writing" ? state.since : undefined);
+  return (
+    <>
+      <span class="keycap">L</span>
+      <button
+        type="button"
+        class="key-action"
+        disabled={state.status === "kept" || state.status === "writing"}
+        onClick={write}
+      >
+        Timeline
+      </button>
+      {state.status === "kept" ? (
+        <span class="kept">✓ Kept</span>
+      ) : state.status === "writing" ? (
+        <span class="writing">● {elapsed(secs)}</span>
+      ) : (
+        <span class="muted">~1¢</span>
+      )}
+    </>
+  );
+}
+
 /**
  * The story index (M1): the issue's stories, the selected one open in the ink box with its keys,
- * who it names, where else it ran and its related stories; the others one line each.
+ * who it names, where else it ran, its timeline once written (#19) and its related stories; the
+ * others one line each.
  */
 function StoryIndex({
   id,
@@ -504,7 +545,8 @@ function StoryIndex({
   publication?: string;
   n?: number;
   onPick: (n: number) => void;
-  onOpen: (id: string) => void;
+  /** Opens an issue, at one of its stories when given. */
+  onOpen: (id: string, n?: number) => void;
   onClose?: () => void;
 }) {
   const stories = useStories(id);
@@ -580,7 +622,16 @@ function StoryIndex({
                   <span class="muted">No source link</span>
                 )}
                 <span />
+                <TimelineKeys id={id} n={s.n} />
               </div>
+              <TimelinePanel
+                key={`${id}#${s.n}`}
+                id={id}
+                n={s.n}
+                href={(rid, rn) => queueHref("news", undefined, rid, rn)}
+                onOpen={onOpen}
+                compact
+              />
               {related.status === "ok" && (
                 <div class="index-related">
                   <p class="label section-label">Related, before and since</p>

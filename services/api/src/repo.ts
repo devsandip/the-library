@@ -39,6 +39,9 @@ import {
   retryOnConflict,
   s3Keys,
   senderItemKey,
+  storyKey,
+  storyRef,
+  timelineKey,
   TOPICS_KEY,
   toVector,
   EMBED_DIMENSIONS,
@@ -68,6 +71,7 @@ import type {
   ShelfSetBy,
   StatusResponse,
   SummaryResponse,
+  Timeline,
   Topic,
   UnreadCount,
   UnreadCountsResponse,
@@ -78,6 +82,7 @@ import type { ListOptions, RepoPort } from "./port.js";
 import type { CorpusIssue, CorpusSource, CorpusStory } from "./corpus.js";
 import type { OwnStory, RelatedSource } from "./related.js";
 import type { SearchSource } from "./search.js";
+import type { StoredTimeline, TimelineStore, TimelineStory } from "./timeline.js";
 
 type Item = Record<string, unknown>;
 
@@ -244,7 +249,9 @@ function decodePhase(cursor: string | undefined): { phase: 1 | 2; cursor?: strin
   return { phase: o.p, cursor: o.c as string | undefined };
 }
 
-export class DynamoRepo implements RepoPort, CorpusSource, SearchSource, RelatedSource {
+export class DynamoRepo
+  implements RepoPort, CorpusSource, SearchSource, RelatedSource, TimelineStore
+{
   private readonly ddb: DynamoDBDocumentClient;
   private readonly s3: S3Client;
   private readonly table: string;
@@ -908,6 +915,64 @@ export class DynamoRepo implements RepoPort, CorpusSource, SearchSource, Related
         },
       ];
     });
+  }
+
+  // ---------- how this evolved (#19) ----------
+
+  /** One story with its embedding and event, and its issue's newsletter, read now. */
+  async timelineStory(id: string, n: number): Promise<TimelineStory | undefined> {
+    const [issue, story] = await Promise.all([
+      this.ddb.send(
+        new GetCommand({
+          TableName: this.table,
+          Key: issueKey(id),
+          ProjectionExpression: "#pub, #c",
+          ExpressionAttributeNames: { "#pub": "publication", "#c": "storyCount" },
+        }),
+      ),
+      this.ddb.send(new GetCommand({ TableName: this.table, Key: storyKey(id, n) })),
+    ]);
+    const s = story.Item;
+    if (!issue.Item || !s || typeof s.receivedAt !== "string") return undefined;
+    const vector = s.vector instanceof Uint8Array ? toVector(s.vector) : undefined;
+    return {
+      issueId: id,
+      n,
+      senderId: s.senderId as string,
+      receivedAt: s.receivedAt,
+      // Without an embedding nothing is close, and there is no timeline to tell.
+      vector: vector?.length === EMBED_DIMENSIONS ? vector : new Float32Array(0),
+      headline: s.headline as string,
+      summary: (s.summary as string | undefined) ?? "",
+      names: (s.names as string[] | undefined) ?? [],
+      eventId: (s.eventId as string | undefined) ?? storyRef(id, n),
+      publication: issue.Item.publication as string,
+      digest: ((issue.Item.storyCount as number | undefined) ?? 0) > 1,
+    };
+  }
+
+  /** The timeline kept for an event, if one was written. */
+  async getTimeline(eventId: string): Promise<Timeline | undefined> {
+    const res = await this.ddb.send(
+      new GetCommand({ TableName: this.table, Key: timelineKey(eventId) }),
+    );
+    const t = res.Item;
+    if (!t) return undefined;
+    return {
+      gist: t.gist as string,
+      points: t.points as Timeline["points"],
+      at: t.at as string,
+      stories: t.stories as number,
+      ms: t.ms as number,
+      cents: t.cents as number,
+    };
+  }
+
+  /** Keeps a timeline for its event, replacing any earlier one. */
+  async putTimeline(eventId: string, timeline: StoredTimeline): Promise<void> {
+    await this.ddb.send(
+      new PutCommand({ TableName: this.table, Item: { ...timelineKey(eventId), ...timeline } }),
+    );
   }
 
   // ---------- search (#53) and related stories (#20) ----------

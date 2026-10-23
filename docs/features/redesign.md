@@ -18,7 +18,7 @@ A second handoff (2026-10-12) kept every layout and changed three things: the na
 ## Decisions
 
 - **Built on the API as it is, plus three fields.** The stories response carries each story's `names` (the story sheet's names line), the Summary carries `digestAt` (the console's "Fixed 07:52"), and History carries `via`, open or peek, so History says "Opened" or "Read" (#56).
-- **Deep dives, Follow and Ask wait for their backends.** The handoff draws Timeline, Backstory, Takes and Source tabs, a job line, verdicts, and Follow and Ask buttons. None has an API yet (#19, #16, #17, #23, #22, #21), so none is shown: no dead controls. The story sheet and the story index show the source and related stories, which exist. Each piece goes in with its issue, in the place the design gives it.
+- **Deep dives, Follow and Ask wait for their backends.** The handoff draws Timeline, Backstory, Takes and Source tabs, a job line, verdicts, and Follow and Ask buttons. Each goes in with its issue, in the place the design gives it, and nothing without an API is shown: no dead controls. Timeline came first (#19, 2026-10-23, `docs/features/timeline.md`); Backstory, Takes, Source, Follow and Ask still wait (#16, #17, #23, #22, #21).
 - **One tap opens a card in the deck** (the handoff's proposed alternative, taken): the card already shows what is inside, so there is no 260 ms wait. Browse keeps tap to peek and double tap to open, and since 2026-10-12 a tap on a row's title opens it at once (`docs/features/tap-for-a-summary.md`).
 - **Irrelevant always archives,** in the deck, on a row, in the reader and with X on the Mac, so the reader's bar has no separate Archive for a digest. A single-story issue gets Archive in place of Stories.
 - **Undo puts back everything a change touched** (rating, archive state, saved state: rules 3 and 4), for every action, from the toast on the phone and with U on the Mac.
@@ -42,7 +42,7 @@ A second handoff (2026-10-12) kept every layout and changed three things: the na
 
 - Nothing here has been tried on a real iPhone: safe areas, pull to refresh inside the home-screen app, the sheet's drag between heights, and VoiceOver.
 - Links to paid sources from the home-screen app: does a link in The Ken open signed in? If the in-app browser does not share Safari's sign-ins, open those links in Safari. Meco's users complain links open signed out of WSJ and NYT (the newsletter-reader research, 2026-10-11).
-- The deep dives and the job line (#19 first), then Follow and Ask.
+- The other deep dives (Backstory, Takes, Source) and the job line, then Follow and Ask. Timeline needs no job line: it answers within its request.
 - Pull to refresh waits a fixed 8 seconds for the Gmail check, as the old refresh button did.
 - Retake the handoff's screens from mock mode for a before and after.
 - Delete the home-screen icon and add it again from `sandip.dev/nutgraf/`: iOS keeps the old name, icon and address until then.

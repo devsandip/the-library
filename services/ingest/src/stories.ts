@@ -8,13 +8,14 @@ import {
   EVENT_WINDOW_DAYS,
   eventFor,
   linkEvents,
+  READER,
   storyRef,
   storyText,
   type EventCandidate,
 } from "@library/core";
 import type { StoryStats } from "@library/core/types";
 import type { ModelPort, ToolRequest } from "./bedrock.js";
-import { READER, type EnrichCandidate } from "./enrich.js";
+import type { EnrichCandidate } from "./enrich.js";
 import type { Store } from "./store.js";
 
 /** About 15,000 tokens. On prod (2026-10-10) the longest issue was 47,600 characters. */

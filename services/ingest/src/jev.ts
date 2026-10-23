@@ -4,7 +4,7 @@
  * (#81), where Learning means craft. Not on Bedrock: it runs on TypeSafe's API, with the key in
  * SSM. Behind a small port so tests can fake it.
  */
-import { READER } from "./enrich.js";
+import { READER } from "@library/core";
 
 export const JEV_PARAM = "/thelibrary/prod/jev/api-key";
 export const JEV_URL = "https://api.typesafe.ai/v1/systemone";

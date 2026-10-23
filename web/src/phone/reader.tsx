@@ -7,11 +7,13 @@ import { goBack, previousPath } from "../nav.js";
 import { BASE } from "../config.js";
 import { issueHref, newsletterHref, slug, todayHref, type Deep } from "../paths.js";
 import { useOpenIssue } from "../reader.js";
+import { useTimeline } from "../timeline.js";
 import { KIND_WORD } from "../sentence.js";
 import { NewsletterFrame } from "../components/newsletter-frame.js";
 import { isWebLink } from "../components/peek.js";
 import { Thumbs } from "../components/thumbs.js";
 import { namesLine, RelatedList } from "../components/story.js";
+import { TimelineMark, TimelinePanel } from "../components/timeline.js";
 import { Failed, Skeleton } from "../components/ui.js";
 
 /** Where the reader came from, for its way back: "‹ Today", "‹ Browse", "‹ Search". */
@@ -170,7 +172,7 @@ export function Reader({ id, story, deep }: { id: string; story?: number; deep?:
           stories={stories}
           n={Math.min(story, stories.length)}
           deep={deep}
-          onStep={(n) => route(issueHref(id, n), true)}
+          onStep={(n) => route(issueHref(id, n, deep), true)}
           onClose={() => {
             if (previousPath() === issueHref(id)) history.back();
             else route(issueHref(id), true);
@@ -186,14 +188,15 @@ type Detent = "medium" | "full";
 
 /**
  * One story of the issue (P4, P5): ‹ › step through the stories, its headline and what it says,
- * who it names and where else it ran, its source, and its related stories from before and since.
- * Drag the grabber between the two heights (down from the lower one closes it); tap the scrim to
- * close.
+ * who it names and where else it ran, its source, the deep dives (Timeline, #19, so far), and its
+ * related stories from before and since. Drag the grabber between the two heights (down from the
+ * lower one closes it); tap the scrim to close.
  */
 function StorySheet({
   issue,
   stories,
   n,
+  deep,
   onStep,
   onClose,
 }: {
@@ -205,10 +208,11 @@ function StorySheet({
   onClose: () => void;
 }) {
   const { route } = useLocation();
-  const [detent, setDetent] = useState<Detent>("medium");
+  const [detent, setDetent] = useState<Detent>(deep ? "full" : "medium");
   const sheet = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const relatedRef = useRef<HTMLDivElement>(null);
+  const deepRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ y: number; pointer: number; dy: number } | undefined>(undefined);
   const related = useRelated(issue.id);
   const s = stories.find((x) => x.n === n) ?? stories[0]!;
@@ -216,6 +220,7 @@ function StorySheet({
   const rel = storyRelated(related.data, s.n, digest);
   const relCount = rel.earlier.length + rel.since.length;
   const names = namesLine(s, [...rel.earlier, ...rel.since], issue.publication);
+  const timeline = useTimeline(issue.id, s.n);
 
   // A new story starts at its top.
   useEffect(() => {
@@ -259,6 +264,17 @@ function StorySheet({
       if (detent === "full") setDetent("medium");
       else onClose();
     }
+  };
+
+  // A tab opens over the whole screen; the same tab again closes it. The URL says which is open.
+  const toggleDeep = (tab: Deep) => {
+    const open = deep !== tab;
+    route(issueHref(issue.id, s.n, open ? tab : undefined), true);
+    if (!open) return;
+    setDetent("full");
+    requestAnimationFrame(() =>
+      deepRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }),
+    );
   };
 
   const showRelated = () => {
@@ -334,6 +350,27 @@ function StorySheet({
               Related {related.status === "ok" ? relCount : "…"}
             </button>
           </div>
+          <div class="deep-tabs" role="tablist" aria-label="Go deeper" ref={deepRef}>
+            <button
+              type="button"
+              role="tab"
+              class="deep-tab"
+              aria-selected={deep === "timeline"}
+              onClick={() => toggleDeep("timeline")}
+            >
+              Timeline
+              <TimelineMark state={timeline.state} />
+            </button>
+          </div>
+          {deep === "timeline" && (
+            <TimelinePanel
+              key={`${issue.id}#${s.n}`}
+              id={issue.id}
+              n={s.n}
+              href={(rid, rn) => issueHref(rid, rn)}
+              onOpen={(rid, rn) => route(issueHref(rid, rn))}
+            />
+          )}
           <div class="story-related" ref={relatedRef}>
             <p class="label section-label">Related, before and since</p>
             {related.status === "loading" && <p class="related-none">Looking…</p>}
