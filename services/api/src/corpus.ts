@@ -29,6 +29,8 @@ export interface CorpusStory {
   headline: string;
   summary: string;
   names: string[];
+  /** The event it belongs to (#15), linking stories of the same news across newsletters. */
+  eventId?: string;
   vector?: Float32Array;
 }
 

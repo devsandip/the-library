@@ -211,6 +211,38 @@ export interface AskResponse {
   cents: number;
 }
 
+/** One newsletter's take on an event (#17): what it says or stresses, and its story. */
+export interface Take {
+  text: string;
+  source: TimelineSource;
+  /** The story that is open. */
+  current?: true;
+}
+
+/** Newsletters that land in the same place, under a short label ("Skeptical"). */
+export interface TakeGroup {
+  label: string;
+  takes: Take[];
+}
+
+/** How each of Sandip's newsletters covered one event (#17, the first layer), kept per event. */
+export interface Takes {
+  /** Where the newsletters agree and differ, in one sentence. */
+  gist: string;
+  groups: TakeGroup[];
+  at: string;
+  /** Newsletters compared, the open story's included. */
+  newsletters: number;
+  ms: number;
+  cents: number;
+}
+
+/** GET and POST /issues/{id}/stories/{n}/takes: the kept takes, or why there are none. */
+export interface TakesResponse {
+  takes?: Takes;
+  none?: string;
+}
+
 /** One step in how a story evolved (#19). */
 export interface TimelinePoint {
   /** When the newsletters first carried it: the earliest of its stories. */

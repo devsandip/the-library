@@ -44,6 +44,7 @@ import {
   storyKey,
   storyRef,
   storyShelf,
+  takesKey,
   timelineKey,
   TOPICS_KEY,
   toVector,
@@ -79,6 +80,7 @@ import type {
   StoryShelfSetBy,
   StoryState,
   SummaryResponse,
+  Takes,
   Timeline,
   Topic,
   UnreadCount,
@@ -90,6 +92,7 @@ import type { ListOptions, RepoPort } from "./port.js";
 import type { CorpusIssue, CorpusSource, CorpusStory } from "./corpus.js";
 import type { OwnStory, RelatedSource } from "./related.js";
 import type { SearchSource } from "./search.js";
+import type { StoredTakes, TakesStore } from "./takes.js";
 import type { StoredTimeline, TimelineStore, TimelineStory } from "./timeline.js";
 
 type Item = Record<string, unknown>;
@@ -293,7 +296,7 @@ function decodePhase(cursor: string | undefined): { phase: 1 | 2; cursor?: strin
 }
 
 export class DynamoRepo
-  implements RepoPort, CorpusSource, SearchSource, RelatedSource, TimelineStore
+  implements RepoPort, CorpusSource, SearchSource, RelatedSource, TimelineStore, TakesStore
 {
   private readonly ddb: DynamoDBDocumentClient;
   private readonly s3: S3Client;
@@ -1271,6 +1274,29 @@ export class DynamoRepo
     };
   }
 
+  async getTakes(eventId: string): Promise<Takes | undefined> {
+    const res = await this.ddb.send(
+      new GetCommand({ TableName: this.table, Key: takesKey(eventId) }),
+    );
+    const t = res.Item;
+    if (!t) return undefined;
+    return {
+      gist: t.gist as string,
+      groups: t.groups as Takes["groups"],
+      at: t.at as string,
+      newsletters: t.newsletters as number,
+      ms: t.ms as number,
+      cents: t.cents as number,
+    };
+  }
+
+  /** Keeps takes for their event (#17), replacing any earlier ones. */
+  async putTakes(eventId: string, takes: StoredTakes): Promise<void> {
+    await this.ddb.send(
+      new PutCommand({ TableName: this.table, Item: { ...takesKey(eventId), ...takes } }),
+    );
+  }
+
   /** Keeps a timeline for its event, replacing any earlier one. */
   async putTimeline(eventId: string, timeline: StoredTimeline): Promise<void> {
     await this.ddb.send(
@@ -1347,7 +1373,7 @@ export class DynamoRepo
               ":from": from,
               ":to": new Date(Date.parse(from) + WEEK).toISOString(),
             },
-            ProjectionExpression: "#id, #n, #h, #s, #names, #v",
+            ProjectionExpression: "#id, #n, #h, #s, #names, #v, #ev",
             ExpressionAttributeNames: {
               "#id": "id",
               "#n": "n",
@@ -1355,6 +1381,7 @@ export class DynamoRepo
               "#s": "summary",
               "#names": "names",
               "#v": "vector",
+              "#ev": "eventId",
             },
           }),
         ),
@@ -1367,6 +1394,7 @@ export class DynamoRepo
           headline: s.headline as string,
           summary: (s.summary as string | undefined) ?? "",
           names: (s.names as string[] | undefined) ?? [],
+          ...(typeof s.eventId === "string" ? { eventId: s.eventId } : {}),
           ...(vector?.length === EMBED_DIMENSIONS ? { vector } : {}),
         });
       }
