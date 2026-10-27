@@ -17,6 +17,7 @@ import type {
   SenderListItem,
   SenderPatch,
   Shelf,
+  SourceResponse,
   StatusResponse,
   StoryPatch,
   SummaryResponse,
@@ -98,6 +99,12 @@ export interface TakesPort {
   run(id: string, n: number): Promise<TakesResponse>;
 }
 
+/** A story checked against its source (#23): the kept check, or one run now. */
+export interface SourcePort {
+  get(id: string, n: number): Promise<SourceResponse>;
+  run(id: string, n: number): Promise<SourceResponse>;
+}
+
 /** A question answered from the newsletters (#21). */
 export interface AskPort {
   ask(q: string): Promise<AskResponse>;
@@ -109,6 +116,7 @@ export interface Services {
   related: RelatedPort;
   timelines: TimelinePort;
   takes: TakesPort;
+  sources: SourcePort;
   ask: AskPort;
   /** Fire-and-forget ingest run ("refresh now"). */
   startIngest(): Promise<void>;

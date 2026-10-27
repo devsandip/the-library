@@ -19,6 +19,7 @@ import {
   shelfFor,
   storyIndexAttributes,
   storyKey,
+  sourceKey,
   storyRef,
   takesKey,
   timelineKey,
@@ -27,6 +28,7 @@ import {
 } from "@library/core";
 import type {
   AskResponse,
+  SourceResponse,
   TakesResponse,
   LearningListResponse,
   HistoryResponse,
@@ -1340,6 +1342,67 @@ describe("API on dev", () => {
         ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: storyKey(id, 41) })),
       ),
       ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: takesKey("int-ipo") })),
+    ]);
+  });
+
+  it("source: a story checked against the page it links to; a private address refused (#23)", async () => {
+    const tldr = (await getItem("fx-tldr"))!;
+    const put = (n: number, headline: string, summary: string, link: string) =>
+      ddb.send(
+        new PutCommand({
+          TableName: stack.tableName,
+          Item: {
+            ...storyKey("fx-tldr", n),
+            id: "fx-tldr",
+            n,
+            senderId: tldr.senderId,
+            receivedAt: tldr.receivedAt,
+            headline,
+            summary,
+            names: ["IETF"],
+            link,
+          },
+        }),
+      );
+    // RFC 2606, as plain text: it has not changed since 1999.
+    await put(
+      51,
+      "The IETF reserves .test, .example, .invalid and .localhost",
+      "Four top-level names are kept out of the DNS for testing, documentation and examples, and example.com, .net and .org are reserved too.",
+      "https://www.rfc-editor.org/rfc/rfc2606.txt",
+    );
+    await put(
+      52,
+      "Cloud secrets",
+      "A link to the metadata service.",
+      "http://169.254.169.254/latest/meta-data/",
+    );
+
+    expect((await call<SourceResponse>("GET", "/issues/fx-tldr/stories/51/source")).body).toEqual(
+      {},
+    );
+    const ran = await call<SourceResponse>("POST", "/issues/fx-tldr/stories/51/source");
+    expect(ran.status).toBe(200);
+    const check = ran.body.check!;
+    expect(check.url).toBe("https://www.rfc-editor.org/rfc/rfc2606.txt");
+    expect(check.claims.length).toBeGreaterThan(0);
+    expect(["holds", "further", "mixed"]).toContain(check.verdict);
+    // Every quote shown is on the page.
+    for (const c of check.claims) if (c.quote) expect(c.quote.length).toBeGreaterThan(7);
+    expect(
+      (await call<SourceResponse>("GET", "/issues/fx-tldr/stories/51/source")).body.check?.url,
+    ).toBe(check.url);
+
+    const refused = await call<SourceResponse>("POST", "/issues/fx-tldr/stories/52/source");
+    expect(refused.body).toEqual({
+      none: "The source could not be read: the address is not a public one.",
+    });
+
+    await Promise.all([
+      ...[51, 52].map((n) =>
+        ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: storyKey("fx-tldr", n) })),
+      ),
+      ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: sourceKey("fx-tldr", 51) })),
     ]);
   });
 });

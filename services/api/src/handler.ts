@@ -10,6 +10,7 @@ import { API_PREFIX, route, type Request } from "./routes.js";
 import { CorpusCache } from "./corpus.js";
 import { Related } from "./related.js";
 import { Search } from "./search.js";
+import { Sources } from "./source.js";
 import { Takes } from "./takes.js";
 import { Timelines } from "./timeline.js";
 
@@ -104,6 +105,7 @@ export const handler = createHandler({
   related: new Related(repo, corpus),
   timelines: new Timelines(repo, corpus, claude),
   takes: new Takes(repo, corpus, claude),
+  sources: new Sources(repo, claude),
   ask: new Asks(repo, corpus, new TitanEmbedder(), claude),
   startIngest: async () => {
     await lambda.send(
