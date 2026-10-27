@@ -31,6 +31,8 @@ import type {
   StatusResponse,
   StoryPatch,
   SummaryResponse,
+  Takes,
+  TakesResponse,
   Timeline,
   TimelinePoint,
   TimelineResponse,
@@ -635,6 +637,7 @@ function namesIn(text: string): { names?: string[] } {
 
 /** Timelines written in mock mode (#19), by "<issueId>#<n>". */
 const timelines = new Map<string, Timeline>();
+const takesKept = new Map<string, Takes>();
 
 export class MockLibraryApi implements LibraryApi {
   async listIssues(opts: ListIssuesOptions): Promise<IssueListResponse> {
@@ -929,6 +932,67 @@ export class MockLibraryApi implements LibraryApi {
     };
     timelines.set(`${id}#${n}`, timeline);
     return { timeline };
+  }
+
+  async takes(id: string, n: number): Promise<TakesResponse> {
+    await delay();
+    const takes = takesKept.get(`${id}#${n}`);
+    return takes ? { takes } : {};
+  }
+
+  /**
+   * A stand-in for Claude's takes (#17): the story's related stories from other newsletters, the
+   * first half "Just the facts", the rest "Reads more into it".
+   */
+  async writeTakes(id: string, n: number): Promise<TakesResponse> {
+    const started = Date.now();
+    const me = find(id);
+    const own = mockStories(me).stories;
+    const story = own.find((s) => s.n === n);
+    if (!story) throw new Error("issue has no such story");
+    const related = await this.related(id);
+    const near = own.length > 1 ? related.stories?.find((s) => s.n === n) : related;
+    const others = (near ? [...near.earlier, ...near.since] : []).filter(
+      (i, k, all) =>
+        i.publication !== me.publication &&
+        all.findIndex((x) => x.publication === i.publication) === k,
+    );
+    await delay(2200);
+    if (!others.length) return { none: `Only ${me.publication} carried this in your newsletters.` };
+    const take = (i: (typeof others)[number]) => ({
+      text: `${i.publication} leads with ${(i.story?.headline ?? i.subject).replace(/\.$/, "").toLowerCase()}.`,
+      source: { issueId: i.id, publication: i.publication, ...(i.story ? { story: i.story } : {}) },
+    });
+    const half = Math.ceil(others.length / 2);
+    const takes: Takes = {
+      gist: "A stand-in from mock mode: the story's related stories, split into two groups.",
+      groups: [
+        {
+          label: "Just the facts",
+          takes: [
+            {
+              text: `${me.publication} reports ${story.headline.toLowerCase()}.`,
+              source: {
+                issueId: id,
+                publication: me.publication,
+                ...(own.length > 1 ? { story: { n, headline: story.headline } } : {}),
+              },
+              current: true as const,
+            },
+            ...others.slice(0, half).map(take),
+          ],
+        },
+        ...(others.length > half
+          ? [{ label: "Reads more into it", takes: others.slice(half).map(take) }]
+          : []),
+      ],
+      at: new Date().toISOString(),
+      newsletters: others.length + 1,
+      ms: Date.now() - started,
+      cents: 0.8,
+    };
+    takesKept.set(`${id}#${n}`, takes);
+    return { takes };
   }
 
   /**

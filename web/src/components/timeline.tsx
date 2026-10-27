@@ -1,11 +1,11 @@
+import type { ComponentChildren } from "preact";
+import type { TimelineSource } from "@library/core/types";
 import { clock, shortDate } from "../format.js";
 import { clickInPlace } from "../nav.js";
-import { elapsed, useElapsed, useTimeline, type TimelineState } from "../timeline.js";
-
-const SCOPE = "Your newsletters · last 4 weeks · ~1¢ · a few seconds";
+import { elapsed, useElapsed, useTakes, useTimeline, type DeepState } from "../timeline.js";
 
 /** A deep-dive tab's mark (P4): ✓ kept, ● writing. */
-export function TimelineMark({ state }: { state: TimelineState }) {
+export function DeepMark({ state }: { state: DeepState<unknown> }) {
   if (state.status === "kept") {
     return (
       <span class="deep-mark kept" aria-label="kept">
@@ -29,29 +29,61 @@ function receipt(t: { at: string; ms: number; cents: number }): string {
   return `Written ${day} ${clock(t.at)} · ${Math.max(1, Math.round(t.ms / 1000))} s · ${t.cents || "<0.1"}¢`;
 }
 
-/**
- * How this evolved (#19), the Timeline tab (P4). Idle, it says what it does and what it costs,
- * with Run: it never runs on its own. Writing, a ticking status over skeleton points. Kept, the
- * gist and the dated points, each opening the issue that first carried it, then the receipt. In
- * the Mac's story index it is compact: a date column and the text, written with L.
- */
-export function TimelinePanel({
-  id,
-  n,
-  href,
-  onOpen,
-  compact = false,
-}: {
-  id: string;
-  n: number;
+/** Where a deep dive's links go, and how a click opens them in place on the Mac. */
+interface Links {
   href: (issueId: string, story?: number) => string;
   onOpen?: (issueId: string, story?: number) => void;
-  compact?: boolean;
+}
+
+/** A link to the issue a source is from, at its story inside a digest. */
+function SourceLink({
+  s,
+  links,
+  children,
+}: {
+  s: TimelineSource;
+  links: Links;
+  children: ComponentChildren;
 }) {
-  const { state, write, retry } = useTimeline(id, n);
+  return (
+    <a
+      href={links.href(s.issueId, s.story?.n)}
+      onClick={(e) => {
+        const open = links.onOpen;
+        if (open) clickInPlace(e, () => open(s.issueId, s.story?.n));
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
+/**
+ * A deep dive's tab (P4), whatever its kind. Idle, it says what it does and what it costs, with
+ * Run: it never runs on its own. Writing, a ticking status over skeleton lines. Kept, the
+ * result, its receipt and Write again. In the Mac's story index it is compact, written by a key.
+ */
+function DeepPanel<T extends { at: string; ms: number; cents: number }>({
+  name,
+  desc,
+  scope,
+  cost,
+  deep,
+  compact,
+  children,
+}: {
+  name: string;
+  desc: string;
+  scope: string;
+  cost: string;
+  deep: { state: DeepState<T>; write: () => void; retry: () => void };
+  compact: boolean;
+  children: (value: T) => ComponentChildren;
+}) {
+  const { state, write, retry } = deep;
   const secs = useElapsed(state.status === "writing" ? state.since : undefined);
   const cls = `deep${compact ? " compact" : ""}`;
-  const title = !compact && <p class="deep-title">How this evolved</p>;
+  const title = !compact && <p class="deep-title">{name}</p>;
 
   switch (state.status) {
     case "loading":
@@ -80,14 +112,11 @@ export function TimelinePanel({
       return (
         <div class={cls}>
           {title}
-          <p class="deep-desc">
-            This story against the last four weeks of your newsletters, step by step, each step
-            linked to the issue that carried it.
-          </p>
-          <p class="label deep-scope">{SCOPE}</p>
+          <p class="deep-desc">{desc}</p>
+          <p class="label deep-scope">{scope}</p>
           {state.none && <p class="related-none deep-none">{state.none}</p>}
           <button type="button" class="btn fill deep-run" onClick={write}>
-            Run · ~1¢
+            Run · {cost}
           </button>
           <p class="deep-foot">
             Runs only when you ask. Kept for this story afterwards, so a second look is free.
@@ -104,7 +133,7 @@ export function TimelinePanel({
               Writing · {elapsed(secs)}
             </span>
           </div>
-          {!compact && <p class="label deep-scope">{SCOPE}</p>}
+          {!compact && <p class="label deep-scope">{scope}</p>}
           <ol class="deep-skeleton" aria-hidden="true">
             <li />
             <li />
@@ -115,24 +144,51 @@ export function TimelinePanel({
           )}
         </div>
       );
-    case "kept": {
-      const t = state.timeline;
+    case "kept":
       return (
         <div class={cls}>
           {title}
+          {children(state.value)}
+          <p class="label deep-receipt">
+            {receipt(state.value)}
+            {compact ? "" : " · kept for this event, free to reopen"}
+          </p>
+          <button type="button" class="link-btn label deep-again" onClick={write}>
+            Write again · {cost}
+          </button>
+        </div>
+      );
+  }
+}
+
+/**
+ * How this evolved (#19), the Timeline tab: the gist and the dated points, each opening the
+ * issue that first carried it. Compact on the Mac: a date column and the text, written with L.
+ */
+export function TimelinePanel({
+  id,
+  n,
+  compact = false,
+  ...links
+}: { id: string; n: number; compact?: boolean } & Links) {
+  return (
+    <DeepPanel
+      name="How this evolved"
+      desc="This story against the last four weeks of your newsletters, step by step, each step linked to the issue that carried it."
+      scope="Your newsletters · last 4 weeks · ~1¢ · a few seconds"
+      cost="~1¢"
+      deep={useTimeline(id, n)}
+      compact={compact}
+    >
+      {(t) => (
+        <>
           <p class="deep-gist">{t.gist}</p>
           <ol class={`timeline${compact ? " compact" : ""}`}>
             {t.points.map((p, k) => {
-              const first = p.sources[0]!;
               const pubs = [...new Set(p.sources.map((s) => s.publication))].join(", ");
               return (
                 <li key={k} class={p.current ? "current" : undefined}>
-                  <a
-                    href={href(first.issueId, first.story?.n)}
-                    onClick={(e) => {
-                      if (onOpen) clickInPlace(e, () => onOpen(first.issueId, first.story?.n));
-                    }}
-                  >
+                  <SourceLink s={p.sources[0]!} links={links}>
                     <span class="timeline-when label">
                       {shortDate(p.at)}
                       {!compact && ` · ${pubs}`}
@@ -142,20 +198,62 @@ export function TimelinePanel({
                       {p.text}
                       {compact && <span class="timeline-pub"> · {pubs}</span>}
                     </span>
-                  </a>
+                  </SourceLink>
                 </li>
               );
             })}
           </ol>
-          <p class="label deep-receipt">
-            {receipt(t)}
-            {compact ? "" : " · kept for this event, free to reopen"}
-          </p>
-          <button type="button" class="link-btn label deep-again" onClick={write}>
-            Write again · ~1¢
-          </button>
-        </div>
-      );
-    }
-  }
+        </>
+      )}
+    </DeepPanel>
+  );
+}
+
+/**
+ * What your newsletters say (#17), the Takes tab: the gist, then the newsletters grouped by where
+ * they land, each one's sentence opening its story. Compact on the Mac, written with T.
+ */
+export function TakesPanel({
+  id,
+  n,
+  compact = false,
+  ...links
+}: { id: string; n: number; compact?: boolean } & Links) {
+  return (
+    <DeepPanel
+      name="What your newsletters say"
+      desc="How each of your newsletters covered this, side by side and grouped by where they land, each take linked to its story."
+      scope="Your newsletters · the same news · ~1¢ · a few seconds"
+      cost="~1¢"
+      deep={useTakes(id, n)}
+      compact={compact}
+    >
+      {(t) => (
+        <>
+          <p class="deep-gist">{t.gist}</p>
+          {t.groups.map((g) => (
+            <section key={g.label} class={`takes-group${compact ? " compact" : ""}`}>
+              <p class="label takes-label">{g.label}</p>
+              <ul class="takes">
+                {g.takes.map((take) => (
+                  <li
+                    key={`${take.source.issueId}#${take.source.story?.n ?? ""}`}
+                    class={take.current ? "current" : undefined}
+                  >
+                    <SourceLink s={take.source} links={links}>
+                      <span class="takes-pub label">
+                        {take.source.publication}
+                        {take.current && " · This story"}
+                      </span>
+                      <span class="takes-text">{take.text}</span>
+                    </SourceLink>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </>
+      )}
+    </DeepPanel>
+  );
 }

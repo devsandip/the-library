@@ -10,6 +10,13 @@ When several of my newsletters covered the same event, each one's take side by s
 - **Checked by the code.** Every story id must be one it sent; each newsletter counts once, in the first group that has it; empty groups go. A take links to its issue, at its story inside a digest; the open story's take is marked. Fewer than two newsletters left means there is nothing to compare: "Only The Ken carried this in your newsletters." Nothing is kept then, so it can be tried again when more arrive.
 - **Kept for the event** (`TAKES#<eventId>`), so the same news reached from another newsletter opens free.
 
+## The tab (#109)
+
+- **Phone:** the story sheet's Takes tab beside Timeline (`/issue/:id/story/:n/takes`). Idle, it says what it does and costs (`Your newsletters · the same news · ~1¢ · a few seconds`) with Run; ● and "Writing · 0:02" while it writes; ✓ once kept. Kept, the gist, then each group's label over its newsletters' sentences, each opening its story; the open story's is marked "This story" with a yellow edge. Then the receipt and Write again.
+- **Mac:** the story index's key grid has a T row (T writes them), and the takes show compactly under the selected story, under its timeline.
+- **One deep-dive frame.** Timeline and Takes share the state per story and kind (`web/src/timeline.ts`: a small `deepDive` factory) and the panel's idle, writing, error and kept frame (`DeepPanel` in `web/src/components/timeline.tsx`); each brings its words and its kept view. Backstory and Source will slot in the same way.
+- **Mock mode** writes stand-in takes from the mock's related stories, in two groups.
+
 ## Decisions
 
 - **In the request, not a job.** The design budgets Takes at up to 90 seconds because its web layer searches. The newsletters-only layer is one call over at most nine stories, like a timeline, so it answers directly.
