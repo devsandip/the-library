@@ -24,10 +24,13 @@ import { useOpenIssue } from "../reader.js";
 import { useStoryActions, useStoryRead, type StoryActions } from "../learning.js";
 import { useTheme } from "../theme.js";
 import {
+  checkSource,
   elapsed,
+  sourceState,
   takesState,
   timelineState,
   useElapsed,
+  useSource,
   useTakes,
   useTimeline,
   writeTakes,
@@ -40,7 +43,7 @@ import { NewsletterFrame } from "../components/newsletter-frame.js";
 import { ContinueItem } from "../components/now-reading.js";
 import { isWebLink } from "../components/peek.js";
 import { namesLine, RelatedList } from "../components/story.js";
-import { TakesPanel, TimelinePanel } from "../components/timeline.js";
+import { SourcePanel, TakesPanel, TimelinePanel } from "../components/timeline.js";
 import { useToast } from "../components/toast.js";
 import { Failed, Skeleton } from "../components/ui.js";
 import { QueuePane, useQueue } from "./queue.js";
@@ -192,6 +195,15 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
             if (!st.panes) setIndexOpen(true);
             return true;
           }
+          case "c": {
+            // Check the source (#23): only when asked, so C is the asking.
+            if (!st.selected || !stories.length) return false;
+            const c = sourceState(st.selected, n);
+            if (c.status === "kept") toast.say("Kept: the check is under the story");
+            else if (c.status !== "writing") checkSource(api, st.selected, n);
+            if (!st.panes) setIndexOpen(true);
+            return true;
+          }
           case "t": {
             // Takes (#17): written only when asked, so T is the asking.
             if (!st.selected || !stories.length) return false;
@@ -340,6 +352,7 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
             <span>[ ] stories</span>
             <span>L timeline</span>
             <span>T takes</span>
+            <span>C source</span>
             <span>Space peek</span>
             <span>Y useful</span>
             <span>N not useful</span>
@@ -573,6 +586,11 @@ function TimelineKeys({ id, n }: { id: string; n: number }) {
   return <DeepKeys k="L" label="Timeline" deep={useTimeline(id, n)} />;
 }
 
+/** The key grid's C row: check the story against its source (#23), or how it stands. */
+function SourceKeys({ id, n }: { id: string; n: number }) {
+  return <DeepKeys k="C" label="Check source" deep={useSource(id, n)} />;
+}
+
 /** The key grid's T row: write the story's takes (#17), or how they stand. */
 function TakesKeys({ id, n }: { id: string; n: number }) {
   return <DeepKeys k="T" label="Takes" deep={useTakes(id, n)} />;
@@ -715,6 +733,7 @@ function StoryIndex({
                 <span />
                 <TimelineKeys id={id} n={s.n} />
                 <TakesKeys id={id} n={s.n} />
+                <SourceKeys id={id} n={s.n} />
               </div>
               <TimelinePanel
                 key={`${id}#${s.n}`}
@@ -724,6 +743,7 @@ function StoryIndex({
                 onOpen={onOpen}
                 compact
               />
+              <SourcePanel key={`source-${id}#${s.n}`} id={id} n={s.n} compact />
               <TakesPanel
                 key={`takes-${id}#${s.n}`}
                 id={id}

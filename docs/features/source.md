@@ -13,9 +13,25 @@ A story against the page it links to: what the newsletter claimed, what the page
 - **Quotes checked.** A quote is kept only when the page holds it word for word, case, spacing and curly quotes aside. So a quote shown is always the page's own words; a claim whose quote did not match keeps its sentence without one.
 - **No check when there is nothing to check.** No link: "This story has no source link to check." A page that cannot be read says why ("The source could not be read: the address is not a public one."). A page with almost no text, or one Claude says is not the article (a paywall, a sign-in, a home page): "The source could not be read as an article". Nothing is kept then.
 
+## The tab (#116)
+
+- **Phone:** the story sheet's Source tab, after Timeline and Takes (`/issue/:id/story/:n/source`). Idle, what it reads and costs (`The page it links to · ~1¢ · under half a minute`) with Run; "Checking · 0:02" while it runs; ✓ once kept. Kept: the overall verdict (Holds up in green, Goes further than the source in yellow, Not in the source in red, or Mixed), the page's host as a link, the note, then each claim with its verdict, what the page says, and the quote in italics. The receipt says it is kept for this story.
+- **Mac:** the story index's key grid has a C row ("Check source", as the design draws it), C runs it, and the check shows compactly under the selected story.
+- Built on the shared deep-dive store and frame (`web/src/timeline.ts`, `DeepPanel`), which now take what the status line says while running and whether a result is kept for the event or the story.
+- **Mock mode** checks against a stand-in page: one claim that holds, one the newsletter took further.
+
 ## Decisions
 
 - **One page, not an agent.** #23 has Claude follow links until it reaches the primary source. This version reads the page the story links to and says when that page itself reports another source (the note). The hunt is the next step, if notes keep pointing elsewhere.
 - **Haiku, about half a cent.** The design costed Source at about 10¢ for an agent; one call over one page costs far less.
 - **The safety lives in the connection,** not in a check before it: a check-then-fetch can be beaten by a DNS answer that changes between the two, so the address is checked as the socket connects.
 - **Kept per story,** not per event like the timeline and takes: two newsletters on one event link to different pages.
+
+## Probe (2026-10-27, prod, eight recent stories from eight newsletters, through the API Lambda)
+
+Only the outcome of each was printed, not the stories or pages.
+
+- **Five checked,** in 3.2 to 6.3 seconds for 0.4 to 0.7 cents: three hold up, two go further than their source; two to five claims each, and zero to three quotes per check survived the word-for-word match.
+- **Three not read:** a 403 and a 429 (sites that turn away automated readers) and a paywall, each answered with the reason.
+- So about five links in eight can be checked as they are. The reader announces itself honestly ("Nutgraf source check") rather than passing as a browser; sites that refuse it stay refused.
+
