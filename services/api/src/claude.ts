@@ -24,8 +24,9 @@ export interface ClaudePort {
 }
 
 export class BedrockClaude implements ClaudePort {
-  // One retry: the reader is waiting, and the Lambda has 15 seconds.
-  constructor(private readonly client = new BedrockRuntimeClient({ maxAttempts: 2 })) {}
+  // Two retries, with the SDK's backoff: the reader is waiting, within the Lambda's 28 seconds.
+  // One retry let a brief "ServiceUnavailableException" from Bedrock through (2026-10-27).
+  constructor(private readonly client = new BedrockRuntimeClient({ maxAttempts: 3 })) {}
 
   async callTool(req: ToolRequest): Promise<ToolResult> {
     const res = await this.client.send(
