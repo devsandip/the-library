@@ -1,7 +1,7 @@
 /**
- * Enrichment: Claude reads each stored issue once and returns a one-line summary, its shelf (News
- * or Learning), one topic from the topic list, and how much of it is selling (a promo is archived;
- * account mail, which is no issue at all, is filtered).
+ * Enrichment: Claude reads each stored issue once and returns a one-line summary, one topic from
+ * the topic list, and how much of it is selling (a promo is archived; account mail, which is no
+ * issue at all, is filtered). The issue's shelf follows its stories (#81), not Claude.
  * Titan adds an embedding
  * for Phase 2 ranking. Runs after every ingest for new issues (retrying recent failures) and on
  * demand for the backlog (`pnpm enrich`). The topic list is proposed once (`pnpm topics`).
@@ -31,9 +31,9 @@ export function compactText(text: string): string {
 export const SELLING = ["none", "ad-supported", "promo", "account"] as const;
 export type Selling = (typeof SELLING)[number];
 
+/** Claude's call on an issue. Its shelf is no longer Claude's: it follows its stories (#81). */
 export interface Classification {
   summary: string;
-  shelf: Shelf;
   topic: string;
   selling: Selling;
   /** selling === "promo" */
@@ -51,10 +51,6 @@ export function classifyRequest(
       "Call classify_issue for the issue the user sends:",
       "- summary: one plain sentence of at most 25 words on what the issue covers. Specific, no " +
         'hype. Do not start with "This issue" or the newsletter\'s name.',
-      '- shelf: "news" if its value fades within weeks: what happened, launches, funding and ' +
-        "deals, markets, politics, this week's links and quick takes. A digest of links is news. " +
-        '"learning" if it would still be worth reading in three months: explanations, deep ' +
-        "dives, how-tos, frameworks, case studies, interviews about craft, essays.",
       "- topic: the one topic below that fits best.",
       "- selling: how much of the issue is selling something, or whether it is an issue at all.",
       '  "promo": the whole issue exists to sell: a subscription or upgrade offer, a course or ' +
@@ -81,11 +77,10 @@ export function classifyRequest(
         type: "object",
         properties: {
           summary: { type: "string", description: "One sentence, at most 25 words." },
-          shelf: { type: "string", enum: ["news", "learning"] },
           topic: { type: "string", enum: topics.map((t) => t.name) },
           selling: { type: "string", enum: [...SELLING] },
         },
-        required: ["summary", "shelf", "topic", "selling"],
+        required: ["summary", "topic", "selling"],
       },
     },
     maxTokens: 300,
@@ -97,8 +92,6 @@ export function parseClassification(input: unknown, topics: Topic[]): Classifica
   const o = (input ?? {}) as Record<string, unknown>;
   const summary = typeof o.summary === "string" ? o.summary.replace(/\s+/g, " ").trim() : "";
   if (!summary) throw new Error("classification has no summary");
-  if (o.shelf !== "news" && o.shelf !== "learning")
-    throw new Error(`bad shelf: ${String(o.shelf)}`);
   const asked = String(o.topic).toLowerCase();
   const topic = topics.find((t) => t.name.toLowerCase() === asked)?.name;
   if (!topic) throw new Error(`unknown topic: ${String(o.topic)}`);
@@ -106,7 +99,6 @@ export function parseClassification(input: unknown, topics: Topic[]): Classifica
   if (!selling) throw new Error(`bad selling: ${String(o.selling)}`);
   return {
     summary: summary.slice(0, 300),
-    shelf: o.shelf,
     topic,
     selling,
     promo: selling === "promo",

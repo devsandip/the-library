@@ -145,11 +145,14 @@ function fakes(opts: {
   return { store, model, putNarrative };
 }
 
-/** Ten News stories from ten issues, plus a promo, a muted newsletter and a Learning issue. */
+/** Ten News stories from ten issues, plus a promo, a muted newsletter and a Learning story. */
 const day = () => {
   const ids = Array.from({ length: 10 }, (_, k) => `n${k}`);
   return {
-    stories: [...ids, "promo", "muted", "learn"].map((id) => story(id, 1)),
+    stories: [
+      ...[...ids, "promo", "muted"].map((id) => story(id, 1)),
+      { ...story("learn", 1), shelf: "learning" as const },
+    ],
     issues: [
       ...ids.map((id) => issue(id)),
       issue("promo", { promo: true }),
@@ -160,6 +163,20 @@ const day = () => {
 };
 
 describe("writeNarrative", () => {
+  it("goes by each story's shelf, not its issue's (#81)", async () => {
+    const d = day();
+    // A craft story inside a News digest stays out; a News story in an issue once called
+    // Learning, and one not shelved yet, get in.
+    d.stories.push(
+      { ...story("n0", 2), shelf: "learning" },
+      { ...story("old", 1), shelf: "news" },
+      story("new", 1),
+    );
+    d.issues.push(issue("old", { shelf: "learning" }), issue("new"));
+    const { store, model } = fakes(d);
+    expect((await writeNarrative(store, model, { now: NOW })).stories).toBe(12);
+  });
+
   it("writes a narrative from the last day's News stories only", async () => {
     const { store, model, putNarrative } = fakes(day());
     const stats = await writeNarrative(store, model, { now: NOW });

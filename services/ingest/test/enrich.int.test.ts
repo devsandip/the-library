@@ -4,13 +4,20 @@
  * model access (a one-time form in the Bedrock console); otherwise those tests are skipped.
  */
 import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
-import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  DeleteCommand,
+  GetCommand,
+  PutCommand,
+  QueryCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   embeddingKey,
   issueKey,
   senderIdentity,
   senderItemKey,
+  storyIndexAttributes,
   storyKey,
   TOPICS_KEY,
 } from "@library/core";
@@ -95,8 +102,8 @@ describe("enrichment on dev", () => {
     for (const id of FIXTURE_NEWSLETTER_IDS) {
       const i = await get(issueKey(id));
       expect(i?.summary, id).toMatch(/\S/);
-      // Claude's call is kept; the issue's shelf follows its stories (#81), News until then.
-      expect(["news", "learning"], id).toContain(i?.shelfAuto);
+      // Claude is not asked for a shelf: the issue's follows its stories (#81), News until then.
+      expect(i?.shelfAuto, id).toBeUndefined();
       expect(i?.shelf, id).toBe("news");
       expect(i?.shelfSetBy, id).toBeUndefined();
       expect(
@@ -180,6 +187,23 @@ describe("archive rules on dev", () => {
         ExpressionAttributeValues: { ":t": true },
       }),
     );
+    // A craft story inside the TLDR digest (#81): its own state, so the rule leaves it on Learning.
+    const tldr = (await get(issueKey("fx-tldr")))!;
+    const craft = { issueId: "fx-tldr", n: 9, receivedAt: tldr.receivedAt as string };
+    await ddb.send(
+      new PutCommand({
+        TableName: stack.tableName,
+        Item: {
+          ...storyKey("fx-tldr", 9),
+          id: "fx-tldr",
+          n: 9,
+          headline: "How caches fail",
+          shelf: "learning",
+          shelfSetBy: "jev",
+          ...storyIndexAttributes({ ...craft, shelf: "learning" }).set,
+        },
+      }),
+    );
     const now = Date.parse("2026-10-09T00:00:00.000Z");
     // The rule reads senders and unread news through GSIs, which lag the writes above: wait
     // until both show them, or Platformer can be archived before its Must Read star arrives.
@@ -197,6 +221,8 @@ describe("archive rules on dev", () => {
     expect((await get(issueKey("fx-tldr")))?.autoArchived).toBe("old-news");
     expect((await get(issueKey("fx-platformer")))?.state).toBe("unread"); // Must Read
     expect((await get(issueKey("fx-lenny")))?.state).toBe("unread"); // Learning
+    expect((await get(storyKey("fx-tldr", 9)))?.gsi2pk).toBe("LEARNING");
+    await ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: storyKey("fx-tldr", 9) }));
   });
 
   it("leaves a saved issue alone (#43)", async () => {

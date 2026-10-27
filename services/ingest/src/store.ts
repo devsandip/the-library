@@ -861,8 +861,8 @@ export class Store {
   }
 
   /**
-   * Store Claude's classification. Its shelf is kept as `shelfAuto` only: an issue's shelf follows
-   * its stories (#81). One with none yet starts on its newsletter's "always" setting, else News.
+   * Store Claude's classification. An issue's shelf follows its stories (#81): one with none yet
+   * starts on its newsletter's "always" setting, else News.
    */
   async putClassification(id: string, c: Classification, senderShelf?: Shelf): Promise<void> {
     await this.ddb.send(
@@ -870,13 +870,12 @@ export class Store {
         TableName: this.table,
         Key: issueKey(id),
         UpdateExpression:
-          "SET #sum = :sum, #auto = :auto, #topic = :topic, #promo = :promo, #selling = :selling, " +
+          "SET #sum = :sum, #topic = :topic, #promo = :promo, #selling = :selling, " +
           "#at = :at, #model = :model, #shelf = if_not_exists(#shelf, :shelf)" +
           (senderShelf ? ", #by = if_not_exists(#by, :sender)" : ""),
         ConditionExpression: "attribute_exists(pk)",
         ExpressionAttributeNames: {
           "#sum": "summary",
-          "#auto": "shelfAuto",
           "#topic": "topic",
           "#promo": "promo",
           "#selling": "selling",
@@ -887,7 +886,6 @@ export class Store {
         },
         ExpressionAttributeValues: {
           ":sum": c.summary,
-          ":auto": c.shelf,
           ":topic": c.topic,
           ":promo": c.promo,
           ":selling": c.selling,
@@ -945,7 +943,7 @@ export class Store {
 
   /** Stories received between two times (inclusive), oldest first, with what they say. */
   async storyTexts(fromIso: string, toIso: string): Promise<StoryText[]> {
-    const items = await this.queryStories(fromIso, toIso, "headline, summary");
+    const items = await this.queryStories(fromIso, toIso, "headline, summary, shelf");
     return items.map((i) => ({
       key: storyRef(i.id as string, i.n as number),
       issueId: i.id as string,
@@ -954,6 +952,7 @@ export class Store {
       summary: i.summary as string,
       names: (i.names as string[] | undefined) ?? [],
       eventId: (i.eventId as string | undefined) ?? storyRef(i.id as string, i.n as number),
+      ...(i.shelf ? { shelf: i.shelf as Shelf } : {}),
     }));
   }
 

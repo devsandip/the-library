@@ -70,7 +70,7 @@ A private, single-user web reader that ingests my newsletters daily, ranks them 
 - Issue view: clean, readable rendering of the newsletter; fast on mobile
 - Actions per issue: thumbs up (it was useful), thumbs down (it was not), mark read, archive, open original. A thumb changes nothing else: thumbs down does not archive. Until 2026-10-19 the thumbs were Relevant and Irrelevant, and swipes gave them; swipes now only move through Today's deck (`docs/features/thumbs.md`).
 - Filters: unread / all, by sender, by topic
-- News and Learning: two shelves (a word in Browse's filter sentence on the phone, two queues on the Mac). Claude decides per issue with one test, "would this still be worth reading in three months?", and I can move any issue or set a newsletter to always land in one tab. Claude also tags one topic per issue (tap it to filter), archives promos, and unread news archives itself after a week (except Must Read).
+- News and Learning: two shelves (a word in Browse's filter sentence on the phone, two queues on the Mac). Since #81 the unit is the story: Jev decides per story whether it builds my craft (Learning) or is news, News lists issues and Learning lists stories, and I can move a story or an issue or set a newsletter to always land in one tab. Claude also tags one topic per issue (tap it to filter), archives promos, and unread news archives itself after a week (except Must Read).
 - Per-sender view with a "mute sender" action and a visible unsubscribe link
 - Must Read: I star the newsletters I never want to miss; their unread issues come first
 

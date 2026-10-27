@@ -182,7 +182,7 @@ export function Newsletter({ slug, wide }: { slug: string; wide: boolean }) {
             update({ shelf: ((e.target as HTMLSelectElement).value || null) as Shelf | null })
           }
         >
-          <option value="">Claude decides each issue</option>
+          <option value="">Jev decides each story</option>
           <option value="news">Always News</option>
           <option value="learning">Always Learning</option>
         </select>

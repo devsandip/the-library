@@ -5,7 +5,7 @@
  * it came from. Not an agent: fixed steps and one call, about a cent.
  */
 import { READER } from "@library/core";
-import type { Narrative, NarrativeStats, NarrativeThread } from "@library/core/types";
+import type { Narrative, NarrativeStats, NarrativeThread, Shelf } from "@library/core/types";
 import { MODELS, type ModelPort, type ToolRequest } from "./bedrock.js";
 import type { Store } from "./store.js";
 
@@ -32,6 +32,8 @@ export interface StoryText {
   summary: string;
   names: string[];
   eventId: string;
+  /** The story's own shelf (#81), once shelved; one not shelved yet counts as News. */
+  shelf?: Shelf;
 }
 
 /** What the app shows, plus what the next run needs to decide on a new version. */
@@ -175,8 +177,8 @@ export interface NarrativeOptions {
 
 /**
  * Write a new narrative if the day's News has moved on: at least 4 hours since the last version
- * and 5 or more News stories it did not have. News means the issue's shelf; promos and muted
- * newsletters are left out.
+ * and 5 or more News stories it did not have. News means the story's own shelf (#81), so a craft
+ * essay inside a digest stays out; promos and muted newsletters are left out.
  */
 export async function writeNarrative(
   store: Store,
@@ -208,10 +210,10 @@ export async function writeNarrative(
   ]);
   const news = new Map(
     issues
-      .filter((i) => i.shelf === "news" && !i.promo && !senders.get(i.senderId)?.muted)
+      .filter((i) => !i.promo && !senders.get(i.senderId)?.muted)
       .map((i) => [i.id, i.publication]),
   );
-  const today = stories.filter((s) => news.has(s.issueId));
+  const today = stories.filter((s) => news.has(s.issueId) && s.shelf !== "learning");
   stats.stories = today.length;
   if (today.length < MIN_STORIES) return done("too few News stories");
   if (!opts.force && latest) {
