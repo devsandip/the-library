@@ -44,7 +44,7 @@ function fakes(opts: {
   account?: { keep?: string[] };
   staleNews?: { id: string; senderId: string }[];
 }) {
-  const classified: { id: string; shelf: Shelf; senderShelf?: Shelf }[] = [];
+  const classified: { id: string; topic: string; senderShelf?: Shelf }[] = [];
   const embedded: string[] = [];
   const archived: { id: string; reason: string }[] = [];
   const filtered: { id: string; reason: string; by: string }[] = [];
@@ -76,8 +76,8 @@ function fakes(opts: {
     },
     unreadNewsBefore: async () => opts.staleNews ?? [],
     getText: async (id: string) => `Body of ${id}`,
-    putClassification: async (id: string, c: { shelf: Shelf }, senderShelf?: Shelf) =>
-      void classified.push({ id, shelf: c.shelf, senderShelf }),
+    putClassification: async (id: string, c: { topic: string }, senderShelf?: Shelf) =>
+      void classified.push({ id, topic: c.topic, senderShelf }),
     putEmbedding: async (id: string) => void embedded.push(id),
   } as unknown as Store;
   const model: ModelPort = {
@@ -88,7 +88,6 @@ function fakes(opts: {
       return {
         input: {
           summary: "  A sentence  about it. ",
-          shelf: "learning",
           topic: "engineering",
           selling: opts.account ? "account" : opts.promo ? "promo" : "ad-supported",
         },
@@ -118,29 +117,28 @@ describe("classification request and parsing", () => {
     );
     expect(req.tool.name).toBe("classify_issue");
     expect(req.system).toContain("- AI: Models, tools and the AI industry");
-    expect(req.system).toContain("worth reading in three months");
+    // The shelf is the stories' now (#81): Claude is not asked.
+    expect(req.system).not.toContain("shelf");
     expect(req.user).toMatch(/^Newsletter: TLDR AI\nSubject: Agents ship\n\n/);
     expect(req.user.length).toBeLessThan(6100); // text is cut to about 1,500 tokens
     expect(req.tool.schema).toMatchObject({
-      properties: {
-        shelf: { enum: ["news", "learning"] },
-        topic: { enum: ["AI", "Product", "Engineering", "Business"] },
-      },
+      properties: { topic: { enum: ["AI", "Product", "Engineering", "Business"] } },
+      required: ["summary", "topic", "selling"],
     });
+    expect(Object.keys((req.tool.schema as { properties: object }).properties)).not.toContain(
+      "shelf",
+    );
   });
 
   it("normalizes a good answer and matches topics case-insensitively", () => {
     expect(
-      parseClassification(
-        { summary: " Two\n lines ", shelf: "news", topic: "ai", selling: "promo" },
-        topics,
-      ),
-    ).toEqual({ summary: "Two lines", shelf: "news", topic: "AI", selling: "promo", promo: true });
+      parseClassification({ summary: " Two\n lines ", topic: "ai", selling: "promo" }, topics),
+    ).toEqual({ summary: "Two lines", topic: "AI", selling: "promo", promo: true });
   });
 
   it("reads an account answer as no promo (#50)", () => {
     const c = parseClassification(
-      { summary: "A sign-in code.", shelf: "news", topic: "AI", selling: "account" },
+      { summary: "A sign-in code.", topic: "AI", selling: "account" },
       topics,
     );
     expect(c).toMatchObject({ selling: "account", promo: false });
@@ -156,8 +154,7 @@ describe("classification request and parsing", () => {
   });
 
   it("rejects answers outside the schema", () => {
-    const ok = { summary: "S", shelf: "news", topic: "AI", selling: "ad-supported" };
-    expect(() => parseClassification({ ...ok, shelf: "opinion" }, topics)).toThrow("bad shelf");
+    const ok = { summary: "S", topic: "AI", selling: "ad-supported" };
     expect(() => parseClassification({ ...ok, topic: "Sports" }, topics)).toThrow("unknown topic");
     expect(() => parseClassification({ ...ok, selling: "yes" }, topics)).toThrow("bad selling");
     expect(() => parseClassification({ ...ok, summary: " " }, topics)).toThrow("summary");
@@ -196,7 +193,7 @@ describe("enrich", () => {
     expect(f.model.callTool).not.toHaveBeenCalled();
   });
 
-  it("sorts and embeds what is missing, honoring a sender's shelf, and counts tokens", async () => {
+  it("sorts and embeds what is missing, passing a sender's shelf on, and counts tokens", async () => {
     const f = fakes({
       candidates: [
         candidate("a"),
@@ -220,8 +217,8 @@ describe("enrich", () => {
     });
     expect(f.classified).toEqual(
       expect.arrayContaining([
-        { id: "a", shelf: "learning", senderShelf: undefined },
-        { id: "b", shelf: "learning", senderShelf: "news" },
+        { id: "a", topic: "Engineering", senderShelf: undefined },
+        { id: "b", topic: "Engineering", senderShelf: "news" },
       ]),
     );
     expect(f.embedded.sort()).toEqual(["a", "b", "half"]);
