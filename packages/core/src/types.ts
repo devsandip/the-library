@@ -110,6 +110,8 @@ export interface UnreadCountsResponse {
   counts: UnreadCount[];
   /** Issues saved for later (#43), read or not. */
   saved: number;
+  /** Unread Learning stories (#81) by newsletter and their issue's topic; `shelf` is Learning. */
+  learning: UnreadCount[];
 }
 
 /** One story of an issue, from the story index (#15), as a tap on its row shows it (#41). */
@@ -121,11 +123,33 @@ export interface IssueStory {
   link?: string;
   /** The people, companies and places it names, as the story index found them; absent when none. */
   names?: string[];
+  /** Its shelf (#81): Sandip's move, then the newsletter's setting, then Jev. Absent until shelved. */
+  shelf?: Shelf;
+  /** Its own state (#81), apart from its issue's; absent means unread. */
+  state?: Exclude<StoryState, "unread">;
 }
 
 /** GET /issues/{id}/stories: in the order they appear; empty until the issue is split. */
 export interface IssueStoriesResponse {
   stories: IssueStory[];
+}
+
+/** One row of Learning (#81): a Learning story, and its issue as a row. */
+export interface LearningItem {
+  issue: IssueListItem;
+  story: IssueStory;
+}
+
+/** GET /learning: Learning stories for a view, newest first. */
+export interface LearningListResponse {
+  items: LearningItem[];
+  cursor?: string;
+}
+
+/** PATCH /issues/{id}/stories/{n}: a story's own state, or Sandip moving it (#81). */
+export interface StoryPatch {
+  state?: StoryState;
+  shelf?: Shelf;
 }
 
 /** An issue shown as related to the open one (#20). */

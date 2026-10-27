@@ -61,6 +61,8 @@ import type {
   IssueState,
   IssueStoriesResponse,
   IssueStory,
+  LearningItem,
+  LearningListResponse,
   Narrative,
   NowReadingResponse,
   Rating,
@@ -73,6 +75,7 @@ import type {
   Shelf,
   ShelfSetBy,
   StatusResponse,
+  StoryPatch,
   StoryShelfSetBy,
   StoryState,
   SummaryResponse,
@@ -149,6 +152,39 @@ export function toSender(s: Item): SenderListItem {
   };
 }
 
+/** A stored story as the web shows it: no embedding, and unread left implicit (#81). */
+function toStory(s: Item): IssueStory {
+  const names = Array.isArray(s.names) ? (s.names as string[]) : [];
+  const state = s.state as StoryState | undefined;
+  return {
+    n: s.n as number,
+    headline: s.headline as string,
+    summary: s.summary as string,
+    ...(typeof s.link === "string" ? { link: s.link } : {}),
+    ...(names.length ? { names } : {}),
+    ...(s.shelf ? { shelf: s.shelf as Shelf } : {}),
+    ...(state && state !== "unread" ? { state } : {}),
+  };
+}
+
+/**
+ * The index lists an issue's stories last first (newest issue first, then by `nn` descending):
+ * put each run of one issue's stories back in the order they appear in it.
+ */
+function inReadingOrder(items: LearningItem[]): LearningItem[] {
+  const out: LearningItem[] = [];
+  for (let i = 0; i < items.length;) {
+    let j = i;
+    while (j < items.length && items[j]!.issue.id === items[i]!.issue.id) j++;
+    out.push(...items.slice(i, j).sort((a, b) => a.story.n - b.story.n));
+    i = j;
+  }
+  return out;
+}
+
+/** What Learning reads of a story (#81): never its embedding. */
+const STORY_ATTRIBUTES = ["id", "n", "headline", "summary", "link", "names", "shelf", "state"];
+
 function isConditionFailure(err: unknown): boolean {
   const e = err as { name?: string; CancellationReasons?: { Code?: string }[] };
   return (
@@ -188,6 +224,8 @@ interface IndexQuery {
   skAttr: string;
   pkValue: string;
   filter?: Filter;
+  /** Read only these attributes (with the keys, for the cursor). */
+  attributes?: string[];
 }
 
 /** AND filters together; each one uses its own placeholder prefix. */
@@ -449,6 +487,20 @@ export class DynamoRepo
     limit: number,
     cursor: string | undefined,
   ): Promise<IssueListResponse> {
+    const page = await this.readRaw(q, limit, cursor);
+    return { items: page.items.map(toListItem), cursor: page.cursor };
+  }
+
+  /** `readStream` before the items become rows: issues, or stories (#81). */
+  private async readRaw(
+    q: IndexQuery,
+    limit: number,
+    cursor: string | undefined,
+  ): Promise<{ items: Item[]; cursor?: string }> {
+    const keys = ["pk", "sk", q.pkAttr, q.skAttr];
+    const projection = q.attributes
+      ? Object.fromEntries([...keys, ...q.attributes].map((a, i) => [`#p${i}`, a]))
+      : undefined;
     let start = this.decodeCursor(cursor, q);
     const items: Item[] = [];
     let exhausted = false;
@@ -458,9 +510,10 @@ export class DynamoRepo
       const res: QueryCommandOutput = await this.query({
         IndexName: q.index,
         KeyConditionExpression: "#pk = :pk",
-        ExpressionAttributeNames: { "#pk": q.pkAttr, ...q.filter?.names },
+        ExpressionAttributeNames: { "#pk": q.pkAttr, ...q.filter?.names, ...projection },
         ExpressionAttributeValues: { ":pk": q.pkValue, ...q.filter?.values },
         FilterExpression: q.filter?.expr,
+        ProjectionExpression: projection ? Object.keys(projection).join(", ") : undefined,
         ScanIndexForward: false,
         Limit: q.filter ? Math.max(need, 50) : need,
         ExclusiveStartKey: start,
@@ -475,12 +528,12 @@ export class DynamoRepo
 
     if (items.length > limit) {
       const page = items.slice(0, limit);
-      return { items: page.map(toListItem), cursor: this.encodeCursor(page[page.length - 1]!, q) };
+      return { items: page, cursor: this.encodeCursor(page[page.length - 1]!, q) };
     }
     // Short page: either the index is exhausted, or the round cap hit; then resume where reading stopped.
     const next =
       exhausted || !start ? undefined : Buffer.from(JSON.stringify(start)).toString("base64url");
-    return { items: items.map(toListItem), cursor: next };
+    return { items, cursor: next };
   }
 
   private async mustGetIssue(id: string): Promise<Item> {
@@ -666,6 +719,167 @@ export class DynamoRepo
       event,
     ]);
     return toListItem({ ...item, shelf, shelfSetBy: "stories" });
+  }
+
+  // ---------- Learning (#81) ----------
+
+  /**
+   * Learning stories for a view, newest first, each with its issue as a row. Unread reads the
+   * LEARNING index; All and Archived read every story and keep the Learning ones. Muted
+   * newsletters are hidden unless picked, except in Archived. Topics are the issue's, so they are
+   * applied once the issues are read, reading on until the page is full.
+   */
+  async listLearning(
+    view: Exclude<View, "saved">,
+    opts: Omit<ListOptions, "shelf">,
+  ): Promise<LearningListResponse> {
+    const senders = await this.listSenders();
+    const muted = senders.filter((s) => s.muted).map((s) => s.senderId);
+    const starred = new Set(senders.filter((s) => s.mustRead).map((s) => s.senderId));
+    const picked = opts.senderIds?.length ? opts.senderIds : undefined;
+    const who = picked
+      ? inFilter("senderId", "sid", picked)
+      : view !== "archived" && muted.length
+        ? inFilter("senderId", "m", muted.slice(0, 100), true)
+        : undefined;
+    const q: IndexQuery =
+      view === "unread"
+        ? {
+            index: INDEX.unread,
+            pkAttr: "gsi2pk",
+            skAttr: "gsi2sk",
+            pkValue: PARTITION.learning,
+            filter: who,
+            attributes: STORY_ATTRIBUTES,
+          }
+        : {
+            index: INDEX.list,
+            pkAttr: "gsi1pk",
+            skAttr: "gsi1sk",
+            pkValue: PARTITION.stories,
+            filter: andFilters(
+              who,
+              { expr: "#lsh = :lsh", names: { "#lsh": "shelf" }, values: { ":lsh": "learning" } },
+              view === "archived"
+                ? {
+                    expr: "#lst = :lst",
+                    names: { "#lst": "state" },
+                    values: { ":lst": "archived" },
+                  }
+                : {
+                    expr: "attribute_not_exists(#lst) OR #lst <> :lst",
+                    names: { "#lst": "state" },
+                    values: { ":lst": "archived" },
+                  },
+            ),
+            attributes: STORY_ATTRIBUTES,
+          };
+
+    const items: LearningItem[] = [];
+    let cursor = opts.cursor;
+    for (let round = 0; round < 5 && items.length < opts.limit; round++) {
+      const page = await this.readRaw(q, opts.limit - items.length, cursor);
+      const ids = [...new Set(page.items.map((s) => s.id as string))];
+      const issues = new Map(
+        (await this.batchGet(ids.map(issueKey), LIST_ATTRIBUTES)).map((i) => [i.id as string, i]),
+      );
+      for (const s of page.items) {
+        const issue = issues.get(s.id as string);
+        if (!issue || issue.state === "filtered") continue;
+        if (opts.topics?.length && !opts.topics.includes(issue.topic as string)) continue;
+        const row = toListItem(issue);
+        items.push({
+          issue: starred.has(row.senderId) ? { ...row, mustRead: true } : row,
+          story: toStory(s),
+        });
+      }
+      cursor = page.cursor;
+      if (!cursor) break;
+    }
+    return { items: inReadingOrder(items), ...(cursor ? { cursor } : {}) };
+  }
+
+  /**
+   * A story's own state, or Sandip moving it (#81): a move is his, never undone by Jev or a
+   * newsletter's setting, and the issue's shelf follows. Returns the story as it now is.
+   */
+  async setStory(id: string, n: number, patch: StoryPatch): Promise<IssueStory> {
+    await this.mustGetIssue(id);
+    const res = await this.ddb.send(
+      new GetCommand({ TableName: this.table, Key: storyKey(id, n), ConsistentRead: true }),
+    );
+    if (!res.Item) throw notFound("story not found");
+    let s: Item = res.Item;
+    if (patch.shelf && (s.shelf !== patch.shelf || s.shelfSetBy !== "sandip")) {
+      await this.putStoryShelf(id, s, patch.shelf, "sandip");
+      s = { ...s, shelf: patch.shelf, shelfSetBy: "sandip" };
+      await this.deriveIssueShelf(id);
+    }
+    if (patch.state && patch.state !== ((s.state as StoryState | undefined) ?? "unread")) {
+      await this.putStoryState(id, s, patch.state);
+      s = { ...s, state: patch.state };
+    }
+    return toStory(s);
+  }
+
+  /** A story's state with the Learning index that follows, if its shelf is still as read. */
+  private async putStoryState(id: string, s: Item, state: StoryState) {
+    const shelf = s.shelf as Shelf | undefined;
+    const index = storyIndexAttributes({
+      issueId: id,
+      n: s.n as number,
+      receivedAt: s.receivedAt as string,
+      shelf,
+      state,
+    });
+    // Unread is the absence of a state.
+    const u = updateExpression({ ...(state === "unread" ? {} : { state }), ...index.set }, [
+      ...(state === "unread" ? ["state"] : []),
+      ...index.remove,
+    ]);
+    const values = { ...u.values, ...(shelf ? { ":csh": shelf } : {}) };
+    try {
+      await this.ddb.send(
+        new UpdateCommand({
+          TableName: this.table,
+          Key: storyKey(id, s.n as number),
+          UpdateExpression: u.expr,
+          ConditionExpression:
+            "attribute_exists(pk) AND " + (shelf ? "#csh = :csh" : "attribute_not_exists(#csh)"),
+          ExpressionAttributeNames: { ...u.names, "#csh": "shelf" },
+          ExpressionAttributeValues: Object.keys(values).length ? values : undefined,
+        }),
+      );
+    } catch (err) {
+      if (isConditionFailure(err)) throw conflict();
+      throw err;
+    }
+  }
+
+  /** Unread Learning stories (#81) by newsletter and their issue's topic. */
+  private async countLearning(): Promise<UnreadCount[]> {
+    const stories = await this.queryAll({
+      IndexName: INDEX.unread,
+      KeyConditionExpression: "gsi2pk = :p",
+      ExpressionAttributeValues: { ":p": PARTITION.learning },
+      ProjectionExpression: "id, senderId",
+    });
+    const ids = [...new Set(stories.map((s) => s.id as string))];
+    const topics = new Map(
+      (await this.batchGet(ids.map(issueKey), ["id", "topic", "state"]))
+        .filter((i) => i.state !== "filtered")
+        .map((i) => [i.id as string, i.topic as string | undefined]),
+    );
+    const tally = new Map<string, UnreadCount>();
+    for (const s of stories) {
+      if (!topics.has(s.id as string)) continue;
+      const topic = topics.get(s.id as string);
+      const key = `${s.senderId as string}|${topic ?? ""}`;
+      const t = tally.get(key);
+      if (t) t.n++;
+      else tally.set(key, { senderId: s.senderId as string, shelf: "learning", topic, n: 1 });
+    }
+    return [...tally.values()];
   }
 
   // ---------- story shelves (#81) ----------
@@ -960,26 +1174,19 @@ export class DynamoRepo
         KeyConditionExpression: "pk = :pk AND begins_with(sk, :story)",
         ExpressionAttributeValues: { ":pk": issueKey(id).pk, ":story": "STORY#" },
         // Not the embedding: a few lines of text each.
-        ProjectionExpression: "#n, #h, #s, #l, #nm",
+        ProjectionExpression: "#n, #h, #s, #l, #nm, #sh, #st",
         ExpressionAttributeNames: {
           "#n": "n",
           "#h": "headline",
           "#s": "summary",
           "#l": "link",
           "#nm": "names",
+          "#sh": "shelf",
+          "#st": "state",
         },
       }),
     ]);
-    const stories: IssueStory[] = (res.Items ?? []).map((s) => {
-      const names = Array.isArray(s.names) ? (s.names as string[]) : [];
-      return {
-        n: s.n as number,
-        headline: s.headline as string,
-        summary: s.summary as string,
-        ...(typeof s.link === "string" ? { link: s.link } : {}),
-        ...(names.length ? { names } : {}),
-      };
-    });
+    const stories = (res.Items ?? []).map(toStory);
     return { stories: stories.sort((a, b) => a.n - b.n) };
   }
 
@@ -1339,6 +1546,7 @@ export class DynamoRepo
    */
   async unreadCounts(): Promise<UnreadCountsResponse> {
     const saved = this.countSaved();
+    const learning = this.countLearning();
     const tally = new Map<string, UnreadCount>();
     let start: Item | undefined;
     do {
@@ -1365,7 +1573,7 @@ export class DynamoRepo
       }
       start = res.LastEvaluatedKey;
     } while (start);
-    return { counts: [...tally.values()], saved: await saved };
+    return { counts: [...tally.values()], saved: await saved, learning: await learning };
   }
 
   private async countSaved(): Promise<number> {

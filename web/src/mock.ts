@@ -693,7 +693,12 @@ export class MockLibraryApi implements LibraryApi {
       if (t) t.n++;
       else tally.set(key, { senderId: i.senderId, shelf: i.shelf, topic: i.topic, n: 1 });
     }
-    return { counts: [...tally.values()], saved: issues.filter((i) => i.savedAt).length };
+    // Learning stories (#81) come to the mock with the screens that list them.
+    return {
+      counts: [...tally.values()],
+      saved: issues.filter((i) => i.savedAt).length,
+      learning: [],
+    };
   }
   async related(id: string): Promise<RelatedResponse> {
     await delay();

@@ -5,6 +5,8 @@ import type {
   SearchSort,
   SenderPatch,
   Shelf,
+  StoryPatch,
+  StoryState,
   View,
 } from "@library/core/types";
 import { badRequest, HttpError, notFound } from "./errors.js";
@@ -32,6 +34,8 @@ const SENDER_ID = "(s[0-9a-f]{12})";
 const STORY_N = "([1-9][0-9]?)";
 const VIEWS: readonly View[] = ["unread", "all", "archived", "saved"];
 const READER_STATES: readonly ReaderState[] = ["unread", "read", "archived"];
+const STORY_STATES: readonly StoryState[] = ["unread", "read", "archived"];
+const STORY_VIEWS: readonly Exclude<View, "saved">[] = ["unread", "all", "archived"];
 const SHELVES: readonly Shelf[] = ["news", "learning"];
 const SORTS: readonly SearchSort[] = ["best", "newest"];
 
@@ -51,6 +55,24 @@ function list(value: string | undefined): string[] | undefined {
   return value === undefined ? undefined : value.split(",").map((v) => v.trim());
 }
 
+/** The paging and filters `/issues` and `/learning` share: limit, senders and topics. */
+function listQuery(req: Request) {
+  const limit = req.query.limit === undefined ? 30 : Number(req.query.limit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw badRequest("limit must be an integer from 1 to 100");
+  }
+  const senderIds = list(req.query.sender);
+  const senderRe = new RegExp(`^${SENDER_ID}$`);
+  if (senderIds && (senderIds.length > 50 || !senderIds.every((id) => senderRe.test(id)))) {
+    throw badRequest("sender must be up to 50 sender ids, comma-separated");
+  }
+  const topics = list(req.query.topic);
+  if (topics && (topics.length > 20 || topics.some((t) => t.length === 0 || t.length > 60))) {
+    throw badRequest("topic must be up to 20 topics of 1 to 60 characters, comma-separated");
+  }
+  return { limit, cursor: req.query.cursor, senderIds, topics };
+}
+
 function param(params: string[], i: number): string {
   const v = params[i];
   if (v === undefined) throw notFound();
@@ -66,32 +88,20 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
       if (!VIEWS.includes(view)) {
         throw badRequest("view must be unread, all, archived or saved");
       }
-      const limit = req.query.limit === undefined ? 30 : Number(req.query.limit);
-      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-        throw badRequest("limit must be an integer from 1 to 100");
-      }
-      const senderIds = list(req.query.sender);
-      const senderRe = new RegExp(`^${SENDER_ID}$`);
-      if (senderIds && (senderIds.length > 50 || !senderIds.every((id) => senderRe.test(id)))) {
-        throw badRequest("sender must be up to 50 sender ids, comma-separated");
-      }
       const shelf = req.query.shelf as Shelf | undefined;
       if (shelf !== undefined && !SHELVES.includes(shelf)) {
         throw badRequest("shelf must be news or learning");
       }
-      const topics = list(req.query.topic);
-      if (topics && (topics.length > 20 || topics.some((t) => t.length === 0 || t.length > 60))) {
-        throw badRequest("topic must be up to 20 topics of 1 to 60 characters, comma-separated");
-      }
-      return ok(
-        await svc.repo.listIssues(view, {
-          limit,
-          cursor: req.query.cursor,
-          senderIds,
-          shelf,
-          topics,
-        }),
-      );
+      return ok(await svc.repo.listIssues(view, { ...listQuery(req), shelf }));
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/learning$/,
+    handler: async (svc, req) => {
+      const view = (req.query.view ?? "unread") as Exclude<View, "saved">;
+      if (!STORY_VIEWS.includes(view)) throw badRequest("view must be unread, all or archived");
+      return ok(await svc.repo.listLearning(view, listQuery(req)));
     },
   },
   {
@@ -135,6 +145,26 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     method: "GET",
     pattern: new RegExp(`^/issues/${ISSUE_ID}/stories$`),
     handler: async (svc, _req, p) => ok(await svc.repo.stories(param(p, 0))),
+  },
+  {
+    method: "PATCH",
+    pattern: new RegExp(`^/issues/${ISSUE_ID}/stories/${STORY_N}$`),
+    handler: async (svc, req, p) => {
+      const { state, shelf } = json<{ state?: unknown; shelf?: unknown }>(req);
+      if (state === undefined && shelf === undefined) throw badRequest("send state or shelf");
+      if (state !== undefined && !STORY_STATES.includes(state as StoryState)) {
+        throw badRequest("state must be unread, read or archived");
+      }
+      if (shelf !== undefined && !SHELVES.includes(shelf as Shelf)) {
+        throw badRequest("shelf must be news or learning");
+      }
+      return ok(
+        await svc.repo.setStory(param(p, 0), Number(param(p, 1)), {
+          state,
+          shelf,
+        } as StoryPatch),
+      );
+    },
   },
   {
     method: "GET",
