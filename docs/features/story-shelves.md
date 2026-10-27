@@ -44,6 +44,8 @@ Sandip's rules (2026-10-17), the reference for labels and for any change to Jev'
 15. Judge by what you take away. If it is a technique or lesson you could reuse, Learning; if it is a fact about the moment, News.
 16. A digest item is judged on its own, not by the newsletter it came in.
 
+- **A forced re-split keeps what Sandip did** (#98): before `pnpm stories --force` replaces an issue's stories, each new story takes the move and read state of the old story with the same link, or else the same headline (`carriedOver` in `services/ingest/src/stories.ts`). Jev reads every new story again; a carried move still beats it.
+
 ## Decisions
 
 - **Learning means craft** (Sandip, 2026-10-12): product management, system design, engineering, building with AI, startup strategy; how-tos, case studies, frameworks, interviews about the work. Essays on culture or life are News, however long they stay worth reading.
@@ -87,4 +89,4 @@ Sandip's rules (2026-10-17), the reference for labels and for any change to Jev'
 
 - The unsure band. Since the accuracy is fine as it is, the proposal is now simpler: shelve every story by 0.5, store Jev's probability, and leave a list of unsure calls for later. Sandip's moves become labels (#26).
 - If the unsure band needs to shrink, the next thing to try is more text per story, not more questions: Jev sees a 45-word summary, and for an essay that is thin.
-- A forced re-split of an issue (`pnpm stories --force`) replaces its stories, moves and read state included; the next run shelves them again (#98).
+

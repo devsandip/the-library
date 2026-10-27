@@ -59,7 +59,7 @@ import { mapLimit } from "./ingest.js";
 import type { SenderFields, SenderPlan, StoredIssue, StoredSender } from "./senders.js";
 import type { StoredNarrative, StoryText } from "./narrative.js";
 import type { ShelfCandidate } from "./shelves.js";
-import type { NewStory, StoredStory } from "./stories.js";
+import { carriedOver, type NewStory, type OldStory, type StoredStory } from "./stories.js";
 
 type Newsletter = Extract<ProcessedMessage, { kind: "newsletter" }>;
 type Filtered = Extract<ProcessedMessage, { kind: "filtered" }>;
@@ -1236,11 +1236,26 @@ export class Store {
       gsi1pk: PARTITION.stories,
       gsi1sk: `${issue.receivedAt}#${storyRef(issue.id, s.n)}`,
     }));
-    // A redo can come back with fewer stories than before.
+    // A forced redo keeps Sandip's moves and read states (#98), and can come back with fewer
+    // stories than before.
+    const old = await this.oldStories(issue.id);
+    for (const [k, p] of puts.entries()) {
+      const carried = carriedOver(stories[k]!, old);
+      Object.assign(
+        p,
+        carried,
+        storyIndexAttributes({
+          issueId: issue.id,
+          n: p.n,
+          receivedAt: issue.receivedAt,
+          ...carried,
+        }).set,
+      );
+    }
     const keep = new Set(puts.map((p) => p.sk));
-    const stale = (await this.storyKeys(issue.id)).filter((k) => !keep.has(k.sk));
+    const stale = old.filter((k) => !keep.has(k.sk));
     await this.batchWrite([
-      ...stale.map((Key) => ({ DeleteRequest: { Key } })),
+      ...stale.map(({ pk, sk }) => ({ DeleteRequest: { Key: { pk, sk } } })),
       ...puts.map((Item) => ({ PutRequest: { Item } })),
     ]);
     await this.ddb.send(
@@ -1292,6 +1307,29 @@ export class Store {
       }),
     );
     return (res.Items ?? []).map((i) => ({ pk: i.pk as string, sk: i.sk as string }));
+  }
+
+  /** An issue's stored stories: their keys, and what a re-split carries over (#98). */
+  private async oldStories(id: string): Promise<(OldStory & { pk: string; sk: string })[]> {
+    const res = await this.ddb.send(
+      new QueryCommand({
+        TableName: this.table,
+        KeyConditionExpression: "pk = :pk AND begins_with(sk, :story)",
+        ExpressionAttributeValues: { ":pk": issueKey(id).pk, ":story": "STORY#" },
+        ProjectionExpression: "pk, sk, link, headline, shelf, shelfSetBy, #st",
+        ExpressionAttributeNames: { "#st": "state" },
+        ConsistentRead: true,
+      }),
+    );
+    return (res.Items ?? []).map((i) => ({
+      pk: i.pk as string,
+      sk: i.sk as string,
+      link: i.link as string | undefined,
+      headline: (i.headline as string | undefined) ?? "",
+      shelf: i.shelf as Shelf | undefined,
+      shelfSetBy: i.shelfSetBy as string | undefined,
+      state: i.state as StoryState | undefined,
+    }));
   }
 
   /** BatchWriteItem in chunks of 25, retrying what DynamoDB leaves unprocessed. */

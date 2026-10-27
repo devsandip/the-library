@@ -3,6 +3,7 @@ import type { ModelPort, ToolRequest } from "../src/bedrock.js";
 import type { EnrichCandidate } from "../src/enrich.js";
 import type { Store } from "../src/store.js";
 import {
+  carriedOver,
   indexStories,
   parseStories,
   relinkStories,
@@ -245,5 +246,42 @@ describe("relinkStories", () => {
     } as unknown as Store;
     expect(await relinkStories(store)).toEqual({ stories: 3, events: 2, shared: 1, changed: 1 });
     expect(setEventIds).toHaveBeenCalledWith([{ issueId: "b", n: 1, eventId: "a#01" }]);
+  });
+});
+
+describe("carriedOver (#98)", () => {
+  const old = [
+    {
+      link: "https://a.test/1",
+      headline: "Anthropic files to list",
+      shelf: "learning" as const,
+      shelfSetBy: "sandip",
+      state: "read" as const,
+    },
+    {
+      headline: "How caches fail!",
+      shelf: "news" as const,
+      shelfSetBy: "jev",
+      state: "archived" as const,
+    },
+    { headline: "Rates rise", shelf: "news" as const, shelfSetBy: "jev" },
+  ];
+  const s = (headline: string, link?: string) => ({ headline, summary: "S.", names: [], link });
+
+  it("keeps Sandip's move and the read state of the old story with the same link", () => {
+    expect(carriedOver(s("A new headline", "https://a.test/1"), old)).toEqual({
+      shelf: "learning",
+      shelfSetBy: "sandip",
+      state: "read",
+    });
+  });
+
+  it("matches on the headline's words when the link does not, and leaves Jev's shelf to Jev", () => {
+    expect(carriedOver(s("how caches fail"), old)).toEqual({ state: "archived" });
+    expect(carriedOver(s("Rates rise"), old)).toEqual({});
+  });
+
+  it("carries nothing to a story that is new", () => {
+    expect(carriedOver(s("Something else", "https://b.test"), old)).toEqual({});
   });
 });
