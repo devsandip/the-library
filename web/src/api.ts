@@ -21,6 +21,7 @@ import type {
   StatusResponse,
   StoryPatch,
   SummaryResponse,
+  TakesResponse,
   TimelineResponse,
   TopicListResponse,
   UnreadCountsResponse,
@@ -88,6 +89,10 @@ export interface LibraryApi {
   timeline(id: string, n: number): Promise<TimelineResponse>;
   /** Writes the story's timeline now: one Claude call, about half a cent. Only when asked. */
   writeTimeline(id: string, n: number): Promise<TimelineResponse>;
+  /** How each newsletter covered the story's event (#17): the takes kept for it, if any. */
+  takes(id: string, n: number): Promise<TakesResponse>;
+  /** Writes the takes now: one Claude call, about a cent. Only when asked. */
+  writeTakes(id: string, n: number): Promise<TakesResponse>;
   /** What the newsletters said (#53): by words, then by meaning. */
   search(q: string, sort: SearchSort): Promise<SearchResponse>;
   listSenders(): Promise<SenderListResponse>;
@@ -226,6 +231,18 @@ export class HttpLibraryApi implements LibraryApi {
     return this.request<TimelineResponse>(
       "POST",
       `/issues/${encodeURIComponent(id)}/stories/${n}/timeline`,
+    );
+  }
+  takes(id: string, n: number) {
+    return this.request<TakesResponse>(
+      "GET",
+      `/issues/${encodeURIComponent(id)}/stories/${n}/takes`,
+    );
+  }
+  writeTakes(id: string, n: number) {
+    return this.request<TakesResponse>(
+      "POST",
+      `/issues/${encodeURIComponent(id)}/stories/${n}/takes`,
     );
   }
   search(q: string, sort: SearchSort) {

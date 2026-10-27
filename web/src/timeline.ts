@@ -1,97 +1,123 @@
 /**
- * How a story evolved (#19), as the app holds it: one state per story, shared by the phone's
- * Timeline tab and the Mac's story index, and kept for the page's life. A timeline is written only
- * when the reader asks, and a run carries on when its sheet closes: coming back finds it writing,
- * or done.
+ * The deep dives as the app holds them: How this evolved (#19) and Takes (#17). One state per
+ * story and kind, shared by the phone's tabs and the Mac's story index, and kept for the page's
+ * life. A deep dive is written only when the reader asks, and a run carries on when its sheet
+ * closes: coming back finds it writing, or done.
  */
 import { useEffect, useState } from "preact/hooks";
-import type { Timeline } from "@library/core/types";
+import type { Takes, Timeline } from "@library/core/types";
 import type { LibraryApi } from "./api.js";
 import { useApp } from "./context.js";
 
-export type TimelineState =
+export type DeepState<T> =
   | { status: "loading" }
   /** Nothing kept. `none` says why the last run found nothing to tell. */
   | { status: "idle"; none?: string }
   | { status: "writing"; since: number }
-  | { status: "kept"; timeline: Timeline }
+  | { status: "kept"; value: T }
   | { status: "error"; error: string; retry: "read" | "write" };
 
-const states = new Map<string, TimelineState>();
-const reading = new Set<string>();
-const listeners = new Set<() => void>();
-const keyOf = (id: string, n: number) => `${id}#${n}`;
+export type TimelineState = DeepState<Timeline>;
+export type TakesState = DeepState<Takes>;
 
-function put(key: string, state: TimelineState) {
-  states.set(key, state);
-  for (const l of listeners) l();
-}
-
-export const timelineState = (id: string, n: number): TimelineState =>
-  states.get(keyOf(id, n)) ?? { status: "loading" };
-
-/** Asks whether a timeline is kept for the story's event. What is on screen stays meanwhile. */
-function read(api: LibraryApi, id: string, n: number) {
-  const key = keyOf(id, n);
-  if (reading.has(key)) return;
-  reading.add(key);
-  if (!states.has(key)) put(key, { status: "loading" });
-  api
-    .timeline(id, n)
-    .then(
-      (r) => {
-        // A run started meanwhile answers for itself.
-        if (states.get(key)?.status === "writing") return;
-        put(key, r.timeline ? { status: "kept", timeline: r.timeline } : { status: "idle" });
-      },
-      (err: Error) => put(key, { status: "error", error: err.message, retry: "read" }),
-    )
-    .finally(() => reading.delete(key));
-}
-
-/** Writes the story's timeline: one Claude call, about half a cent. One run at a time per story. */
-export function writeTimeline(api: LibraryApi, id: string, n: number) {
-  const key = keyOf(id, n);
-  if (states.get(key)?.status === "writing") return;
-  put(key, { status: "writing", since: Date.now() });
-  api.writeTimeline(id, n).then(
-    (r) =>
-      put(
-        key,
-        r.timeline ? { status: "kept", timeline: r.timeline } : { status: "idle", none: r.none },
-      ),
-    (err: Error) => put(key, { status: "error", error: err.message, retry: "write" }),
-  );
-}
+/** What the API answers for a deep dive: the kept result, or why there is none. */
+type Answer<T> = Promise<{ value?: T; none?: string }>;
 
 /**
- * The story's timeline, read when first shown (and again while nothing is kept: another story of
- * the same event may have written one), with `write` to write it and `retry` after an error.
+ * One kind of deep dive: its states by story, reading what is kept and writing on request (one
+ * run at a time per story), and a hook that follows a story's state.
  */
-export function useTimeline(id: string, n: number) {
-  const { api } = useApp();
-  const [, tick] = useState(0);
-  useEffect(() => {
-    const l = () => tick((t) => t + 1);
-    listeners.add(l);
-    return () => void listeners.delete(l);
-  }, []);
-  useEffect(() => {
-    const s = states.get(keyOf(id, n));
-    if (!s || s.status === "idle" || (s.status === "error" && s.retry === "read")) {
-      read(api, id, n);
-    }
-  }, [id, n]);
-  const state = timelineState(id, n);
-  return {
-    state,
-    write: () => writeTimeline(api, id, n),
-    retry: () =>
-      state.status === "error" && state.retry === "read"
-        ? read(api, id, n)
-        : writeTimeline(api, id, n),
+function deepDive<T>(get: (api: LibraryApi, id: string, n: number) => Answer<T>, run: typeof get) {
+  const states = new Map<string, DeepState<T>>();
+  const reading = new Set<string>();
+  const listeners = new Set<() => void>();
+  const keyOf = (id: string, n: number) => `${id}#${n}`;
+
+  const put = (key: string, state: DeepState<T>) => {
+    states.set(key, state);
+    for (const l of listeners) l();
   };
+  const stateOf = (id: string, n: number): DeepState<T> =>
+    states.get(keyOf(id, n)) ?? { status: "loading" };
+
+  /** Asks whether one is kept for the story's event. What is on screen stays meanwhile. */
+  const read = (api: LibraryApi, id: string, n: number) => {
+    const key = keyOf(id, n);
+    if (reading.has(key)) return;
+    reading.add(key);
+    if (!states.has(key)) put(key, { status: "loading" });
+    get(api, id, n)
+      .then(
+        (r) => {
+          // A run started meanwhile answers for itself.
+          if (states.get(key)?.status === "writing") return;
+          put(key, r.value ? { status: "kept", value: r.value } : { status: "idle" });
+        },
+        (err: Error) => put(key, { status: "error", error: err.message, retry: "read" }),
+      )
+      .finally(() => reading.delete(key));
+  };
+
+  const write = (api: LibraryApi, id: string, n: number) => {
+    const key = keyOf(id, n);
+    if (states.get(key)?.status === "writing") return;
+    put(key, { status: "writing", since: Date.now() });
+    run(api, id, n).then(
+      (r) =>
+        put(key, r.value ? { status: "kept", value: r.value } : { status: "idle", none: r.none }),
+      (err: Error) => put(key, { status: "error", error: err.message, retry: "write" }),
+    );
+  };
+
+  /**
+   * The story's deep dive, read when first shown (and again while nothing is kept: another story
+   * of the same event may have written one), with `write` and `retry` after an error.
+   */
+  const use = (id: string, n: number) => {
+    const { api } = useApp();
+    const [, tick] = useState(0);
+    useEffect(() => {
+      const l = () => tick((t) => t + 1);
+      listeners.add(l);
+      return () => void listeners.delete(l);
+    }, []);
+    useEffect(() => {
+      const s = states.get(keyOf(id, n));
+      if (!s || s.status === "idle" || (s.status === "error" && s.retry === "read")) {
+        read(api, id, n);
+      }
+    }, [id, n]);
+    const state = stateOf(id, n);
+    return {
+      state,
+      write: () => write(api, id, n),
+      retry: () =>
+        state.status === "error" && state.retry === "read" ? read(api, id, n) : write(api, id, n),
+    };
+  };
+
+  return { stateOf, write, use };
 }
+
+const timelines = deepDive<Timeline>(
+  (api, id, n) => api.timeline(id, n).then((r) => ({ value: r.timeline, none: r.none })),
+  (api, id, n) => api.writeTimeline(id, n).then((r) => ({ value: r.timeline, none: r.none })),
+);
+
+const takes = deepDive<Takes>(
+  (api, id, n) => api.takes(id, n).then((r) => ({ value: r.takes, none: r.none })),
+  (api, id, n) => api.writeTakes(id, n).then((r) => ({ value: r.takes, none: r.none })),
+);
+
+export const timelineState = timelines.stateOf;
+/** Writes the story's timeline: one Claude call, about half a cent. */
+export const writeTimeline = timelines.write;
+export const useTimeline = timelines.use;
+
+export const takesState = takes.stateOf;
+/** Writes the takes on the story's event: one Claude call, about a cent. */
+export const writeTakes = takes.write;
+export const useTakes = takes.use;
 
 /** Seconds since `since`, ticking once a second: the writing line's "0:03". */
 export function useElapsed(since: number | undefined): number {

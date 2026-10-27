@@ -1654,6 +1654,56 @@ dialog {
   color: var(--box-text);
 }
 
+/* Takes (#17): groups under a label, each newsletter's sentence opening its story. */
+.takes-group + .takes-group {
+  margin-top: 14px;
+}
+
+.takes-label {
+  margin-bottom: 6px;
+  color: var(--ink-2);
+}
+
+.takes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.takes a {
+  display: block;
+  padding: 0 0 10px 12px;
+  border-left: 2px solid var(--line-2);
+}
+
+.takes li.current a {
+  border-left-color: var(--box);
+}
+
+.takes-pub {
+  display: block;
+}
+
+.takes-text {
+  display: block;
+  margin-top: 3px;
+  font: 400 15px/1.35 var(--font-text);
+  color: var(--ink);
+}
+
+.takes-group.compact .takes a {
+  padding-bottom: 6px;
+}
+
+.takes-group.compact .takes-text {
+  font: 400 12.5px/1.35 var(--font-text);
+  color: var(--ink-body);
+}
+
+.takes-group.compact li.current .takes-pub {
+  color: var(--box-text);
+}
+
 /* ---------- deep dives (#19): the story sheet's tabs, and How this evolved ---------- */
 
 .deep-tabs {

@@ -23,14 +23,24 @@ import {
 import { useOpenIssue } from "../reader.js";
 import { useStoryActions, useStoryRead, type StoryActions } from "../learning.js";
 import { useTheme } from "../theme.js";
-import { elapsed, timelineState, useElapsed, useTimeline, writeTimeline } from "../timeline.js";
+import {
+  elapsed,
+  takesState,
+  timelineState,
+  useElapsed,
+  useTakes,
+  useTimeline,
+  writeTakes,
+  writeTimeline,
+  type DeepState,
+} from "../timeline.js";
 import { health } from "../phone/library-home.js";
 import { ThumbIcon } from "../components/icons.js";
 import { NewsletterFrame } from "../components/newsletter-frame.js";
 import { ContinueItem } from "../components/now-reading.js";
 import { isWebLink } from "../components/peek.js";
 import { namesLine, RelatedList } from "../components/story.js";
-import { TimelinePanel } from "../components/timeline.js";
+import { TakesPanel, TimelinePanel } from "../components/timeline.js";
 import { useToast } from "../components/toast.js";
 import { Failed, Skeleton } from "../components/ui.js";
 import { QueuePane, useQueue } from "./queue.js";
@@ -182,6 +192,15 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
             if (!st.panes) setIndexOpen(true);
             return true;
           }
+          case "t": {
+            // Takes (#17): written only when asked, so T is the asking.
+            if (!st.selected || !stories.length) return false;
+            const t = takesState(st.selected, n);
+            if (t.status === "kept") toast.say("Kept: the takes are under the story");
+            else if (t.status !== "writing") writeTakes(api, st.selected, n);
+            if (!st.panes) setIndexOpen(true);
+            return true;
+          }
         }
         if (!issue || !actions) return false;
         switch (k) {
@@ -320,6 +339,7 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
             <span>J/K issues</span>
             <span>[ ] stories</span>
             <span>L timeline</span>
+            <span>T takes</span>
             <span>Space peek</span>
             <span>Y useful</span>
             <span>N not useful</span>
@@ -550,18 +570,36 @@ function MacReader({
 
 /** The key grid's L row (M1): write the story's timeline (#19), or how it stands. */
 function TimelineKeys({ id, n }: { id: string; n: number }) {
-  const { state, write } = useTimeline(id, n);
+  return <DeepKeys k="L" label="Timeline" deep={useTimeline(id, n)} />;
+}
+
+/** The key grid's T row: write the story's takes (#17), or how they stand. */
+function TakesKeys({ id, n }: { id: string; n: number }) {
+  return <DeepKeys k="T" label="Takes" deep={useTakes(id, n)} />;
+}
+
+/** A deep dive's row in the key grid: its key, write it, and ✓ kept, ● writing or its cost. */
+function DeepKeys({
+  k,
+  label,
+  deep,
+}: {
+  k: string;
+  label: string;
+  deep: { state: DeepState<unknown>; write: () => void };
+}) {
+  const { state, write } = deep;
   const secs = useElapsed(state.status === "writing" ? state.since : undefined);
   return (
     <>
-      <span class="keycap">L</span>
+      <span class="keycap">{k}</span>
       <button
         type="button"
         class="key-action"
         disabled={state.status === "kept" || state.status === "writing"}
         onClick={write}
       >
-        Timeline
+        {label}
       </button>
       {state.status === "kept" ? (
         <span class="kept">✓ Kept</span>
@@ -676,9 +714,18 @@ function StoryIndex({
                 )}
                 <span />
                 <TimelineKeys id={id} n={s.n} />
+                <TakesKeys id={id} n={s.n} />
               </div>
               <TimelinePanel
                 key={`${id}#${s.n}`}
+                id={id}
+                n={s.n}
+                href={(rid, rn) => queueHref("news", undefined, rid, rn)}
+                onOpen={onOpen}
+                compact
+              />
+              <TakesPanel
+                key={`takes-${id}#${s.n}`}
                 id={id}
                 n={s.n}
                 href={(rid, rn) => queueHref("news", undefined, rid, rn)}

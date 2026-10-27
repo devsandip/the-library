@@ -8,13 +8,13 @@ import { goBack, previousPath } from "../nav.js";
 import { BASE } from "../config.js";
 import { issueHref, newsletterHref, slug, todayHref, type Deep } from "../paths.js";
 import { useOpenIssue } from "../reader.js";
-import { useTimeline } from "../timeline.js";
+import { useTakes, useTimeline } from "../timeline.js";
 import { KIND_WORD } from "../sentence.js";
 import { NewsletterFrame } from "../components/newsletter-frame.js";
 import { isWebLink } from "../components/peek.js";
 import { Thumbs } from "../components/thumbs.js";
 import { namesLine, RelatedList } from "../components/story.js";
-import { TimelineMark, TimelinePanel } from "../components/timeline.js";
+import { DeepMark, TakesPanel, TimelinePanel } from "../components/timeline.js";
 import { Failed, Skeleton } from "../components/ui.js";
 
 /** Where the reader came from, for its way back: "‹ Today", "‹ Browse", "‹ Search". */
@@ -226,6 +226,7 @@ function StorySheet({
   const relCount = rel.earlier.length + rel.since.length;
   const names = namesLine(s, [...rel.earlier, ...rel.since], issue.publication);
   const timeline = useTimeline(issue.id, s.n);
+  const takes = useTakes(issue.id, s.n);
   // Viewing a Learning story reads it, not its issue (#81).
   useStoryRead(issue.id, s, actions);
   const shelf = s.shelf ?? "news";
@@ -389,11 +390,30 @@ function StorySheet({
               onClick={() => toggleDeep("timeline")}
             >
               Timeline
-              <TimelineMark state={timeline.state} />
+              <DeepMark state={timeline.state} />
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="deep-tab"
+              aria-selected={deep === "takes"}
+              onClick={() => toggleDeep("takes")}
+            >
+              Takes
+              <DeepMark state={takes.state} />
             </button>
           </div>
           {deep === "timeline" && (
             <TimelinePanel
+              key={`${issue.id}#${s.n}`}
+              id={issue.id}
+              n={s.n}
+              href={(rid, rn) => issueHref(rid, rn)}
+              onOpen={(rid, rn) => route(issueHref(rid, rn))}
+            />
+          )}
+          {deep === "takes" && (
+            <TakesPanel
               key={`${issue.id}#${s.n}`}
               id={issue.id}
               n={s.n}
