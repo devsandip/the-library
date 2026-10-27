@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
+import type { Shelf } from "@library/core/types";
 import type { EnrichCandidate } from "../src/enrich.js";
 import type { DecisionPort, Question } from "../src/jev.js";
-import { shelfFor, shelveStories, type ShelfCandidate } from "../src/shelves.js";
+import {
+  deriveShelves,
+  shelveStories,
+  startingState,
+  type ShelfCandidate,
+} from "../src/shelves.js";
 import type { Store } from "../src/store.js";
 
 const since = "2026-10-01T00:00:00.000Z";
@@ -13,6 +19,7 @@ const story = (
 ): ShelfCandidate => ({
   issueId,
   n,
+  senderId: `s-${issueId}`,
   receivedAt: "2026-10-16T08:00:00.000Z",
   headline: `${issueId} ${n}`,
   summary: "What it says.",
@@ -39,48 +46,78 @@ function fakeJev(p: Record<string, number>) {
   return { port, states };
 }
 
-function fakeStore(stories: ShelfCandidate[], moved: string[] = []) {
-  const put: { ref: string; shelf: string; learning: number; model: string }[] = [];
+interface Put {
+  ref: string;
+  shelf?: string;
+  shelfSetBy?: string;
+  state?: string;
+  learning?: number;
+}
+
+function fakeStore(
+  stories: ShelfCandidate[],
+  opts: {
+    moved?: string[];
+    senderShelf?: Record<string, Shelf>;
+    issues?: Partial<EnrichCandidate>[];
+  } = {},
+) {
+  const put: Put[] = [];
+  const derived: string[][] = [];
   const store = {
     storyShelves: vi.fn(async () => stories),
-    enrichCandidates: vi.fn(async () =>
-      [...new Set(stories.map((s) => s.issueId))].map(
-        (id) => ({ id, publication: `Pub ${id}` }) as EnrichCandidate,
-      ),
+    enrichCandidates: vi.fn(
+      async () =>
+        opts.issues ??
+        [...new Set(stories.map((s) => s.issueId))].map(
+          (id) => ({ id, publication: `Pub ${id}` }) as EnrichCandidate,
+        ),
+    ),
+    senderSettings: vi.fn(
+      async () =>
+        new Map(
+          Object.entries(opts.senderShelf ?? {}).map(([id, shelf]) => [
+            id,
+            { shelf, mustRead: false, muted: false },
+          ]),
+        ),
     ),
     putStoryShelf: vi.fn(
-      async (issueId: string, n: number, s: { shelf: string; learning: number; model: string }) => {
-        const ref = `${issueId} ${n}`;
-        if (moved.includes(ref)) return false;
-        put.push({ ref, ...s });
+      async (
+        s: ShelfCandidate,
+        next: { shelf?: string; shelfSetBy?: string; state?: string },
+        jev?: { learning: number },
+      ) => {
+        const ref = `${s.issueId} ${s.n}`;
+        if (opts.moved?.includes(ref)) return false;
+        put.push({ ref, ...next, ...(jev ? { learning: jev.learning } : {}) });
         return true;
       },
     ),
+    deriveIssueShelves: vi.fn(async (ids: Iterable<string>) => {
+      derived.push([...ids]);
+      return derived.at(-1)!.length;
+    }),
   };
-  return { store: store as unknown as Store, put, spies: store };
+  return { store: store as unknown as Store, put, derived, spies: store };
 }
 
-describe("shelfFor", () => {
-  it("puts 0.5 and up on Learning", () => {
-    expect([0, 0.49, 0.5, 1].map(shelfFor)).toEqual(["news", "news", "learning", "learning"]);
-  });
-});
-
 describe("shelveStories", () => {
-  it("asks Jev about unshelved stories only, with the newsletter's name, and stores its answer", async () => {
-    const { store, put } = fakeStore([
+  it("asks Jev about stories it has not read, with the newsletter's name, and stores its answer", async () => {
+    const { store, put, derived } = fakeStore([
       story("a", 1),
       story("a", 2),
-      story("b", 1, { shelfSetBy: "jev" }),
-      story("b", 2, { shelfSetBy: "sandip" }),
+      story("b", 1, { shelfSetBy: "jev", learning: 0.3 }),
+      story("b", 2, { shelf: "news", shelfSetBy: "sandip", learning: 0.8 }),
     ]);
     const { port, states } = fakeJev({ "a 1": 0.92, "a 2": 0.45 });
     const stats = await shelveStories(store, async () => port, { sinceIso: since });
 
     expect(put).toEqual([
-      { ref: "a 1", shelf: "learning", learning: 0.92, model: "jev-1.13.0" },
-      { ref: "a 2", shelf: "news", learning: 0.45, model: "jev-1.13.0" },
+      { ref: "a 1", shelf: "learning", shelfSetBy: "jev", learning: 0.92 },
+      { ref: "a 2", shelf: "news", shelfSetBy: "jev", learning: 0.45 },
     ]);
+    expect(derived).toEqual([["a"]]);
     expect(states[0]).toContain("Newsletter: Pub a\nHeadline: a 1\nSummary: What it says.");
     expect(stats).toMatchObject({
       checked: 2,
@@ -92,10 +129,10 @@ describe("shelveStories", () => {
     });
   });
 
-  it("with force, asks again about Jev's own calls but never over Sandip's", async () => {
+  it("with force, asks again about every story but Sandip's moves", async () => {
     const { store, put } = fakeStore([
-      story("a", 1, { shelfSetBy: "jev" }),
-      story("a", 2, { shelfSetBy: "sandip" }),
+      story("a", 1, { shelfSetBy: "jev", learning: 0.9 }),
+      story("a", 2, { shelf: "learning", shelfSetBy: "sandip", learning: 0.1 }),
     ]);
     const { port } = fakeJev({ "a 1": 0.1, "a 2": 0.9 });
     const stats = await shelveStories(store, async () => port, { sinceIso: since, force: true });
@@ -104,7 +141,9 @@ describe("shelveStories", () => {
   });
 
   it("keeps going past a failed story, and does not count one Sandip moved meanwhile", async () => {
-    const { store, put } = fakeStore([story("a", 1), story("a", 2), story("a", 3)], ["a 3"]);
+    const { store, put } = fakeStore([story("a", 1), story("a", 2), story("a", 3)], {
+      moved: ["a 3"],
+    });
     const { port } = fakeJev({ "a 1": 0.7, "a 3": 0.2 });
     const stats = await shelveStories(store, async () => port, { sinceIso: since });
     expect(put.map((p) => p.ref)).toEqual(["a 1"]);
@@ -113,7 +152,7 @@ describe("shelveStories", () => {
   });
 
   it("does not read the key when there is nothing to shelve", async () => {
-    const { store } = fakeStore([story("a", 1, { shelfSetBy: "jev" })]);
+    const { store } = fakeStore([story("a", 1, { shelfSetBy: "jev", learning: 0.2 })]);
     const jev = vi.fn(async () => fakeJev({}).port);
     const stats = await shelveStories(store, jev, { sinceIso: since });
     expect(jev).not.toHaveBeenCalled();
@@ -130,5 +169,65 @@ describe("shelveStories", () => {
     });
     expect(put).toEqual([]);
     expect(stats).toMatchObject({ checked: 3, shelved: 0, deferred: 3 });
+  });
+
+  it("puts a story on its newsletter's setting, keeping Jev's answer beside it", async () => {
+    const { store, put } = fakeStore([story("a", 1)], { senderShelf: { "s-a": "learning" } });
+    const { port } = fakeJev({ "a 1": 0.1 });
+    const stats = await shelveStories(store, async () => port, { sinceIso: since });
+    expect(put).toEqual([{ ref: "a 1", shelf: "learning", shelfSetBy: "sender", learning: 0.1 }]);
+    // The stats count Jev's calls, whatever the setting.
+    expect(stats).toMatchObject({ shelved: 1, learning: 0 });
+  });
+});
+
+describe("startingState", () => {
+  it("is read for an issue read or archived by Sandip, unread inside news a rule archived", () => {
+    const issue = (e: Partial<EnrichCandidate>) => e as EnrichCandidate;
+    expect(startingState(issue({ state: "read" }))).toBe("read");
+    expect(startingState(issue({ state: "archived" }))).toBe("read");
+    expect(startingState(issue({ state: "archived", autoArchived: true }))).toBeUndefined();
+    expect(startingState(issue({ state: "unread" }))).toBeUndefined();
+    expect(startingState(undefined)).toBeUndefined();
+  });
+});
+
+describe("deriveShelves", () => {
+  it("writes only what differs, and derives every issue with stories", async () => {
+    const { store, put, derived } = fakeStore(
+      [
+        // Already in line: Jev's Learning, unread, indexed.
+        story("a", 1, { shelf: "learning", shelfSetBy: "jev", learning: 0.8, indexed: true }),
+        // Learning but not indexed yet.
+        story("a", 2, { shelf: "learning", shelfSetBy: "jev", learning: 0.7 }),
+        // Its issue was read: the story starts read, out of the index.
+        story("b", 1, { shelf: "learning", shelfSetBy: "jev", learning: 0.9, indexed: true }),
+        // Its newsletter is always News now.
+        story("c", 1, { shelf: "learning", shelfSetBy: "jev", learning: 0.9, indexed: true }),
+      ],
+      {
+        senderShelf: { "s-c": "news" },
+        issues: [
+          { id: "a", state: "unread" },
+          { id: "b", state: "read" },
+          { id: "c", state: "unread" },
+        ],
+      },
+    );
+    const stats = await deriveShelves(store, { sinceIso: since });
+    expect(put).toEqual([
+      { ref: "a 2", shelf: "learning", shelfSetBy: "jev" },
+      { ref: "b 1", shelf: "learning", shelfSetBy: "jev", state: "read" },
+      { ref: "c 1", shelf: "news", shelfSetBy: "sender" },
+    ]);
+    expect(derived).toEqual([["a", "b", "c"]]);
+    expect(stats).toMatchObject({
+      stories: 4,
+      storiesChanged: 3,
+      unreadLearning: 2,
+      issues: 3,
+      issuesChanged: 3,
+      skipped: 0,
+    });
   });
 });

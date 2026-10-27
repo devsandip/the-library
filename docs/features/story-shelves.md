@@ -5,8 +5,10 @@ News or Learning for each story instead of each issue, where Learning means craf
 ## What exists so far
 
 - **A Jev client** (`services/ingest/src/jev.ts`): one call carries the story and the questions, and comes back with a probability per option.
-- **Jev in ingest** (`services/ingest/src/shelves.ts`): after the story index, every ingest run sends the stories of the last 14 days that have no shelf to Jev, four at a time, and stores `shelf`, `learning` (the probability), `shelfSetBy: "jev"`, `shelfModel` and `shelvedAt` on each story. Its own pass, so a Jev outage never holds up stories; failures are counted on Status and retried next run. It never writes over a story Sandip moved (`shelfSetBy: "sandip"`). Nothing reads the story's shelf yet.
-- **The backfill**: `AWS_PROFILE=admin pnpm shelves --days N` runs the same pass in the ingest Lambda, eight at a time, for up to 9 minutes a run; `--force` asks again about Jev's own calls.
+- **Jev in ingest** (`services/ingest/src/shelves.ts`): after the story index, every ingest run sends the stories of the last 14 days that Jev has not read to Jev, four at a time, and stores `learning` (the probability), `shelfModel` and `shelvedAt` on each story, with its effective `shelf` and `shelfSetBy`. Its own pass, so a Jev outage never holds up stories; failures are counted on Status and retried next run. It never writes over a story Sandip moved or read meanwhile.
+- **The effective shelf** (#94, `packages/core/src/shelves.ts`): Sandip's move, then the newsletter's "always" setting, then Jev. A story on Learning and unread is also in `gsi2` under `LEARNING`, so Learning can list and count those without reading every story.
+- **The issue follows its stories** (#94): Learning when every story is Learning, News otherwise, written after each Jev pass and each move (`shelfSetBy: "stories"`). An issue with no stories keeps its own shelf; a new one starts on its newsletter's setting, else News. Claude's shelf is still stored as `shelfAuto` and no longer decides. Moving an issue moves all its stories, as Sandip's moves.
+- **The backfill**: `AWS_PROFILE=admin pnpm shelves --days N` runs the same pass in the ingest Lambda, eight at a time, for up to 9 minutes a run; `--force` asks again about every story but Sandip's moves. `--derive` asks Jev nothing: it brings every story's shelf, state and index attributes in line and derives every issue's shelf; run again, it writes nothing.
 - **The question**, a yes or no: "does this story build the reader's craft?", with `CRAFT` and `NOT_CRAFT` as the two sides. Jev reads the reader line enrichment uses, the newsletter's name, and the story's headline and summary from the story index (#15). Answers from 0.4 up to 0.6 are unsure (`UNSURE`).
 - **A scoring script**: `AWS_PROFILE=admin pnpm jev:score <labels.json>` runs Jev on labelled stories and prints agreement and calibration beside two baselines: Claude's guesses and the shelf Haiku gave the whole issue. It stores nothing in the table.
 
@@ -50,7 +52,10 @@ Sandip's rules (2026-10-17), the reference for labels and for any change to Jev'
 - **The yes or no phrasing leads** (2026-10-17, against Sandip's labels). It agreed on 56 of 59 to the choice phrasing's 54, and its uncertain middle holds the hard calls. The choice phrasing was confidently wrong once: a book-club announcement from Product Talk at 0.85. Against Claude's guesses the order was the other way round, which is why the labels came first.
 
 - **The story's field is `shelf`, like the issue's** (2026-10-17), with `learning` beside it. #81 said `kind`; `shelf` matches the issue's field and its `Shelf` type, so step 4 can treat both alike.
-- **Jev reads every story, whatever the newsletter's "always" setting** (2026-10-17). The setting is applied where stories are read (step 4), not stamped on them, so changing it needs no rewrite, and Jev's probability is there for every story. No newsletter has one yet.
+- **Jev reads every story, whatever the newsletter's "always" setting** (2026-10-17), so its probability is there for every story.
+- **The setting is stamped on the stories** (2026-10-27, #94), not applied where they are read as planned on 2026-10-17: listing and counting Learning needs the effective shelf in an index. Changing it rewrites the newsletter's stories; clearing it goes back to Jev's call from the stored probability. No newsletter had one.
+- **Reading a Learning story marks the story, not its issue** (2026-10-27, Sandip's go-ahead to use judgement on #81's questions). Learning stories do not expire. Archive and the shelf move act on the story; thumbs rate the issue. No Save on stories for now: unread ones stay in Learning anyway.
+- **Where existing stories start** (2026-10-27): read when their issue was read or archived by Sandip, unread otherwise, including inside news the old-news rule archived unseen. On prod that is 15 read and 427 unread of 442 Learning stories.
 - **Each environment has its own key** (`/thelibrary/<stage>/jev/api-key`). Dev has none, so shelving shows an error on dev's Status; dev's tests use a fake Jev.
 
 ## Jev's API (learned 2026-10-17)
@@ -79,5 +84,5 @@ Sandip's rules (2026-10-17), the reference for labels and for any change to Jev'
 
 - The unsure band. Since the accuracy is fine as it is, the proposal is now simpler: shelve every story by 0.5, store Jev's probability, and leave a list of unsure calls for later. Sandip's moves become labels (#26).
 - If the unsure band needs to shrink, the next thing to try is more text per story, not more questions: Jev sees a 45-word summary, and for an essay that is thin.
-- #81 steps 4 and 5: Learning listing stories, and the brief and archive rule following stories. Step 4 needs Sandip's answers to #81's three questions first.
-- A forced re-split of an issue (`pnpm stories --force`) replaces its stories, shelves and moves included; the next run shelves them again. Moves would be lost, which matters once step 4 lets Sandip move stories.
+- #81 steps 4 and 5, the milestone [Learning lists stories (#81)](https://github.com/devsandip/the-library/milestone/1): the API (#95), the screens (#96), and the brief and Haiku's prompt (#97).
+- A forced re-split of an issue (`pnpm stories --force`) replaces its stories, moves and read state included; the next run shelves them again (#98).

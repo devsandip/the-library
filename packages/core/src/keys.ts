@@ -31,7 +31,10 @@ export const timelineKey = (eventId: string) => ({ pk: `TIMELINE#${eventId}`, sk
 export const INDEX = {
   /** INBOX (unread + read) | ARCHIVE | SENDERS | STORIES | OPENS */
   list: "gsi1",
-  /** Sparse: unread issues (UNREAD), and saved ones (SAVED, #43), which leave UNREAD. */
+  /**
+   * Sparse: unread issues (UNREAD), saved ones (SAVED, #43), which leave UNREAD, and unread
+   * Learning stories (LEARNING, #81).
+   */
   unread: "gsi2",
   /** SENDER#<senderId> */
   bySender: "gsi3",
@@ -47,6 +50,7 @@ export const PARTITION = {
   opens: "OPENS",
   unread: "UNREAD",
   saved: "SAVED",
+  learning: "LEARNING",
   rated: "RATED",
 } as const;
 

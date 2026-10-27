@@ -12,8 +12,12 @@ export type Rating = 1 | -1;
 export type View = "unread" | "all" | "archived" | "saved";
 /** Home's two tabs: what's happening now, or worth reading in three months. */
 export type Shelf = "news" | "learning";
-/** Who decided an issue's shelf: Claude, the sender's "always" setting, or Sandip moving it. */
-export type ShelfSetBy = "claude" | "sender" | "sandip";
+/**
+ * Who decided an issue's shelf. `stories`: it follows its stories (#81), Learning when every one
+ * is. An issue with no stories: the sender's "always" setting, Sandip moving it, or, before #81,
+ * Claude.
+ */
+export type ShelfSetBy = "stories" | "claude" | "sender" | "sandip";
 
 export interface Topic {
   name: string;
@@ -358,8 +362,10 @@ export interface StoryStats {
   durationMs: number;
 }
 
-/** Who decided a story's shelf (#81): Jev, or Sandip moving it. */
-export type StoryShelfSetBy = "jev" | "sandip";
+/** Who decided a story's shelf (#81): Jev, the newsletter's "always" setting, or Sandip moving it. */
+export type StoryShelfSetBy = "jev" | "sender" | "sandip";
+/** A Learning story's own state (#81), apart from its issue's. Absent means unread. */
+export type StoryState = "unread" | "read" | "archived";
 
 /** One run of story shelving (#81): Jev reads each new story and picks News or Learning. */
 export interface ShelfStats {
@@ -375,6 +381,20 @@ export interface ShelfStats {
   errors: number;
   errorSamples: string[];
   inputTokens: number;
+  durationMs: number;
+}
+
+/** What `pnpm shelves --derive` changed (#81). */
+export interface ShelfDeriveStats {
+  stories: number;
+  /** Stories whose shelf, state or `gsi2` attributes were rewritten. */
+  storiesChanged: number;
+  /** Unread Learning stories afterwards. */
+  unreadLearning: number;
+  issues: number;
+  issuesChanged: number;
+  /** Stories Sandip moved or read while this ran; run it again. */
+  skipped: number;
   durationMs: number;
 }
 

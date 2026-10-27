@@ -33,6 +33,8 @@ import {
   s3Keys,
   senderIndexAttributes,
   senderItemKey,
+  issueShelf,
+  storyIndexAttributes,
   storyKey,
   storyRef,
   toVector,
@@ -47,6 +49,7 @@ import type {
   ShelfSetBy,
   ShelfStats,
   StoryShelfSetBy,
+  StoryState,
   StoryStats,
   Topic,
 } from "@library/core/types";
@@ -532,7 +535,8 @@ export class Store {
             KeyConditionExpression: "gsi1pk = :p AND gsi1sk >= :since",
             ExpressionAttributeValues: { ":p": partition, ":since": sinceIso },
             ProjectionExpression:
-              "id, senderId, publication, subject, receivedAt, summary, shelf, shelfSetBy, enrichedAt, embeddedAt, promo, storiedAt, storyAttempts",
+              "id, senderId, publication, subject, receivedAt, summary, shelf, shelfSetBy, enrichedAt, embeddedAt, promo, storiedAt, storyAttempts, #st, autoArchived",
+            ExpressionAttributeNames: { "#st": "state" },
             ExclusiveStartKey: start,
           }),
         );
@@ -551,6 +555,8 @@ export class Store {
             promo: i.promo === true,
             storied: Boolean(i.storiedAt),
             storyAttempts: (i.storyAttempts as number | undefined) ?? 0,
+            state: i.state as EnrichCandidate["state"],
+            autoArchived: i.autoArchived !== undefined,
           });
         }
         start = res.LastEvaluatedKey;
@@ -855,61 +861,43 @@ export class Store {
   }
 
   /**
-   * Store Claude's classification. The effective shelf follows the sender's "always" setting if
-   * it has one, else Claude; an issue Sandip moved himself keeps his choice.
+   * Store Claude's classification. Its shelf is kept as `shelfAuto` only: an issue's shelf follows
+   * its stories (#81). One with none yet starts on its newsletter's "always" setting, else News.
    */
   async putClassification(id: string, c: Classification, senderShelf?: Shelf): Promise<void> {
-    const names = {
-      "#sum": "summary",
-      "#auto": "shelfAuto",
-      "#topic": "topic",
-      "#promo": "promo",
-      "#selling": "selling",
-      "#at": "enrichedAt",
-      "#model": "enrichModel",
-    };
-    const values = {
-      ":sum": c.summary,
-      ":auto": c.shelf,
-      ":topic": c.topic,
-      ":promo": c.promo,
-      ":selling": c.selling,
-      ":at": new Date().toISOString(),
-      ":model": MODELS.classify,
-    };
-    const base =
-      "SET #sum = :sum, #auto = :auto, #topic = :topic, #promo = :promo, #selling = :selling, #at = :at, #model = :model";
-    try {
-      await this.ddb.send(
-        new UpdateCommand({
-          TableName: this.table,
-          Key: issueKey(id),
-          UpdateExpression: `${base}, #shelf = :shelf, #by = :by`,
-          ConditionExpression:
-            "attribute_exists(pk) AND (attribute_not_exists(#by) OR #by <> :sandip)",
-          ExpressionAttributeNames: { ...names, "#shelf": "shelf", "#by": "shelfSetBy" },
-          ExpressionAttributeValues: {
-            ...values,
-            ":shelf": senderShelf ?? c.shelf,
-            ":by": senderShelf ? "sender" : "claude",
-            ":sandip": "sandip",
-          },
-        }),
-      );
-    } catch (err) {
-      if ((err as { name?: string }).name !== "ConditionalCheckFailedException") throw err;
-      // Sandip moved this issue himself: keep his shelf, store the rest.
-      await this.ddb.send(
-        new UpdateCommand({
-          TableName: this.table,
-          Key: issueKey(id),
-          UpdateExpression: base,
-          ConditionExpression: "attribute_exists(pk)",
-          ExpressionAttributeNames: names,
-          ExpressionAttributeValues: values,
-        }),
-      );
-    }
+    await this.ddb.send(
+      new UpdateCommand({
+        TableName: this.table,
+        Key: issueKey(id),
+        UpdateExpression:
+          "SET #sum = :sum, #auto = :auto, #topic = :topic, #promo = :promo, #selling = :selling, " +
+          "#at = :at, #model = :model, #shelf = if_not_exists(#shelf, :shelf)" +
+          (senderShelf ? ", #by = if_not_exists(#by, :sender)" : ""),
+        ConditionExpression: "attribute_exists(pk)",
+        ExpressionAttributeNames: {
+          "#sum": "summary",
+          "#auto": "shelfAuto",
+          "#topic": "topic",
+          "#promo": "promo",
+          "#selling": "selling",
+          "#at": "enrichedAt",
+          "#model": "enrichModel",
+          "#shelf": "shelf",
+          ...(senderShelf ? { "#by": "shelfSetBy" } : {}),
+        },
+        ExpressionAttributeValues: {
+          ":sum": c.summary,
+          ":auto": c.shelf,
+          ":topic": c.topic,
+          ":promo": c.promo,
+          ":selling": c.selling,
+          ":at": new Date().toISOString(),
+          ":model": MODELS.classify,
+          ":shelf": senderShelf ?? "news",
+          ...(senderShelf ? { ":sender": "sender" } : {}),
+        },
+      }),
+    );
   }
 
   async putEmbedding(id: string, vector: number[]): Promise<void> {
@@ -969,48 +957,87 @@ export class Store {
     }));
   }
 
-  /** Stories received since `fromIso`, oldest first, with what Jev reads and who shelved them. */
+  /** Stories received since `fromIso`, oldest first, with what Jev reads and their shelf fields. */
   async storyShelves(fromIso: string): Promise<ShelfCandidate[]> {
     const items = await this.queryStories(
       fromIso,
       "9999-12-31T23:59:59.999Z",
-      "headline, summary, shelfSetBy",
+      "senderId, headline, summary, shelf, shelfSetBy, learning, #st, gsi2pk",
+      { "#st": "state" },
     );
     return items.map((i) => ({
       issueId: i.id as string,
       n: i.n as number,
+      senderId: i.senderId as string,
       receivedAt: i.receivedAt as string,
       headline: i.headline as string,
       summary: i.summary as string,
+      shelf: i.shelf as Shelf | undefined,
       shelfSetBy: i.shelfSetBy as StoryShelfSetBy | undefined,
+      learning: i.learning as number | undefined,
+      state: i.state as StoryState | undefined,
+      indexed: i.gsi2pk !== undefined,
     }));
   }
 
   /**
-   * Jev's shelf for one story, with its probability of Learning. Never over a move by Sandip;
-   * returns false when the story was moved or is gone.
+   * Write a story's shelf and state, the `gsi2` attributes that follow from them, and Jev's answer
+   * when there is one, provided its shelf's setter and its state are still those `s` was read
+   * with. Returns false when they changed meanwhile (Sandip moved or read it) or it is gone.
    */
   async putStoryShelf(
-    issueId: string,
-    n: number,
-    shelf: { shelf: Shelf; learning: number; model: string },
+    s: ShelfCandidate,
+    next: { shelf?: Shelf; shelfSetBy?: StoryShelfSetBy; state?: StoryState },
+    jev?: { learning: number; model: string },
   ): Promise<boolean> {
+    const set: Record<string, unknown> = {};
+    if (jev) Object.assign(set, { learning: jev.learning, shelfModel: jev.model });
+    if (jev) set.shelvedAt = new Date().toISOString();
+    if (next.shelf) Object.assign(set, { shelf: next.shelf, shelfSetBy: next.shelfSetBy });
+    if (next.state) set.state = next.state;
+    const index = storyIndexAttributes({
+      issueId: s.issueId,
+      n: s.n,
+      receivedAt: s.receivedAt,
+      shelf: next.shelf,
+      state: next.state ?? s.state,
+    });
+    Object.assign(set, index.set);
+    const names: Record<string, string> = { "#by": "shelfSetBy", "#st": "state" };
+    const values: Record<string, unknown> = {};
+    const assign = Object.entries(set).map(([k, v], i) => {
+      names[`#a${i}`] = k;
+      values[`:a${i}`] = v;
+      return `#a${i} = :a${i}`;
+    });
+    const remove = index.remove.map((a, i) => {
+      names[`#r${i}`] = a;
+      return `#r${i}`;
+    });
+    const asRead = (attr: string, v: string | undefined, key: string) => {
+      if (v === undefined) return `attribute_not_exists(${attr})`;
+      values[key] = v;
+      return `${attr} = ${key}`;
+    };
     try {
       await this.ddb.send(
         new UpdateCommand({
           TableName: this.table,
-          Key: storyKey(issueId, n),
-          UpdateExpression:
-            "SET shelf = :s, learning = :p, shelfSetBy = :jev, shelfModel = :m, shelvedAt = :at",
-          ConditionExpression:
-            "attribute_exists(pk) AND (attribute_not_exists(shelfSetBy) OR shelfSetBy = :jev)",
-          ExpressionAttributeValues: {
-            ":s": shelf.shelf,
-            ":p": shelf.learning,
-            ":jev": "jev",
-            ":m": shelf.model,
-            ":at": new Date().toISOString(),
-          },
+          Key: storyKey(s.issueId, s.n),
+          UpdateExpression: [
+            assign.length ? `SET ${assign.join(", ")}` : "",
+            remove.length ? `REMOVE ${remove.join(", ")}` : "",
+          ]
+            .filter(Boolean)
+            .join(" "),
+          ConditionExpression: [
+            "attribute_exists(pk)",
+            asRead("#by", s.shelfSetBy, ":by0"),
+            asRead("#st", s.state, ":st0"),
+          ].join(" AND "),
+          ExpressionAttributeNames: names,
+          // DynamoDB rejects an empty map: a write that only removes, with nothing to compare.
+          ExpressionAttributeValues: Object.keys(values).length ? values : undefined,
         }),
       );
       return true;
@@ -1020,7 +1047,58 @@ export class Store {
     }
   }
 
-  private async queryStories(fromIso: string, toIso: string, extra: string) {
+  /**
+   * Set each issue's shelf from its stories' (#81): Learning when every one is Learning. Reads
+   * them fresh, so a move made meanwhile counts. Issues with no stories keep theirs. Returns how
+   * many changed.
+   */
+  async deriveIssueShelves(ids: Iterable<string>): Promise<number> {
+    let changed = 0;
+    await mapLimit([...new Set(ids)], 8, async (id) => {
+      const [meta, stories] = await Promise.all([
+        this.ddb.send(
+          new GetCommand({
+            TableName: this.table,
+            Key: issueKey(id),
+            ProjectionExpression: "shelf, shelfSetBy, #st",
+            ExpressionAttributeNames: { "#st": "state" },
+            ConsistentRead: true,
+          }),
+        ),
+        this.ddb.send(
+          new QueryCommand({
+            TableName: this.table,
+            KeyConditionExpression: "pk = :pk AND begins_with(sk, :story)",
+            ExpressionAttributeValues: { ":pk": issueKey(id).pk, ":story": "STORY#" },
+            ProjectionExpression: "shelf",
+            ConsistentRead: true,
+          }),
+        ),
+      ]);
+      const item = meta.Item;
+      const shelf = issueShelf((stories.Items ?? []).map((i) => i.shelf as Shelf | undefined));
+      if (!item || !shelf || item.state === "filtered") return;
+      if (item.shelf === shelf && item.shelfSetBy === "stories") return;
+      await this.ddb.send(
+        new UpdateCommand({
+          TableName: this.table,
+          Key: issueKey(id),
+          UpdateExpression: "SET shelf = :s, shelfSetBy = :by",
+          ConditionExpression: "attribute_exists(pk)",
+          ExpressionAttributeValues: { ":s": shelf, ":by": "stories" },
+        }),
+      );
+      changed++;
+    });
+    return changed;
+  }
+
+  private async queryStories(
+    fromIso: string,
+    toIso: string,
+    extra: string,
+    names: Record<string, string> = {},
+  ) {
     const out: Record<string, unknown>[] = [];
     let start: Record<string, unknown> | undefined;
     do {
@@ -1035,7 +1113,7 @@ export class Store {
             ":to": `${toIso}\uffff`,
           },
           ProjectionExpression: `id, n, receivedAt, #names, eventId, ${extra}`,
-          ExpressionAttributeNames: { "#names": "names" },
+          ExpressionAttributeNames: { "#names": "names", ...names },
           ExclusiveStartKey: start,
         }),
       );

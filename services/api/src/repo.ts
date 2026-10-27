@@ -29,6 +29,7 @@ import {
   openIndexAttributes,
   issueIndexAttributes,
   issueKey,
+  issueShelf,
   PARTITION,
   pickTop,
   rank,
@@ -39,8 +40,10 @@ import {
   retryOnConflict,
   s3Keys,
   senderItemKey,
+  storyIndexAttributes,
   storyKey,
   storyRef,
+  storyShelf,
   timelineKey,
   TOPICS_KEY,
   toVector,
@@ -70,6 +73,8 @@ import type {
   Shelf,
   ShelfSetBy,
   StatusResponse,
+  StoryShelfSetBy,
+  StoryState,
   SummaryResponse,
   Timeline,
   Topic,
@@ -615,10 +620,38 @@ export class DynamoRepo
     return toListItem({ ...item, savedAt });
   }
 
+  /**
+   * Sandip moves an issue. Its stories move with it (#81), each as his own move, and the issue's
+   * shelf follows them; an issue with no stories is moved itself.
+   */
   async setShelf(id: string, shelf: Shelf): Promise<IssueListItem> {
-    const item = await this.mustGetIssue(id);
-    if (item.shelf === shelf && item.shelfSetBy === "sandip") return toListItem(item);
+    const [item, stories] = await Promise.all([this.mustGetIssue(id), this.storyShelves(id)]);
     const now = new Date().toISOString();
+    const event = this.event(id, now, {
+      type: "shelf",
+      value: shelf,
+      prev: (item.shelf as string) ?? null,
+    });
+    if (!stories.length) {
+      if (item.shelf === shelf && item.shelfSetBy === "sandip") return toListItem(item);
+      await this.transact([
+        {
+          Update: {
+            TableName: this.table,
+            Key: issueKey(id),
+            UpdateExpression: "SET #sh = :sh, #by = :by",
+            ConditionExpression: "attribute_exists(pk)",
+            ExpressionAttributeNames: { "#sh": "shelf", "#by": "shelfSetBy" },
+            ExpressionAttributeValues: { ":sh": shelf, ":by": "sandip" },
+          },
+        },
+        event,
+      ]);
+      return toListItem({ ...item, shelf, shelfSetBy: "sandip" });
+    }
+    const moving = stories.filter((s) => s.shelf !== shelf || s.shelfSetBy !== "sandip");
+    if (!moving.length && item.shelf === shelf) return toListItem(item);
+    for (const s of moving) await this.putStoryShelf(id, s, shelf, "sandip");
     await this.transact([
       {
         Update: {
@@ -627,12 +660,75 @@ export class DynamoRepo
           UpdateExpression: "SET #sh = :sh, #by = :by",
           ConditionExpression: "attribute_exists(pk)",
           ExpressionAttributeNames: { "#sh": "shelf", "#by": "shelfSetBy" },
-          ExpressionAttributeValues: { ":sh": shelf, ":by": "sandip" },
+          ExpressionAttributeValues: { ":sh": shelf, ":by": "stories" },
         },
       },
-      this.event(id, now, { type: "shelf", value: shelf, prev: (item.shelf as string) ?? null }),
+      event,
     ]);
-    return toListItem({ ...item, shelf, shelfSetBy: "sandip" });
+    return toListItem({ ...item, shelf, shelfSetBy: "stories" });
+  }
+
+  // ---------- story shelves (#81) ----------
+
+  /** An issue's stories with their shelf fields and state, read fresh. */
+  private storyShelves(id: string): Promise<Item[]> {
+    return this.queryAll({
+      KeyConditionExpression: "pk = :pk AND begins_with(sk, :story)",
+      ExpressionAttributeValues: { ":pk": issueKey(id).pk, ":story": "STORY#" },
+      ProjectionExpression: "#n, receivedAt, shelf, shelfSetBy, learning, #st",
+      ExpressionAttributeNames: { "#n": "n", "#st": "state" },
+      ConsistentRead: true,
+    });
+  }
+
+  /**
+   * Put a story on a shelf with the Learning index that follows, provided its state is still the
+   * one `s` was read with (a 409 otherwise).
+   */
+  private async putStoryShelf(id: string, s: Item, shelf: Shelf, by: StoryShelfSetBy) {
+    const state = s.state as StoryState | undefined;
+    const index = storyIndexAttributes({
+      issueId: id,
+      n: s.n as number,
+      receivedAt: s.receivedAt as string,
+      shelf,
+      state,
+    });
+    const u = updateExpression({ shelf, shelfSetBy: by, ...index.set }, index.remove);
+    try {
+      await this.ddb.send(
+        new UpdateCommand({
+          TableName: this.table,
+          Key: storyKey(id, s.n as number),
+          UpdateExpression: u.expr,
+          ConditionExpression:
+            "attribute_exists(pk) AND " + (state ? "#cst = :cst" : "attribute_not_exists(#cst)"),
+          ExpressionAttributeNames: { ...u.names, "#cst": "state" },
+          ExpressionAttributeValues: { ...u.values, ...(state ? { ":cst": state } : {}) },
+        }),
+      );
+    } catch (err) {
+      if (isConditionFailure(err)) throw conflict();
+      throw err;
+    }
+  }
+
+  /** Set an issue's shelf from its stories' (#81). Undefined for an issue with no stories. */
+  private async deriveIssueShelf(id: string): Promise<Shelf | undefined> {
+    const shelf = issueShelf(
+      (await this.storyShelves(id)).map((s) => s.shelf as Shelf | undefined),
+    );
+    if (!shelf) return undefined;
+    await this.ddb.send(
+      new UpdateCommand({
+        TableName: this.table,
+        Key: issueKey(id),
+        UpdateExpression: "SET shelf = :s, shelfSetBy = :by",
+        ConditionExpression: "attribute_exists(pk)",
+        ExpressionAttributeValues: { ":s": shelf, ":by": "stories" },
+      }),
+    );
+    return shelf;
   }
 
   async setRating(id: string, value: Rating | 0): Promise<IssueListItem> {
@@ -1154,26 +1250,20 @@ export class DynamoRepo
   }
 
   /**
-   * Apply a sender's "always" shelf to its issues, or hand them back to Claude when it is cleared.
-   * Issues Sandip moved himself keep his choice.
+   * Apply a sender's "always" shelf to its stories, and its issues follow (#81); clearing it hands
+   * each story back to Jev's call. Sandip's moves keep his choice. An issue with no stories takes
+   * the setting itself, and goes back to Claude's call before #81 when it is cleared.
    */
   private async reshelveSender(senderId: string, shelf: Shelf | null): Promise<void> {
-    const issues: Item[] = [];
-    let start: Item | undefined;
-    do {
-      const res: QueryCommandOutput = await this.query({
-        IndexName: INDEX.bySender,
-        KeyConditionExpression: "gsi3pk = :p",
-        ExpressionAttributeValues: { ":p": `SENDER#${senderId}` },
-        ProjectionExpression: "id, shelfAuto, shelfSetBy",
-        ExclusiveStartKey: start,
-      });
-      issues.push(...(res.Items ?? []));
-      start = res.LastEvaluatedKey;
-    } while (start);
+    const issues = await this.queryAll({
+      IndexName: INDEX.bySender,
+      KeyConditionExpression: "gsi3pk = :p",
+      ExpressionAttributeValues: { ":p": `SENDER#${senderId}` },
+      ProjectionExpression: "id, shelfAuto, shelfSetBy",
+    });
 
     const names = { "#sh": "shelf", "#by": "shelfSetBy" };
-    const update = (i: Item) => {
+    const unstoried = (i: Item) => {
       const by = i.shelfSetBy as ShelfSetBy | undefined;
       if (by === "sandip") return undefined;
       if (shelf) {
@@ -1196,27 +1286,43 @@ export class DynamoRepo
             ExpressionAttributeValues: { ":sender": "sender" },
           };
     };
-    const writes = issues
-      .map((i) => ({ id: i.id as string, u: update(i) }))
-      .filter((w) => w.u !== undefined);
-    for (let n = 0; n < writes.length; n += 10) {
-      await Promise.all(
-        writes.slice(n, n + 10).map(({ id, u }) =>
-          this.ddb
-            .send(
-              new UpdateCommand({
-                TableName: this.table,
-                Key: issueKey(id),
-                ExpressionAttributeNames: names,
-                ...u!,
-              }),
-            )
-            .catch((err: unknown) => {
-              // Sandip moved it in the meantime: his choice stands.
-              if (!isConditionFailure(err)) throw err;
+    const reshelve = async (i: Item) => {
+      const id = i.id as string;
+      const stories = await this.storyShelves(id);
+      if (!stories.length) {
+        const u = unstoried(i);
+        if (!u) return;
+        await this.ddb
+          .send(
+            new UpdateCommand({
+              TableName: this.table,
+              Key: issueKey(id),
+              ExpressionAttributeNames: names,
+              ...u,
             }),
-        ),
-      );
+          )
+          .catch((err: unknown) => {
+            // Sandip moved it in the meantime: his choice stands.
+            if (!isConditionFailure(err)) throw err;
+          });
+        return;
+      }
+      for (const s of stories) {
+        const next = storyShelf(
+          {
+            shelf: s.shelf as Shelf | undefined,
+            shelfSetBy: s.shelfSetBy as StoryShelfSetBy | undefined,
+            learning: s.learning as number | undefined,
+          },
+          shelf ?? undefined,
+        );
+        if (!next.shelf || (next.shelf === s.shelf && next.shelfSetBy === s.shelfSetBy)) continue;
+        await this.putStoryShelf(id, s, next.shelf, next.shelfSetBy!);
+      }
+      await this.deriveIssueShelf(id);
+    };
+    for (let n = 0; n < issues.length; n += 5) {
+      await Promise.all(issues.slice(n, n + 5).map(reshelve));
     }
   }
 

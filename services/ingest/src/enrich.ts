@@ -225,6 +225,9 @@ export interface EnrichCandidate {
   storied?: boolean;
   /** Failed story splits so far; after a few the issue is left alone. */
   storyAttempts?: number;
+  state?: "unread" | "read" | "archived";
+  /** Archived by a rule rather than by Sandip. */
+  autoArchived?: boolean;
 }
 
 export interface EnrichOptions {

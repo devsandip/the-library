@@ -95,8 +95,10 @@ describe("enrichment on dev", () => {
     for (const id of FIXTURE_NEWSLETTER_IDS) {
       const i = await get(issueKey(id));
       expect(i?.summary, id).toMatch(/\S/);
-      expect(["news", "learning"], id).toContain(i?.shelf);
-      expect(i?.shelfSetBy).toBe("claude");
+      // Claude's call is kept; the issue's shelf follows its stories (#81), News until then.
+      expect(["news", "learning"], id).toContain(i?.shelfAuto);
+      expect(i?.shelf, id).toBe("news");
+      expect(i?.shelfSetBy, id).toBeUndefined();
       expect(
         topics.map((t) => t.name),
         id,
