@@ -2,6 +2,7 @@ import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
 import type { EnrichStats, ShelfStats, StoryStats } from "@library/core/types";
 import { Bedrock } from "./bedrock.js";
 import { archiveOldNews, enrich, proposeTopics } from "./enrich.js";
+import { checkFollows } from "./follow.js";
 import { Gmail, type GmailCredentials } from "./gmail.js";
 import { ingest } from "./ingest.js";
 import { Jev } from "./jev.js";
@@ -227,6 +228,17 @@ export async function handler(event: IngestEvent = {}) {
     deadline: started + 8.75 * 60_000,
   }).catch(shelfFailed);
   console.log(JSON.stringify({ level: "info", msg: "shelves done", ...shelved }));
+  // Then followed stories (#22): a new story that moves one becomes a point. Like the steps
+  // before it, it never fails the run.
+  if (Date.now() < started + 8.9 * 60_000) {
+    await checkFollows(store, bedrock)
+      .then((s) => console.log(JSON.stringify({ level: "info", msg: "follows done", ...s })))
+      .catch((err: Error) =>
+        console.error(
+          JSON.stringify({ level: "error", msg: "follows failed", error: String(err) }),
+        ),
+      );
+  }
   // Then today's narrative (#18), when the day's News has moved on. It never fails the run either.
   await writeNarrative(store, bedrock, { deadline: started + 9 * 60_000 })
     .then((told) => console.log(JSON.stringify({ level: "info", msg: "narrative done", ...told })))
