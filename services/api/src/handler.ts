@@ -1,5 +1,6 @@
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
+import { Asks } from "./ask.js";
 import { HttpError } from "./errors.js";
 import type { Services } from "./port.js";
 import { BedrockClaude } from "./claude.js";
@@ -94,11 +95,14 @@ const repo = new DynamoRepo({
 // Dev reads the corpus every time: integration tests rewrite it between calls.
 const corpus = new CorpusCache(repo, STAGE === "prod" ? {} : { ttlMs: 0 });
 
+const claude = new BedrockClaude();
+
 export const handler = createHandler({
   repo,
   search: new Search(repo, new TitanEmbedder(), corpus),
   related: new Related(repo, corpus),
-  timelines: new Timelines(repo, corpus, new BedrockClaude()),
+  timelines: new Timelines(repo, corpus, claude),
+  ask: new Asks(repo, corpus, new TitanEmbedder(), claude),
   startIngest: async () => {
     await lambda.send(
       new InvokeCommand({

@@ -191,6 +191,26 @@ export interface TimelineSource {
   story?: { n: number; headline: string };
 }
 
+/** One paragraph of an answer from the newsletters (#21), with the stories it draws on. */
+export interface AskParagraph {
+  text: string;
+  sources: TimelineSource[];
+}
+
+/** POST /ask (#21): a question answered from Sandip's own newsletters. Nothing is kept. */
+export interface AskResponse {
+  q: string;
+  /** The answer, empty when the newsletters have nothing on it (then `none` says so). */
+  paragraphs: AskParagraph[];
+  none?: string;
+  /** What it looked for: each search's words, and its dates when the question named some. */
+  searches: string[];
+  /** Stories read for the answer. */
+  stories: number;
+  ms: number;
+  cents: number;
+}
+
 /** One step in how a story evolved (#19). */
 export interface TimelinePoint {
   /** When the newsletters first carried it: the earliest of its stories. */

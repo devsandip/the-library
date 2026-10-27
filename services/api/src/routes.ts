@@ -137,6 +137,18 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     },
   },
   {
+    method: "POST",
+    pattern: /^\/ask$/,
+    handler: async (svc, req) => {
+      const { q } = json<{ q?: unknown }>(req);
+      const question = typeof q === "string" ? q.replace(/\s+/g, " ").trim() : "";
+      if (question.length < 3 || question.length > 300) {
+        throw badRequest("q must be a question of 3 to 300 characters");
+      }
+      return ok(await svc.ask.ask(question));
+    },
+  },
+  {
     method: "GET",
     pattern: new RegExp(`^/issues/${ISSUE_ID}/related$`),
     handler: async (svc, _req, p) => ok(await svc.related.related(param(p, 0))),
