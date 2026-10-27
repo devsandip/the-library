@@ -18,6 +18,7 @@ import type {
   SenderListResponse,
   SenderPatch,
   Shelf,
+  SourceResponse,
   StatusResponse,
   StoryPatch,
   SummaryResponse,
@@ -93,6 +94,10 @@ export interface LibraryApi {
   takes(id: string, n: number): Promise<TakesResponse>;
   /** Writes the takes now: one Claude call, about a cent. Only when asked. */
   writeTakes(id: string, n: number): Promise<TakesResponse>;
+  /** The story checked against its source (#23), if it was checked. */
+  source(id: string, n: number): Promise<SourceResponse>;
+  /** Checks the story against its source now: a page read and one Claude call. Only when asked. */
+  checkSource(id: string, n: number): Promise<SourceResponse>;
   /** What the newsletters said (#53): by words, then by meaning. */
   search(q: string, sort: SearchSort): Promise<SearchResponse>;
   listSenders(): Promise<SenderListResponse>;
@@ -243,6 +248,18 @@ export class HttpLibraryApi implements LibraryApi {
     return this.request<TakesResponse>(
       "POST",
       `/issues/${encodeURIComponent(id)}/stories/${n}/takes`,
+    );
+  }
+  source(id: string, n: number) {
+    return this.request<SourceResponse>(
+      "GET",
+      `/issues/${encodeURIComponent(id)}/stories/${n}/source`,
+    );
+  }
+  checkSource(id: string, n: number) {
+    return this.request<SourceResponse>(
+      "POST",
+      `/issues/${encodeURIComponent(id)}/stories/${n}/source`,
     );
   }
   search(q: string, sort: SearchSort) {

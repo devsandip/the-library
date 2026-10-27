@@ -1654,6 +1654,69 @@ dialog {
   color: var(--box-text);
 }
 
+/* Check the source (#23): the verdict, the page, then each claim with the page's own words. */
+.source-verdict {
+  font: 600 17px/1.3 var(--font-text);
+}
+
+.source-verdict.holds,
+.source-claims li.holds .source-claim-verdict {
+  color: var(--rel);
+}
+
+.source-verdict.further,
+.source-claims li.further .source-claim-verdict {
+  color: var(--box-text);
+}
+
+.source-verdict.missing,
+.source-claims li.missing .source-claim-verdict {
+  color: var(--irr);
+}
+
+.source-page {
+  margin-top: 4px;
+}
+
+.source-claims {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.source-claims li + li {
+  margin-top: 12px;
+}
+
+.source-claim {
+  margin-top: 3px;
+  font: 600 15px/1.35 var(--font-text);
+  color: var(--ink);
+}
+
+.source-says {
+  margin-top: 3px;
+  font: 400 14px/1.4 var(--font-text);
+  color: var(--ink-2);
+}
+
+.source-quote {
+  margin: 6px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--line-2);
+  font: italic 400 14px/1.4 var(--font-text);
+  color: var(--ink-body);
+}
+
+.source-claims.compact .source-claim {
+  font-size: 12.5px;
+}
+
+.source-claims.compact .source-says,
+.source-claims.compact .source-quote {
+  font-size: 12px;
+}
+
 /* Takes (#17): groups under a label, each newsletter's sentence opening its story. */
 .takes-group + .takes-group {
   margin-top: 14px;

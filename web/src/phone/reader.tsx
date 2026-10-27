@@ -8,13 +8,13 @@ import { goBack, previousPath } from "../nav.js";
 import { BASE } from "../config.js";
 import { issueHref, newsletterHref, slug, todayHref, type Deep } from "../paths.js";
 import { useOpenIssue } from "../reader.js";
-import { useTakes, useTimeline } from "../timeline.js";
+import { useSource, useTakes, useTimeline } from "../timeline.js";
 import { KIND_WORD } from "../sentence.js";
 import { NewsletterFrame } from "../components/newsletter-frame.js";
 import { isWebLink } from "../components/peek.js";
 import { Thumbs } from "../components/thumbs.js";
 import { namesLine, RelatedList } from "../components/story.js";
-import { DeepMark, TakesPanel, TimelinePanel } from "../components/timeline.js";
+import { DeepMark, SourcePanel, TakesPanel, TimelinePanel } from "../components/timeline.js";
 import { Failed, Skeleton } from "../components/ui.js";
 
 /** Where the reader came from, for its way back: "‹ Today", "‹ Browse", "‹ Search". */
@@ -227,6 +227,7 @@ function StorySheet({
   const names = namesLine(s, [...rel.earlier, ...rel.since], issue.publication);
   const timeline = useTimeline(issue.id, s.n);
   const takes = useTakes(issue.id, s.n);
+  const source = useSource(issue.id, s.n);
   // Viewing a Learning story reads it, not its issue (#81).
   useStoryRead(issue.id, s, actions);
   const shelf = s.shelf ?? "news";
@@ -402,6 +403,16 @@ function StorySheet({
               Takes
               <DeepMark state={takes.state} />
             </button>
+            <button
+              type="button"
+              role="tab"
+              class="deep-tab"
+              aria-selected={deep === "source"}
+              onClick={() => toggleDeep("source")}
+            >
+              Source
+              <DeepMark state={source.state} />
+            </button>
           </div>
           {deep === "timeline" && (
             <TimelinePanel
@@ -412,6 +423,7 @@ function StorySheet({
               onOpen={(rid, rn) => route(issueHref(rid, rn))}
             />
           )}
+          {deep === "source" && <SourcePanel key={`${issue.id}#${s.n}`} id={issue.id} n={s.n} />}
           {deep === "takes" && (
             <TakesPanel
               key={`${issue.id}#${s.n}`}

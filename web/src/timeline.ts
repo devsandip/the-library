@@ -1,11 +1,12 @@
 /**
- * The deep dives as the app holds them: How this evolved (#19) and Takes (#17). One state per
+ * The deep dives as the app holds them: How this evolved (#19), Takes (#17) and the source
+ * check (#23). One state per
  * story and kind, shared by the phone's tabs and the Mac's story index, and kept for the page's
  * life. A deep dive is written only when the reader asks, and a run carries on when its sheet
  * closes: coming back finds it writing, or done.
  */
 import { useEffect, useState } from "preact/hooks";
-import type { Takes, Timeline } from "@library/core/types";
+import type { SourceCheck, Takes, Timeline } from "@library/core/types";
 import type { LibraryApi } from "./api.js";
 import { useApp } from "./context.js";
 
@@ -19,6 +20,7 @@ export type DeepState<T> =
 
 export type TimelineState = DeepState<Timeline>;
 export type TakesState = DeepState<Takes>;
+export type SourceState = DeepState<SourceCheck>;
 
 /** What the API answers for a deep dive: the kept result, or why there is none. */
 type Answer<T> = Promise<{ value?: T; none?: string }>;
@@ -113,6 +115,16 @@ export const timelineState = timelines.stateOf;
 /** Writes the story's timeline: one Claude call, about half a cent. */
 export const writeTimeline = timelines.write;
 export const useTimeline = timelines.use;
+
+const sources = deepDive<SourceCheck>(
+  (api, id, n) => api.source(id, n).then((r) => ({ value: r.check, none: r.none })),
+  (api, id, n) => api.checkSource(id, n).then((r) => ({ value: r.check, none: r.none })),
+);
+
+export const sourceState = sources.stateOf;
+/** Checks the story against its source: a page read and one Claude call, about a cent. */
+export const checkSource = sources.write;
+export const useSource = sources.use;
 
 export const takesState = takes.stateOf;
 /** Writes the takes on the story's event: one Claude call, about a cent. */

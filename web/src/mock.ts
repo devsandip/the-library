@@ -30,6 +30,8 @@ import type {
   Shelf,
   StatusResponse,
   StoryPatch,
+  SourceCheck,
+  SourceResponse,
   SummaryResponse,
   Takes,
   TakesResponse,
@@ -638,6 +640,7 @@ function namesIn(text: string): { names?: string[] } {
 /** Timelines written in mock mode (#19), by "<issueId>#<n>". */
 const timelines = new Map<string, Timeline>();
 const takesKept = new Map<string, Takes>();
+const checksKept = new Map<string, SourceCheck>();
 
 export class MockLibraryApi implements LibraryApi {
   async listIssues(opts: ListIssuesOptions): Promise<IssueListResponse> {
@@ -932,6 +935,47 @@ export class MockLibraryApi implements LibraryApi {
     };
     timelines.set(`${id}#${n}`, timeline);
     return { timeline };
+  }
+
+  async source(id: string, n: number): Promise<SourceResponse> {
+    await delay();
+    const check = checksKept.get(`${id}#${n}`);
+    return check ? { check } : {};
+  }
+
+  /**
+   * A stand-in for the source check (#23): a digest's story has a link, and its check finds one
+   * claim that holds and one the newsletter took further; a story with no link has nothing.
+   */
+  async checkSource(id: string, n: number): Promise<SourceResponse> {
+    const started = Date.now();
+    const story = mockStories(find(id)).stories.find((s) => s.n === n);
+    if (!story) throw new Error("issue has no such story");
+    await delay(2400);
+    if (!story.link) return { none: "This story has no source link to check." };
+    const check: SourceCheck = {
+      url: story.link,
+      verdict: "mixed",
+      claims: [
+        {
+          claim: `${story.headline}.`,
+          source: "The page says the same, in its first paragraph.",
+          quote: `${story.headline.toLowerCase()}, the company said`,
+          verdict: "holds",
+        },
+        {
+          claim: "It is the biggest change of the year.",
+          source: "The page calls it one of several changes this quarter.",
+          verdict: "further",
+        },
+      ],
+      note: "A stand-in from mock mode: the page is the company's own post.",
+      at: new Date().toISOString(),
+      ms: Date.now() - started,
+      cents: 0.6,
+    };
+    checksKept.set(`${id}#${n}`, check);
+    return { check };
   }
 
   async takes(id: string, n: number): Promise<TakesResponse> {

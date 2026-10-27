@@ -1,8 +1,15 @@
 import type { ComponentChildren } from "preact";
-import type { TimelineSource } from "@library/core/types";
+import type { SourceCheck, TimelineSource } from "@library/core/types";
 import { clock, shortDate } from "../format.js";
 import { clickInPlace } from "../nav.js";
-import { elapsed, useElapsed, useTakes, useTimeline, type DeepState } from "../timeline.js";
+import {
+  elapsed,
+  useElapsed,
+  useSource,
+  useTakes,
+  useTimeline,
+  type DeepState,
+} from "../timeline.js";
 
 /** A deep-dive tab's mark (P4): ✓ kept, ● writing. */
 export function DeepMark({ state }: { state: DeepState<unknown> }) {
@@ -68,6 +75,8 @@ function DeepPanel<T extends { at: string; ms: number; cents: number }>({
   desc,
   scope,
   cost,
+  doing = "Writing",
+  keptFor = "event",
   deep,
   compact,
   children,
@@ -76,6 +85,10 @@ function DeepPanel<T extends { at: string; ms: number; cents: number }>({
   desc: string;
   scope: string;
   cost: string;
+  /** What the status line says while it runs. */
+  doing?: string;
+  /** What it is kept for: the event (timeline, takes) or the story (a source check). */
+  keptFor?: "event" | "story";
   deep: { state: DeepState<T>; write: () => void; retry: () => void };
   compact: boolean;
   children: (value: T) => ComponentChildren;
@@ -130,7 +143,7 @@ function DeepPanel<T extends { at: string; ms: number; cents: number }>({
             {title}
             <span class="label deep-status">
               <span class="deep-dot" aria-hidden="true" />
-              Writing · {elapsed(secs)}
+              {doing} · {elapsed(secs)}
             </span>
           </div>
           {!compact && <p class="label deep-scope">{scope}</p>}
@@ -151,7 +164,7 @@ function DeepPanel<T extends { at: string; ms: number; cents: number }>({
           {children(state.value)}
           <p class="label deep-receipt">
             {receipt(state.value)}
-            {compact ? "" : " · kept for this event, free to reopen"}
+            {compact ? "" : ` · kept for this ${keptFor}, free to reopen`}
           </p>
           <button type="button" class="link-btn label deep-again" onClick={write}>
             Write again · {cost}
@@ -252,6 +265,63 @@ export function TakesPanel({
               </ul>
             </section>
           ))}
+        </>
+      )}
+    </DeepPanel>
+  );
+}
+
+/** A verdict in words. */
+export const VERDICT: Record<SourceCheck["verdict"], string> = {
+  holds: "Holds up",
+  further: "Goes further than the source",
+  missing: "Not in the source",
+  mixed: "Mixed",
+};
+
+/**
+ * Check the source (#23), the Source tab: the overall verdict and the page read, then each claim
+ * with its verdict, what the page says and the page's own words. Compact on the Mac, run with C.
+ */
+export function SourcePanel({
+  id,
+  n,
+  compact = false,
+}: {
+  id: string;
+  n: number;
+  compact?: boolean;
+}) {
+  return (
+    <DeepPanel
+      name="Check the source"
+      desc="What this story claims against the page it links to: each claim with what the page says, its own words, and whether it holds up."
+      scope="The page it links to · ~1¢ · under half a minute"
+      cost="~1¢"
+      doing="Checking"
+      keptFor="story"
+      deep={useSource(id, n)}
+      compact={compact}
+    >
+      {(c) => (
+        <>
+          <p class={`source-verdict ${c.verdict}`}>{VERDICT[c.verdict]}</p>
+          <p class="label source-page">
+            <a href={c.url} target="_blank" rel="noopener noreferrer">
+              {new URL(c.url).hostname} ↗
+            </a>
+          </p>
+          {c.note && <p class="deep-gist">{c.note}</p>}
+          <ul class={`source-claims${compact ? " compact" : ""}`}>
+            {c.claims.map((claim, k) => (
+              <li key={k} class={claim.verdict}>
+                <p class="label source-claim-verdict">{VERDICT[claim.verdict]}</p>
+                <p class="source-claim">{claim.claim}</p>
+                <p class="source-says">{claim.source}</p>
+                {claim.quote && <blockquote class="source-quote">“{claim.quote}”</blockquote>}
+              </li>
+            ))}
+          </ul>
         </>
       )}
     </DeepPanel>
