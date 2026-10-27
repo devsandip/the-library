@@ -37,13 +37,13 @@ function receipt(t: { at: string; ms: number; cents: number }): string {
 }
 
 /** Where a deep dive's links go, and how a click opens them in place on the Mac. */
-interface Links {
+export interface Links {
   href: (issueId: string, story?: number) => string;
   onOpen?: (issueId: string, story?: number) => void;
 }
 
 /** A link to the issue a source is from, at its story inside a digest. */
-function SourceLink({
+export function SourceLink({
   s,
   links,
   children,

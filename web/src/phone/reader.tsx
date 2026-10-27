@@ -7,6 +7,7 @@ import { useStoryActions, useStoryRead, type StoryActions } from "../learning.js
 import { goBack, previousPath } from "../nav.js";
 import { BASE } from "../config.js";
 import { issueHref, newsletterHref, slug, todayHref, type Deep } from "../paths.js";
+import { useFollow } from "../following.js";
 import { useOpenIssue } from "../reader.js";
 import { useSource, useTakes, useTimeline } from "../timeline.js";
 import { KIND_WORD } from "../sentence.js";
@@ -15,6 +16,7 @@ import { isWebLink } from "../components/peek.js";
 import { Thumbs } from "../components/thumbs.js";
 import { namesLine, RelatedList } from "../components/story.js";
 import { DeepMark, SourcePanel, TakesPanel, TimelinePanel } from "../components/timeline.js";
+import { useToast } from "../components/toast.js";
 import { Failed, Skeleton } from "../components/ui.js";
 
 /** Where the reader came from, for its way back: "‹ Today", "‹ Browse", "‹ Search". */
@@ -361,6 +363,7 @@ function StorySheet({
             <button type="button" class="btn line caps" onClick={showRelated}>
               Related {related.status === "ok" ? relCount : "…"}
             </button>
+            <FollowButton id={issue.id} n={s.n} />
           </div>
           <div class="story-actions story-own" role="group" aria-label="This story">
             <button
@@ -449,5 +452,27 @@ function StorySheet({
         </div>
       </div>
     </div>
+  );
+}
+
+/** FOLLOW on the story sheet (#22): free, so one tap follows and another unfollows. */
+function FollowButton({ id, n }: { id: string; n: number }) {
+  const toast = useToast();
+  const f = useFollow(id, n);
+  return (
+    <button
+      type="button"
+      class={`btn line caps${f.followed ? " on" : ""}`}
+      aria-pressed={f.followed}
+      disabled={!f.ready || f.busy}
+      onClick={() =>
+        f.toggle().then(
+          (on) => toast.say(on ? "Following. New steps show in Library › Following" : "Unfollowed"),
+          (err: Error) => toast.say(err.message),
+        )
+      }
+    >
+      {f.followed ? "Following ✓" : "Follow"}
+    </button>
   );
 }

@@ -20,6 +20,14 @@ Milestone 5 builds it in three pieces: the API (#120), the check after each inge
 - **Checked by the code.** A move counts only with stories sent under its own follow that Claude called moves. Its date is its earliest story's; its sources are those stories' issues, at the story inside a digest. Several newsletters on one development make one point.
 - **Written back.** Moves are appended with `added`, so they are new until Sandip looks; `movedAt` becomes the newest move's date; every candidate, moved or not, goes into `checked` (the newest 300), so a repeat is never asked about again. A follow unfollowed while the check ran is left alone. `seenAt` is never touched.
 
+## The screens (#122)
+
+- **Follow, where the handoff draws it.** On the phone, the story sheet's first row is Source, Related and Follow; once followed it reads Following ✓, and a tap unfollows. On the Mac, the key grid's F row (Follow, or Unfollow with ✓ Following), and F itself. Free, so no Run step and no cost line; a toast says what happened.
+- **Following** (`/library/following`, `web/src/pages/following.tsx`): on the phone a Library row, out of Coming later, showing "2 new" in yellow or how many stories; on the Mac a ⌘K line with the same count. Each followed story: its newsletter, when it was followed and last moved, its headline (opening the story), its dated points (each opening the issue that carried it, at its story), and Unfollow. Quiet stories come last under "Quiet · no news for 30 days", dimmed.
+- **New, then seen.** Opening Following reads the list again (the check may have run), notes which points are new, and marks everything seen; those points keep a yellow dot and "New" for the visit, while Library's count clears. Which points are new comes from the count: the follow's newest `unseen` points by `added`.
+- **One list for the page's life** (`web/src/following.ts`), like the deep dives' states: a story sheet asks it whether a story is followed (by the story refs each follow lists) instead of asking the API per story; following and unfollowing change it at once.
+- **Mock mode** starts with two followed stories, one with a new move and one quiet, and follows any story from its mock timeline or itself.
+
 ## Decisions
 
 - **The event is the follow.** Timelines and takes are kept per event already, and the story index links the same news across newsletters; a follow per story would follow one event twice.

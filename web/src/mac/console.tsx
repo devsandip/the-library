@@ -10,6 +10,7 @@ import { PANES, useMedia } from "../media.js";
 import {
   askHref,
   DEFAULT_QUEUE,
+  followingHref,
   historyHref,
   newslettersHref,
   queueHref,
@@ -20,6 +21,7 @@ import {
   type QueueTab,
   type Screen,
 } from "../paths.js";
+import { followingState, toggleFollow, useFollow, useFollowing } from "../following.js";
 import { useOpenIssue } from "../reader.js";
 import { useStoryActions, useStoryRead, type StoryActions } from "../learning.js";
 import { useTheme } from "../theme.js";
@@ -98,6 +100,8 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
   const storyActions = useStoryActions(queue.patchStory);
   const s = lib.status.data;
   const h = health(s);
+  const followed = useFollowing().state;
+  const following = { unseen: followed.status === "ok" ? followed.data.unseen : 0 };
   const senders = lib.senders.data?.items ?? [];
   const count = (t: QueueTab) =>
     t === "saved"
@@ -201,6 +205,20 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
             const c = sourceState(st.selected, n);
             if (c.status === "kept") toast.say("Kept: the check is under the story");
             else if (c.status !== "writing") checkSource(api, st.selected, n);
+            if (!st.panes) setIndexOpen(true);
+            return true;
+          }
+          case "f": {
+            // Follow a story (#22): free, so F follows and unfollows.
+            if (!st.selected || !stories.length) return false;
+            if (followingState().status !== "ok") {
+              toast.say("Following is still loading");
+              return true;
+            }
+            toggleFollow(api, st.selected, n).then(
+              (on) => toast.say(on ? "Following this story" : "Unfollowed this story"),
+              (err: Error) => toast.say(err.message),
+            );
             if (!st.panes) setIndexOpen(true);
             return true;
           }
@@ -350,6 +368,7 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
           <span class="keys">
             <span>J/K issues</span>
             <span>[ ] stories</span>
+            <span>F follow</span>
             <span>L timeline</span>
             <span>T takes</span>
             <span>C source</span>
@@ -376,6 +395,11 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
           { label: "Saved", hint: "3", href: queueHref("saved") },
           { label: "The day in brief", hint: "News", href: queueHref("news") },
           { label: "Ask Nutgraf", hint: "An answer from your newsletters", href: askHref() },
+          {
+            label: "Following",
+            hint: following.unseen ? `${following.unseen} new` : "Stories you follow",
+            href: followingHref(),
+          },
           { label: "History", hint: "What you read", href: historyHref() },
           { label: "Newsletters", hint: "Stars and mutes", href: newslettersHref() },
           { label: "Status", hint: h.at ? `${h.word} · ${h.at}` : h.word, href: statusHref() },
@@ -581,6 +605,31 @@ function MacReader({
   );
 }
 
+/** The key grid's F row (M1): follow the story (#22), free, or unfollow it. */
+function FollowKeys({ id, n }: { id: string; n: number }) {
+  const toast = useToast();
+  const f = useFollow(id, n);
+  return (
+    <>
+      <span class="keycap">F</span>
+      <button
+        type="button"
+        class="key-action"
+        disabled={!f.ready || f.busy}
+        onClick={() =>
+          f.toggle().then(
+            (on) => toast.say(on ? "Following this story" : "Unfollowed this story"),
+            (err: Error) => toast.say(err.message),
+          )
+        }
+      >
+        {f.followed ? "Unfollow" : "Follow"}
+      </button>
+      {f.followed ? <span class="kept">✓ Following</span> : <span class="muted">Free</span>}
+    </>
+  );
+}
+
 /** The key grid's L row (M1): write the story's timeline (#19), or how it stands. */
 function TimelineKeys({ id, n }: { id: string; n: number }) {
   return <DeepKeys k="L" label="Timeline" deep={useTimeline(id, n)} />;
@@ -731,6 +780,7 @@ function StoryIndex({
                   <span class="muted">No source link</span>
                 )}
                 <span />
+                <FollowKeys id={id} n={s.n} />
                 <TimelineKeys id={id} n={s.n} />
                 <TakesKeys id={id} n={s.n} />
                 <SourceKeys id={id} n={s.n} />
