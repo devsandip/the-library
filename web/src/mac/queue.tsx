@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { useLocation } from "preact-iso";
-import type { IssueListItem } from "@library/core/types";
+import type { IssueListItem, IssueStory } from "@library/core/types";
 import type { IssueChange } from "../actions.js";
 import { useApp } from "../context.js";
 import { patchIssue, tally } from "../data.js";
 import { age, reasonCode } from "../format.js";
 import { useAsync } from "../hooks.js";
 import { useLibrary, useOnRefresh } from "../library.js";
+import { learningRowId, useLearningList, type StoryChange } from "../learning.js";
 import { useIssueList } from "../list.js";
 import { queueHref, slug, type QueueFilters, type QueueTab, type Show } from "../paths.js";
 import {
@@ -29,12 +30,18 @@ export interface QueueItem {
   issue: IssueListItem;
   rank: number;
   five: boolean;
+  /** On Learning (#81), the story this row is; its issue is `issue`. */
+  story?: IssueStory;
 }
+
+/** A row's own id: the issue's, or on Learning the story's within it. */
+export const queueRowId = (q: { issue: { id: string }; story?: { n: number } }) =>
+  q.story ? learningRowId(q.issue.id, q.story.n) : q.issue.id;
 
 /**
  * The console's queue. News, unread, best first, unfiltered is the ranked Summary (the five, then
- * the rest of the 20), followed by any other unread News, newest first. Anything else is the
- * plain list for that tab and filter line.
+ * the rest of the 20), followed by any other unread News, newest first. Learning lists its stories
+ * (#81). Anything else is the plain list for that tab and filter line.
  */
 export function useQueue(tab: QueueTab, f: QueueFilters) {
   const { api } = useApp();
@@ -58,33 +65,51 @@ export function useQueue(tab: QueueTab, f: QueueFilters) {
     ranked ? "summary" : undefined,
   );
   useOnRefresh(summary.reload);
+  const learning = tab === "learning";
   const key = known ? queueHref(tab, f) : "";
-  const list = useIssueList(key, (cursor) =>
-    known
+  const never = () => new Promise<never>(() => undefined);
+  const list = useIssueList(learning ? "" : key, (cursor) =>
+    known && !learning
       ? api.listIssues({
           view: tab === "saved" ? "saved" : f.show,
-          ...(tab === "saved" ? {} : { shelf: tab }),
+          ...(tab === "saved" ? {} : { shelf: "news" as const }),
           topics: names,
           senders: ids,
           cursor,
         })
-      : new Promise<never>(() => undefined),
+      : never(),
+  );
+  const stories = useLearningList(learning ? key : "", (cursor) =>
+    known && learning
+      ? api.listLearning({ view: f.show, topics: names, senders: ids, cursor })
+      : never(),
   );
 
   const top = (ranked && summary.data?.items) || [];
   const digest = new Set(ranked ? (summary.data?.digest ?? []) : []);
   const inTop = new Set(top.map((i) => i.id));
   const rest = list.items.filter((i) => !inTop.has(i.id));
-  const items: QueueItem[] = [...top, ...rest].map((issue, k) => ({
-    issue,
-    rank: k + 1,
-    five: digest.has(issue.id),
-  }));
+  const items: QueueItem[] = learning
+    ? stories.items.map((r, k) => ({ issue: r.issue, story: r.story, rank: k + 1, five: false }))
+    : [...top, ...rest].map((issue, k) => ({
+        issue,
+        rank: k + 1,
+        five: digest.has(issue.id),
+      }));
 
+  /** An issue changed (a thumb, Save, a read): its row, or on Learning each of its stories' rows. */
   const patch = (id: string, change: IssueChange) => {
+    if (learning) {
+      for (const r of stories.items) if (r.issue.id === id) stories.patch(r.id, { issue: change });
+      return;
+    }
     list.patch(id, change);
     if (ranked) summary.set((d) => (d ? { ...d, items: patchIssue(d.items, id, change) } : d));
   };
+  /** A story changed on Learning (#81): read, archived or moved. */
+  const patchStory = (issueId: string, n: number, change: StoryChange) =>
+    learning && stories.patch(learningRowId(issueId, n), change);
+  const shown = learning ? stories : list;
 
   const counts = tally(lib.counts.data, senderList, {
     shelf: tab === "saved" ? undefined : tab,
@@ -94,25 +119,26 @@ export function useQueue(tab: QueueTab, f: QueueFilters) {
   const status =
     ranked && summary.status !== "ok"
       ? summary.status
-      : list.status === "ok" || top.length
+      : shown.status === "ok" || top.length
         ? "ok"
-        : list.status;
+        : shown.status;
 
   return {
     items,
     ranked,
     summary: summary.data,
     status,
-    error: summary.error ?? list.error,
+    error: summary.error ?? shown.error,
     reload: () => {
       summary.reload();
-      list.reload();
+      shown.reload();
     },
-    kept: list.kept,
+    kept: shown.kept,
     patch,
-    hasMore: list.hasMore,
-    loadingMore: list.loadingMore,
-    loadMore: list.loadMore,
+    patchStory,
+    hasMore: shown.hasMore,
+    loadingMore: shown.loadingMore,
+    loadMore: shown.loadMore,
     count:
       tab === "saved" ? lib.counts.data?.saved : f.show === "unread" ? counts?.total : undefined,
     names,
@@ -159,6 +185,7 @@ export function QueuePane({
   filters,
   queue,
   selected,
+  storyN,
   peek,
   onPeek,
 }: {
@@ -166,6 +193,8 @@ export function QueuePane({
   filters: QueueFilters;
   queue: ReturnType<typeof useQueue>;
   selected?: string;
+  /** The open story, which on Learning picks the row (#81). */
+  storyN?: number;
   peek?: string;
   onPeek: (id: string | undefined) => void;
 }) {
@@ -173,7 +202,9 @@ export function QueuePane({
   const lib = useLibrary();
   const [menu, setMenu] = useState<Menu>();
   const set = (next: Partial<QueueFilters>) => route(queueHref(tab, { ...filters, ...next }));
-  const open = (id: string) => route(queueHref(tab, filters, id), true);
+  const open = (q: QueueItem) => route(queueHref(tab, filters, q.issue.id, q.story?.n), true);
+  const selectedRow =
+    selected && tab === "learning" && storyN ? learningRowId(selected, storyN) : selected;
   const topicList = lib.topics.data?.topics ?? [];
   const senderList = lib.senders.data?.items ?? [];
   const senderNames = queue.ids.map(
@@ -188,28 +219,30 @@ export function QueuePane({
 
   // The selected row stays in view as J and K move through the queue.
   useEffect(() => {
-    if (!selected) return;
+    if (!selectedRow) return;
     document
-      .querySelector(`[data-queue-id="${CSS.escape(selected)}"]`)
+      .querySelector(`[data-queue-id="${CSS.escape(selectedRow)}"]`)
       ?.scrollIntoView({ block: "nearest" });
-  }, [selected]);
+  }, [selectedRow]);
 
-  const row = (q: QueueItem) => (
-    <QueueRow
-      key={q.issue.id}
-      q={q}
-      selected={q.issue.id === selected}
-      peeking={q.issue.id === peek}
-      dim={
-        queue.kept.has(q.issue.id) ||
-        (filters.show === "unread" && tab !== "saved" && q.issue.state !== "unread")
-      }
-      code={queue.ranked ? reasonCode(q.issue.scoreReason, q.issue.topic) : (q.issue.topic ?? "")}
-      onOpen={() => open(q.issue.id)}
-      onPeekClose={() => onPeek(undefined)}
-      onChange={queue.patch}
-    />
-  );
+  const row = (q: QueueItem) => {
+    const id = queueRowId(q);
+    const read = q.story ? q.story.state !== undefined : q.issue.state !== "unread";
+    return (
+      <QueueRow
+        key={id}
+        q={q}
+        selected={id === selectedRow}
+        // A story row peeks nowhere: the story is the summary.
+        peeking={!q.story && q.issue.id === peek}
+        dim={queue.kept.has(id) || (filters.show === "unread" && tab !== "saved" && read)}
+        code={queue.ranked ? reasonCode(q.issue.scoreReason, q.issue.topic) : (q.issue.topic ?? "")}
+        onOpen={() => open(q)}
+        onPeekClose={() => onPeek(undefined)}
+        onChange={queue.patch}
+      />
+    );
+  };
 
   return (
     <section class="queue" aria-label="Queue">
@@ -365,7 +398,7 @@ export function QueuePane({
           <p class="empty-text">
             {tab === "saved"
               ? "Nothing saved."
-              : "Nothing here. New issues arrive every two hours."}
+              : `Nothing here. New ${tab === "learning" ? "stories" : "issues"} arrive every two hours.`}
           </p>
         </Empty>
       )}
@@ -405,11 +438,12 @@ function QueueRow({
   onChange: (id: string, change: Partial<IssueListItem>) => void;
 }) {
   const i = q.issue;
+  const s = q.story;
   usePeekRead(i, peeking, onChange);
   return (
     <li
       class={`qrow${selected ? " selected" : ""}${dim ? " dim" : ""}${q.five ? " five" : ""}`}
-      data-queue-id={i.id}
+      data-queue-id={queueRowId(q)}
     >
       {selected && <span class="ybox ink" aria-hidden="true" />}
       <button
@@ -422,7 +456,9 @@ function QueueRow({
         <span class="qrow-body">
           <span class="qrow-meta label">
             {i.publication}
-            {i.mustRead && " ★"} · {i.readMinutes} min · {age(i.receivedAt)}
+            {i.mustRead && " ★"} · {s ? `story ${s.n}` : `${i.readMinutes} min`} ·{" "}
+            {age(i.receivedAt)}
+            {s?.state && ` · ${s.state}`}
             {i.rating === 1 && (
               <span class="rel" title="Useful">
                 {" · "}
@@ -437,7 +473,7 @@ function QueueRow({
             )}
             {i.savedAt && " · saved"}
           </span>
-          <span class="qrow-title">{i.subject}</span>
+          <span class="qrow-title">{s ? s.headline : i.subject}</span>
           {code && <span class="qrow-code label">↳ {code}</span>}
         </span>
       </button>

@@ -20,6 +20,7 @@ import {
   type Screen,
 } from "../paths.js";
 import { useOpenIssue } from "../reader.js";
+import { useStoryActions, useStoryRead, type StoryActions } from "../learning.js";
 import { useTheme } from "../theme.js";
 import { elapsed, timelineState, useElapsed, useTimeline, writeTimeline } from "../timeline.js";
 import { health } from "../phone/library-home.js";
@@ -80,6 +81,7 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
   const storyN = screen.name === "queue" ? screen.story : undefined;
 
   const queue = useQueue(tab, filters);
+  const storyActions = useStoryActions(queue.patchStory);
   const s = lib.status.data;
   const h = health(s);
   const senders = lib.senders.data?.items ?? [];
@@ -111,14 +113,21 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
       }
       if (st.palette || e.metaKey || e.ctrlKey || e.altKey || typing(e.target)) return;
       const items = st.queue.items;
-      const at = items.findIndex((q) => q.issue.id === st.selected);
+      const at = items.findIndex(
+        (q) => q.issue.id === st.selected && (!q.story || q.story.n === st.storyN),
+      );
       const { issue, stories, actions } = reader.current;
       const n = st.storyN ?? 1;
+      // On Learning, E and M act on the open story itself (#81).
+      const learningStory =
+        st.tab === "learning" && st.storyN !== undefined
+          ? stories.find((x) => x.n === st.storyN && x.shelf === "learning")
+          : undefined;
       const step = (by: number) => {
         const next = items[at === -1 ? (by > 0 ? 0 : items.length - 1) : at + by];
         if (next) {
           setPeek(undefined);
-          route(queueHref(st.tab, st.filters, next.issue.id), true);
+          route(queueHref(st.tab, st.filters, next.issue.id, next.story?.n), true);
         }
       };
       const story = (by: number) => {
@@ -186,10 +195,12 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
             else actions.save(issue);
             return true;
           case "e":
-            actions.archive(issue);
+            if (learningStory) storyActions.archive(issue.id, learningStory);
+            else actions.archive(issue);
             return true;
           case "m":
-            actions.move(issue);
+            if (learningStory) storyActions.move(issue.id, learningStory);
+            else actions.move(issue);
             return true;
           case "o": {
             const link = stories.find((x) => x.n === n)?.link;
@@ -241,6 +252,7 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
             filters={filters}
             queue={queue}
             selected={selected}
+            storyN={storyN}
             peek={peek}
             onPeek={setPeek}
           />
@@ -250,6 +262,8 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
                 key={selected}
                 id={selected}
                 tab={tab}
+                storyN={storyN}
+                storyActions={storyActions}
                 rank={queue.items.find((q) => q.issue.id === selected)}
                 onChange={queue.patch}
                 bind={(r) => (reader.current = r)}
@@ -260,8 +274,11 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
               <BriefPane narrative={queue.summary.narrative} onOpen={(id) => select(id)} />
             ) : (
               <div class="reader-empty">
-                <p class="empty-title">Pick an issue.</p>
-                <p class="label">J and K move through the queue · opening one marks it read</p>
+                <p class="empty-title">{tab === "learning" ? "Pick a story." : "Pick an issue."}</p>
+                <p class="label">
+                  J and K move through the queue · opening one marks{" "}
+                  {tab === "learning" ? "the story, not its issue," : "it"} read
+                </p>
               </div>
             )}
           </main>
@@ -306,7 +323,8 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
             <span>Y useful</span>
             <span>N not useful</span>
             <span>S save</span>
-            <span>E archive</span>
+            <span>{tab === "learning" ? "E archive story" : "E archive"}</span>
+            {tab === "learning" && <span>M move story</span>}
             <span>U undo</span>
             <span>/ search</span>
           </span>
@@ -373,6 +391,8 @@ function BriefPane({
 function MacReader({
   id,
   tab,
+  storyN,
+  storyActions,
   rank,
   onChange,
   bind,
@@ -381,6 +401,8 @@ function MacReader({
 }: {
   id: string;
   tab: QueueTab;
+  storyN?: number;
+  storyActions: StoryActions;
   rank?: { rank: number; five: boolean };
   onChange: (id: string, change: Partial<IssueDetailResponse>) => void;
   bind: (r: { issue?: IssueDetailResponse; stories: IssueStory[]; actions?: IssueActions }) => void;
@@ -389,14 +411,21 @@ function MacReader({
 }) {
   const { route } = useLocation();
   const { dark } = useTheme();
-  const { issue, onFit, actions } = useOpenIssue(id, onChange);
+  // A Learning story is read on its own (#81): its issue keeps its state.
+  const onStory = tab === "learning" && storyN !== undefined;
+  const { issue, onFit, actions } = useOpenIssue(id, onChange, onStory);
   const stories = useStories(id).data?.stories ?? [];
   bind({ issue: issue.data, stories, actions });
+  const learningStory = onStory
+    ? stories.find((s) => s.n === storyN && s.shelf === "learning")
+    : undefined;
+  useStoryRead(id, learningStory, storyActions);
 
-  // The console opens an issue under News until it knows the issue's shelf.
+  // The console opens an issue under News until it knows the issue's shelf. A Learning story
+  // stays on Learning whatever its issue's shelf: a craft essay inside a News digest.
   useEffect(() => {
     const d = issue.data;
-    if (!d || tab === "saved") return;
+    if (!d || tab === "saved" || onStory) return;
     const shelf = d.shelf ?? "news";
     if (shelf !== tab) route(queueHref(shelf, DEFAULT_QUEUE, d.id), true);
   }, [issue.data?.id]);
@@ -476,9 +505,24 @@ function MacReader({
           <ThumbIcon down size={14} />,
         )}
         {key("S", saved ? "Saved" : "Save", saved, () => actions.save(d), "", archived)}
-        {key("E", archived ? "Archived" : "Archive", archived, () => actions.archive(d))}
-        {key("M", (d.shelf ?? "news") === "news" ? "To Learning" : "To News", false, () =>
-          actions.move(d),
+        {learningStory ? (
+          // On Learning, E and M are the story's own (#81).
+          <>
+            {key(
+              "E",
+              learningStory.state === "archived" ? "Story archived" : "Archive story",
+              learningStory.state === "archived",
+              () => storyActions.archive(d.id, learningStory),
+            )}
+            {key("M", "Story to News", false, () => storyActions.move(d.id, learningStory))}
+          </>
+        ) : (
+          <>
+            {key("E", archived ? "Archived" : "Archive", archived, () => actions.archive(d))}
+            {key("M", (d.shelf ?? "news") === "news" ? "To Learning" : "To News", false, () =>
+              actions.move(d),
+            )}
+          </>
         )}
         {d.viewOnlineUrl && (
           <a class="keybtn" href={d.viewOnlineUrl} target="_blank" rel="noopener noreferrer">
@@ -608,6 +652,12 @@ function StoryIndex({
                 <span>{s.headline}</span>
               </p>
               <p class="index-summary">{s.summary}</p>
+              {s.shelf && (
+                <p class="index-shelf label">
+                  {s.shelf === "learning" ? "Learning" : "News"}
+                  {s.state && ` · ${s.state}`}
+                </p>
+              )}
               <p class="index-names">
                 {namesLine(s, relItems, publication ?? "")}
                 {relItems.length > 0 && ` · ${relItems.length} related`}

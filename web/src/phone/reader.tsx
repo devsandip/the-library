@@ -3,6 +3,7 @@ import { useLocation } from "preact-iso";
 import type { IssueDetailResponse, IssueStory } from "@library/core/types";
 import { storyRelated, useRelated, useStories } from "../data.js";
 import { clock } from "../format.js";
+import { useStoryActions, useStoryRead, type StoryActions } from "../learning.js";
 import { goBack, previousPath } from "../nav.js";
 import { BASE } from "../config.js";
 import { issueHref, newsletterHref, slug, todayHref, type Deep } from "../paths.js";
@@ -42,8 +43,9 @@ export function Reader({ id, story, deep }: { id: string; story?: number; deep?:
     // Opened from its own story sheet's URL: the way back is still where the reader came from.
     return fromLabel(prev?.startsWith(issueHref(id)) ? undefined : prev);
   });
-  const { issue, onFit, actions } = useOpenIssue(id);
+  const { issue, onFit, actions } = useOpenIssue(id, undefined, story !== undefined);
   const stories = useStories(id).data?.stories ?? [];
+  const storyActions = useStoryActions();
   const digest = stories.length > 1;
 
   const openStory = (n: number) => route(issueHref(id, n));
@@ -172,6 +174,7 @@ export function Reader({ id, story, deep }: { id: string; story?: number; deep?:
           stories={stories}
           n={Math.min(story, stories.length)}
           deep={deep}
+          actions={storyActions}
           onStep={(n) => route(issueHref(id, n, deep), true)}
           onClose={() => {
             if (previousPath() === issueHref(id)) history.back();
@@ -197,6 +200,7 @@ function StorySheet({
   stories,
   n,
   deep,
+  actions,
   onStep,
   onClose,
 }: {
@@ -204,6 +208,7 @@ function StorySheet({
   stories: IssueStory[];
   n: number;
   deep?: Deep;
+  actions: StoryActions;
   onStep: (n: number) => void;
   onClose: () => void;
 }) {
@@ -221,6 +226,9 @@ function StorySheet({
   const relCount = rel.earlier.length + rel.since.length;
   const names = namesLine(s, [...rel.earlier, ...rel.since], issue.publication);
   const timeline = useTimeline(issue.id, s.n);
+  // Viewing a Learning story reads it, not its issue (#81).
+  useStoryRead(issue.id, s, actions);
+  const shelf = s.shelf ?? "news";
 
   // A new story starts at its top.
   useEffect(() => {
@@ -308,6 +316,8 @@ function StorySheet({
             <span class="label">
               {detent === "full" && `${issue.publication} · `}
               {digest ? `Story ${s.n} of ${stories.length}` : "This story"}
+              {shelf === "learning" && " · Learning"}
+              {s.state === "archived" && " · Archived"}
             </span>
             {digest && (
               <span class="steppers">
@@ -349,6 +359,26 @@ function StorySheet({
             <button type="button" class="btn line caps" onClick={showRelated}>
               Related {related.status === "ok" ? relCount : "…"}
             </button>
+          </div>
+          <div class="story-actions story-own" role="group" aria-label="This story">
+            <button
+              type="button"
+              class="btn line caps"
+              aria-label={`${KIND_WORD[shelf]}. Move this story to ${shelf === "news" ? "Learning" : "News"}`}
+              onClick={() => actions.move(issue.id, s)}
+            >
+              {shelf === "news" ? "To Learning" : "To News"}
+            </button>
+            {shelf === "learning" && (
+              <button
+                type="button"
+                class={`btn line caps${s.state === "archived" ? " on" : ""}`}
+                aria-pressed={s.state === "archived"}
+                onClick={() => actions.archive(issue.id, s)}
+              >
+                {s.state === "archived" ? "Archived" : "Archive story"}
+              </button>
+            )}
           </div>
           <div class="deep-tabs" role="tablist" aria-label="Go deeper" ref={deepRef}>
             <button

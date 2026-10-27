@@ -11,6 +11,9 @@ import type {
   IssueListItem,
   IssueListResponse,
   IssueStoriesResponse,
+  IssueStory,
+  LearningItem,
+  LearningListResponse,
   Narrative,
   NowReadingResponse,
   Rating,
@@ -25,6 +28,7 @@ import type {
   SenderPatch,
   Shelf,
   StatusResponse,
+  StoryPatch,
   SummaryResponse,
   Timeline,
   TimelinePoint,
@@ -35,7 +39,7 @@ import type {
   UnreadCountsResponse,
   View,
 } from "@library/core/types";
-import type { LibraryApi, ListIssuesOptions } from "./api.js";
+import type { LibraryApi, ListIssuesOptions, ListLearningOptions } from "./api.js";
 
 const HOUR = 3_600_000;
 const now = Date.now();
@@ -573,6 +577,18 @@ function mockNarrative(top: IssueListItem[]): Narrative | undefined {
   };
 }
 
+/** Each story's own shelf and state as changed in mock mode (#81), by `<issue id>#<n>`. */
+const storyMarks = new Map<string, Partial<Pick<IssueStory, "shelf" | "state">>>();
+
+/**
+ * A stand-in for Jev (#81): a Learning issue's stories are Learning, and inside a News digest a
+ * story that reads like a how-to ("when gRPC beats REST", "three ways to...") is.
+ */
+function mockShelf(i: IssueListItem, headline: string, digest: boolean): Shelf {
+  if (i.shelf === "learning") return "learning";
+  return digest && /\b(how|when|ways|why)\b/i.test(headline) ? "learning" : "news";
+}
+
 /**
  * A stand-in for the story index (#15): a digest's subject or Claude's line lists its stories with
  * semicolons, so each part is a story; anything else is one story. Promos have none, as in the API.
@@ -595,8 +611,16 @@ function mockStories(i: IssueListItem): IssueStoriesResponse {
             " A second sentence from the story index says a little more than the line above.",
       ...(parts.length > 1 ? { link: `https://example.test/${i.id}/story-${k + 1}` } : {}),
       ...namesIn(part),
+      shelf: mockShelf(i, part, parts.length > 1),
+      ...storyMarks.get(`${i.id}#${k + 1}`),
     })),
   };
+}
+
+/** An issue follows its stories (#81): Learning when every one is. */
+function deriveShelf(i: IssueListItem) {
+  const stories = mockStories(i).stories;
+  if (stories.length) i.shelf = stories.every((s) => s.shelf === "learning") ? "learning" : "news";
 }
 
 /** A stand-in for the story index's names: the capitalised words after the first. */
@@ -646,6 +670,48 @@ export class MockLibraryApi implements LibraryApi {
     const page = all.slice(start, start + limit).map((i) => withStar(strip(i)));
     return { items: page, cursor: start + limit < all.length ? String(start + limit) : undefined };
   }
+  async listLearning(opts: ListLearningOptions): Promise<LearningListResponse> {
+    await delay();
+    const muted = new Set(senders.filter((s) => s.muted).map((s) => s.senderId));
+    const picked = opts.senders?.length ? new Set(opts.senders) : undefined;
+    const shows = (s: IssueStory) =>
+      opts.view === "unread"
+        ? s.state === undefined
+        : opts.view === "archived"
+          ? s.state === "archived"
+          : s.state !== "archived";
+    const all: LearningItem[] = issues
+      .filter(
+        (i) =>
+          (picked ? picked.has(i.senderId) : opts.view === "archived" || !muted.has(i.senderId)) &&
+          (!opts.topics?.length || (i.topic !== undefined && opts.topics.includes(i.topic))),
+      )
+      .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt))
+      .flatMap((i) =>
+        mockStories(i)
+          .stories.filter((s) => s.shelf === "learning" && shows(s))
+          .map((story) => ({ issue: withStar(strip(i)), story })),
+      );
+    const start = opts.cursor ? Number(opts.cursor) : 0;
+    const limit = opts.limit ?? 30;
+    return {
+      items: all.slice(start, start + limit),
+      cursor: start + limit < all.length ? String(start + limit) : undefined,
+    };
+  }
+  async setStory(id: string, n: number, patch: StoryPatch): Promise<IssueStory> {
+    await delay(80);
+    const i = find(id);
+    const story = mockStories(i).stories.find((s) => s.n === n);
+    if (!story) throw new Error("story not found");
+    const mark = { ...storyMarks.get(`${id}#${n}`) };
+    if (patch.shelf) mark.shelf = patch.shelf;
+    if (patch.state === "unread") delete mark.state;
+    else if (patch.state) mark.state = patch.state;
+    storyMarks.set(`${id}#${n}`, mark);
+    if (patch.shelf) deriveShelf(i);
+    return mockStories(i).stories.find((s) => s.n === n)!;
+  }
   async getIssue(id: string): Promise<IssueDetailResponse> {
     await delay();
     const i = find(id);
@@ -677,6 +743,10 @@ export class MockLibraryApi implements LibraryApi {
   async setShelf(id: string, shelf: Shelf) {
     await delay(80);
     const i = find(id);
+    // Moving an issue moves its stories (#81).
+    for (const s of mockStories(i).stories) {
+      storyMarks.set(`${id}#${s.n}`, { ...storyMarks.get(`${id}#${s.n}`), shelf });
+    }
     i.shelf = shelf;
     return strip(i);
   }
@@ -693,11 +763,20 @@ export class MockLibraryApi implements LibraryApi {
       if (t) t.n++;
       else tally.set(key, { senderId: i.senderId, shelf: i.shelf, topic: i.topic, n: 1 });
     }
-    // Learning stories (#81) come to the mock with the screens that list them.
+    const learning = new Map<string, UnreadCount>();
+    for (const i of issues) {
+      for (const s of mockStories(i).stories) {
+        if (s.shelf !== "learning" || s.state !== undefined) continue;
+        const key = `${i.senderId}|${i.topic ?? ""}`;
+        const t = learning.get(key);
+        if (t) t.n++;
+        else learning.set(key, { senderId: i.senderId, shelf: "learning", topic: i.topic, n: 1 });
+      }
+    }
     return {
       counts: [...tally.values()],
       saved: issues.filter((i) => i.savedAt).length,
-      learning: [],
+      learning: [...learning.values()],
     };
   }
   async related(id: string): Promise<RelatedResponse> {

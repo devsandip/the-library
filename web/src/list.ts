@@ -36,15 +36,24 @@ export function steady<T extends { id: string }>(
 }
 
 /** The rows each list showed last, by list, so Back finds them where they were. */
-const shown = new Map<string, IssueListItem[]>();
+const shown = new Map<string, { id: string }[]>();
 
 /**
  * A paged list of issues with its rows held in place (see `steady`). `key` names the view (its
  * URL); a new key is a new view and starts over. A refresh (pull to refresh) starts over too.
  */
 export function useIssueList(key: string, load: (cursor?: string) => Promise<IssueListResponse>) {
+  return useList<IssueListItem, IssueChange>(key, load, patchIssue);
+}
+
+/** `useIssueList` for any rows with an id: Learning's stories (#81) use it too. */
+export function useList<T extends { id: string }, C>(
+  key: string,
+  load: (cursor?: string) => Promise<{ items: T[]; cursor?: string }>,
+  patchRows: (items: T[], id: string, change: C) => T[],
+) {
   const first = useAsync(() => load(), [key], `list:${key}`);
-  const [more, setMore] = useState<{ items: IssueListItem[]; cursor?: string; loading: boolean }>();
+  const [more, setMore] = useState<{ items: T[]; cursor?: string; loading: boolean }>();
   const lastKey = useRef(key);
 
   // A different view: forget how the last one looked.
@@ -64,7 +73,7 @@ export function useIssueList(key: string, load: (cursor?: string) => Promise<Iss
   const fresh = [...(first.data?.items ?? []), ...(more?.items ?? [])];
   const ready = first.status === "ok";
   const { items, kept } = ready
-    ? steady(shown.get(key) ?? [], fresh)
+    ? steady((shown.get(key) as T[] | undefined) ?? [], fresh)
     : { items: [], kept: new Set<string>() };
   useEffect(() => {
     if (ready) shown.set(key, items);
@@ -86,11 +95,11 @@ export function useIssueList(key: string, load: (cursor?: string) => Promise<Iss
     }
   };
 
-  const patch = (id: string, change: IssueChange) => {
-    first.set((d) => ({ ...d, items: patchIssue(d.items, id, change) }));
-    setMore((m) => (m ? { ...m, items: patchIssue(m.items, id, change) } : m));
-    const s = shown.get(key);
-    if (s) shown.set(key, patchIssue(s, id, change));
+  const patch = (id: string, change: C) => {
+    first.set((d) => ({ ...d, items: patchRows(d.items, id, change) }));
+    setMore((m) => (m ? { ...m, items: patchRows(m.items, id, change) } : m));
+    const s = shown.get(key) as T[] | undefined;
+    if (s) shown.set(key, patchRows(s, id, change));
   };
 
   return {
