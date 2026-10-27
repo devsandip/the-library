@@ -4,6 +4,8 @@ import type {
   IssueListItem,
   IssueListResponse,
   IssueStoriesResponse,
+  IssueStory,
+  LearningListResponse,
   NowReadingResponse,
   Rating,
   ReaderState,
@@ -15,6 +17,7 @@ import type {
   SenderPatch,
   Shelf,
   StatusResponse,
+  StoryPatch,
   SummaryResponse,
   TimelineResponse,
   Topic,
@@ -52,6 +55,13 @@ export interface RepoPort {
   savePosition(id: string, position: number): Promise<void>;
   /** The issue's stories from the story index (#15), in order (#41). */
   stories(id: string): Promise<IssueStoriesResponse>;
+  /** Learning stories for a view (#81), newest first, each with its issue as a row. */
+  listLearning(
+    view: Exclude<View, "saved">,
+    opts: Omit<ListOptions, "shelf">,
+  ): Promise<LearningListResponse>;
+  /** A story's own state, or Sandip moving it (#81); the issue's shelf follows a move. */
+  setStory(id: string, n: number, patch: StoryPatch): Promise<IssueStory>;
   listSenders(): Promise<SenderListItem[]>;
   getSender(senderId: string): Promise<SenderDetailResponse>;
   updateSender(senderId: string, patch: SenderPatch): Promise<SenderListItem>;

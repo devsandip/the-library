@@ -55,6 +55,17 @@ function setup(overrides: Partial<RepoPort> = {}) {
     unreadCounts: vi.fn(async () => ({
       counts: [{ senderId: sender.senderId, shelf: "news" as const, topic: "AI", n: 2 }],
       saved: 1,
+      learning: [{ senderId: sender.senderId, shelf: "learning" as const, topic: "AI", n: 3 }],
+    })),
+    listLearning: vi.fn(async () => ({
+      items: [{ issue, story: { n: 2, headline: "How caches fail", summary: "A how-to." } }],
+    })),
+    setStory: vi.fn(async (_id, n, patch) => ({
+      n,
+      headline: "How caches fail",
+      summary: "A how-to.",
+      shelf: patch.shelf ?? ("learning" as const),
+      ...(patch.state && patch.state !== "unread" ? { state: patch.state } : {}),
     })),
     summary: vi.fn(async () => ({
       items: [{ ...issue, scoreReason: "From a Must Read newsletter", mustRead: true }],
@@ -231,6 +242,50 @@ describe("routing and validation", () => {
       expect((await call("GET", `/issues/abc123/stories/${n}/timeline`)).status).toBe(404);
     }
     expect((await call("DELETE", "/issues/abc123/stories/2/timeline")).status).toBe(405);
+  });
+
+  it("lists Learning stories: unread by default, the shared filters, no Saved view (#81)", async () => {
+    const { repo, call } = setup();
+    const res = await call("GET", "/learning");
+    expect(res.status).toBe(200);
+    expect(res.body.items[0].story).toMatchObject({ n: 2, headline: "How caches fail" });
+    expect(repo.listLearning).toHaveBeenCalledWith("unread", {
+      limit: 30,
+      cursor: undefined,
+      senderIds: undefined,
+      topics: undefined,
+    });
+    await call("GET", "/learning", {
+      query: { view: "all", limit: "10", cursor: "c", sender: sender.senderId, topic: "AI,Data" },
+    });
+    expect(repo.listLearning).toHaveBeenLastCalledWith("all", {
+      limit: 10,
+      cursor: "c",
+      senderIds: [sender.senderId],
+      topics: ["AI", "Data"],
+    });
+    expect((await call("GET", "/learning", { query: { view: "saved" } })).status).toBe(400);
+    expect((await call("GET", "/learning", { query: { limit: "0" } })).status).toBe(400);
+    expect((await call("GET", "/learning", { query: { sender: "nope" } })).status).toBe(400);
+  });
+
+  it("PATCH a story: its state or a move, validated (#81)", async () => {
+    const { repo, call } = setup();
+    const read = await call("PATCH", "/issues/abc123/stories/2", { body: { state: "read" } });
+    expect(read.status).toBe(200);
+    expect(read.body).toMatchObject({ n: 2, state: "read" });
+    expect(repo.setStory).toHaveBeenCalledWith("abc123", 2, { state: "read", shelf: undefined });
+    await call("PATCH", "/issues/abc123/stories/2", { body: { shelf: "news" } });
+    expect(repo.setStory).toHaveBeenLastCalledWith("abc123", 2, {
+      state: undefined,
+      shelf: "news",
+    });
+    for (const body of [{}, { state: "saved" }, { shelf: "later" }]) {
+      expect((await call("PATCH", "/issues/abc123/stories/2", { body })).status).toBe(400);
+    }
+    expect(
+      (await call("PATCH", "/issues/abc123/stories/0", { body: { state: "read" } })).status,
+    ).toBe(404);
   });
 
   it("serves an issue's stories", async () => {
