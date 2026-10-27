@@ -16,6 +16,8 @@ import {
   openIndexAttributes,
   readerDay,
   senderIdentity,
+  shelfFor,
+  storyIndexAttributes,
   storyKey,
   storyRef,
   timelineKey,
@@ -973,5 +975,98 @@ describe("API on dev", () => {
       stories: [],
     });
     expect((await call("GET", "/issues/does-not-exist/stories")).status).toBe(404);
+  });
+
+  it("moving a split issue moves its stories; a newsletter's setting re-shelves them (#81)", async () => {
+    const BBG = senderIdentity("bytebytego@substack.com", "").senderId;
+    const id = "fx-bytebytego";
+    const receivedAt = (await getItem(id))!.receivedAt as string;
+    const jevStory = (n: number, learning: number) => {
+      const shelf = shelfFor(learning);
+      return ddb.send(
+        new PutCommand({
+          TableName: stack.tableName,
+          Item: {
+            ...storyKey(id, n),
+            id,
+            n,
+            receivedAt,
+            headline: `Story ${n}`,
+            summary: "What it says.",
+            names: [],
+            vector: new Uint8Array(8),
+            eventId: `shelf${n}`,
+            shelf,
+            shelfSetBy: "jev",
+            learning,
+            ...storyIndexAttributes({ issueId: id, n, receivedAt, shelf }).set,
+          },
+        }),
+      );
+    };
+    const story = (n: number) =>
+      ddb
+        .send(
+          new GetCommand({
+            TableName: stack.tableName,
+            Key: storyKey(id, n),
+            ConsistentRead: true,
+          }),
+        )
+        .then((r) => r.Item!);
+    const shelves = async () => {
+      const [a, b, issue] = await Promise.all([story(1), story(2), getItem(id)]);
+      return {
+        stories: [a, b].map((s) => [s.shelf, s.shelfSetBy, s.gsi2pk ?? "-"]),
+        issue: [issue!.shelf, issue!.shelfSetBy],
+      };
+    };
+    await jevStory(1, 0.9);
+    await jevStory(2, 0.2);
+
+    // Moving the issue moves both stories, as Sandip's, and the issue follows them.
+    await call("PATCH", `/issues/${id}`, { body: { shelf: "learning" } });
+    expect(await shelves()).toEqual({
+      stories: [
+        ["learning", "sandip", "LEARNING"],
+        ["learning", "sandip", "LEARNING"],
+      ],
+      issue: ["learning", "stories"],
+    });
+    const back = await call("PATCH", `/issues/${id}`, { body: { shelf: "news" } });
+    expect(back.body).toMatchObject({ shelf: "news" });
+    expect(await shelves()).toEqual({
+      stories: [
+        ["news", "sandip", "-"],
+        ["news", "sandip", "-"],
+      ],
+      issue: ["news", "stories"],
+    });
+
+    // A newsletter's setting re-shelves Jev's stories; clearing it hands them back to Jev.
+    await jevStory(1, 0.9);
+    await jevStory(2, 0.7);
+    await call("PATCH", `/senders/${BBG}`, { body: { shelf: "news" } });
+    expect(await shelves()).toEqual({
+      stories: [
+        ["news", "sender", "-"],
+        ["news", "sender", "-"],
+      ],
+      issue: ["news", "stories"],
+    });
+    await call("PATCH", `/senders/${BBG}`, { body: { shelf: null } });
+    expect(await shelves()).toEqual({
+      stories: [
+        ["learning", "jev", "LEARNING"],
+        ["learning", "jev", "LEARNING"],
+      ],
+      issue: ["learning", "stories"],
+    });
+
+    await Promise.all(
+      [1, 2].map((n) =>
+        ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: storyKey(id, n) })),
+      ),
+    );
   });
 });

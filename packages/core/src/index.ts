@@ -9,6 +9,7 @@ export * from "./days.js";
 export * from "./rank.js";
 export * from "./related.js";
 export * from "./stories.js";
+export * from "./shelves.js";
 export * from "./vectors.js";
 export * from "./claude.js";
 export * from "./search.js";

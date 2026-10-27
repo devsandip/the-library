@@ -8,7 +8,7 @@ import { Jev } from "./jev.js";
 import { writeNarrative } from "./narrative.js";
 import { reprocess } from "./reprocess.js";
 import { rebuildSenders } from "./senders.js";
-import { shelveStories } from "./shelves.js";
+import { deriveShelves, shelveStories } from "./shelves.js";
 import { Store } from "./store.js";
 import { indexStories, relinkStories } from "./stories.js";
 
@@ -85,8 +85,11 @@ export interface IngestEvent {
   proposeTopics?: { days?: number; apply?: boolean; replace?: boolean };
   /** Split stored issues into stories (`pnpm stories`); `relink` only recomputes event links. */
   stories?: { days?: number; force?: boolean; relink?: boolean };
-  /** Jev shelves stored stories (`pnpm shelves`); `force` asks again about the ones it shelved. */
-  shelves?: { days?: number; force?: boolean };
+  /**
+   * Jev shelves stored stories (`pnpm shelves`); `force` asks again about all but Sandip's moves;
+   * `derive` asks Jev nothing and brings shelves, states and issues in line (#81).
+   */
+  shelves?: { days?: number; force?: boolean; derive?: boolean };
   /** Write today's narrative now (`pnpm narrative`); `force` even if the last one is recent. */
   narrative?: { force?: boolean };
   /** Index opens logged before read history existed (`pnpm history-backfill`). */
@@ -117,6 +120,11 @@ export async function handler(event: IngestEvent = {}) {
       deadline: started + 8.5 * 60_000,
     });
     console.log(JSON.stringify({ level: "info", msg: "stories done", ...stats }));
+    return stats;
+  }
+  if (event.shelves?.derive) {
+    const stats = await deriveShelves(store, { sinceIso: daysAgo(event.shelves.days ?? 3650) });
+    console.log(JSON.stringify({ level: "info", msg: "shelves derived", ...stats }));
     return stats;
   }
   if (event.shelves) {
@@ -213,7 +221,7 @@ export async function handler(event: IngestEvent = {}) {
     durationMs: 0,
   }));
   console.log(JSON.stringify({ level: "info", msg: "stories done", ...storied }));
-  // Then Jev shelves the new stories (#81). Nothing reads the shelf yet; it never fails the run.
+  // Then Jev shelves the new stories and their issues follow (#81); it never fails the run.
   const shelved = await shelveStories(store, getJev, {
     sinceIso: daysAgo(14),
     deadline: started + 8.75 * 60_000,

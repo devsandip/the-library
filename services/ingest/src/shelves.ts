@@ -2,10 +2,19 @@
  * Story shelves (#81). Jev reads each story (its newsletter, headline and summary) and gives the
  * probability that it builds the reader's craft; 0.5 and up is Learning. A pass of its own after
  * the story index, so a Jev outage never holds up stories and the next run picks up what failed.
- * Nothing reads the story's shelf yet: Learning still lists issues until #81's step 4.
+ * The story's shelf is its effective one (Sandip's move, then its newsletter's setting, then
+ * Jev), and its issue's shelf follows its stories.
  */
-import { storyRef } from "@library/core";
-import type { Shelf, ShelfStats, StoryShelfSetBy } from "@library/core/types";
+import { shelfFor, storyIndexAttributes, storyRef, storyShelf } from "@library/core";
+import type {
+  Shelf,
+  ShelfDeriveStats,
+  ShelfStats,
+  StoryShelfSetBy,
+  StoryState,
+} from "@library/core/types";
+import type { EnrichCandidate } from "./enrich.js";
+import { mapLimit } from "./ingest.js";
 import {
   JEV_MODEL,
   SHELF_QUESTIONS,
@@ -16,34 +25,37 @@ import {
 } from "./jev.js";
 import type { Store } from "./store.js";
 
-/** Learning from this probability up. */
-export const LEARNING_FROM = 0.5;
+export { LEARNING_FROM, shelfFor } from "@library/core";
 
 /** A stored story as shelving reads it. */
 export interface ShelfCandidate {
   issueId: string;
   n: number;
+  senderId: string;
   receivedAt: string;
   headline: string;
   summary: string;
+  shelf?: Shelf;
   shelfSetBy?: StoryShelfSetBy;
+  /** Jev's probability of Learning, once Jev has read it. */
+  learning?: number;
+  state?: StoryState;
+  /** In `gsi2` under LEARNING. */
+  indexed?: boolean;
 }
 
 export interface ShelveOptions {
   sinceIso: string;
-  /** Ask Jev again about its own calls (after a change to the question). Sandip's moves stay. */
+  /** Ask Jev again about every story but Sandip's moves (after a change to the question). */
   force?: boolean;
   concurrency?: number;
   /** Epoch ms after which no new story is started; the rest wait for the next run. */
   deadline?: number;
 }
 
-export const shelfFor = (learning: number): Shelf =>
-  learning >= LEARNING_FROM ? "learning" : "news";
-
 /**
- * Shelve the stories received since `sinceIso` that have no shelf yet. `jev` is only called when
- * there is work, so a run with nothing to shelve never reads the key.
+ * Shelve the stories received since `sinceIso` that Jev has not read yet. `jev` is only called
+ * when there is work, so a run with nothing to shelve never reads the key.
  */
 export async function shelveStories(
   store: Store,
@@ -72,12 +84,15 @@ export async function shelveStories(
     store.storyShelves(opts.sinceIso),
     store.enrichCandidates(opts.sinceIso),
   ]);
-  const todo = stories.filter((s) => !s.shelfSetBy || (opts.force && s.shelfSetBy === "jev"));
+  const todo = stories.filter((s) =>
+    opts.force ? s.shelfSetBy !== "sandip" : s.learning === undefined,
+  );
   stats.checked = todo.length;
+  const touched = new Set<string>();
 
   if (todo.length) {
     const publication = new Map(issues.map((i) => [i.id, i.publication]));
-    const port = await jev();
+    const [port, settings] = await Promise.all([jev(), store.senderSettings()]);
     const shelve = async (s: ShelfCandidate) => {
       const d = await port.decide(
         storyState({
@@ -89,12 +104,12 @@ export async function shelveStories(
       );
       stats.inputTokens += d.inputTokens;
       const learning = learningProbability(d.answers.craft);
-      const shelf = shelfFor(learning);
-      const model = d.model || JEV_MODEL;
-      // False when Sandip moved it meanwhile: his call stands.
-      if (!(await store.putStoryShelf(s.issueId, s.n, { shelf, learning, model }))) return;
+      const next = storyShelf({ ...s, learning }, settings.get(s.senderId)?.shelf);
+      // False when Sandip moved or read it meanwhile: the next run asks again.
+      if (!(await store.putStoryShelf(s, next, { learning, model: d.model || JEV_MODEL }))) return;
+      touched.add(s.issueId);
       stats.shelved++;
-      if (shelf === "learning") stats.learning++;
+      if (shelfFor(learning) === "learning") stats.learning++;
       if (isUnsure(learning)) stats.unsure++;
     };
     const size = opts.concurrency ?? 4;
@@ -109,7 +124,64 @@ export async function shelveStories(
           .map((s) => shelve(s).catch((err: unknown) => fail(storyRef(s.issueId, s.n), err))),
       );
     }
+    await store.deriveIssueShelves(touched);
   }
+  stats.durationMs = Date.now() - started;
+  return stats;
+}
+
+/**
+ * A story's state when the derive pass meets one without its own: read when its issue was read,
+ * or archived by Sandip; otherwise unread, including inside news a rule archived unseen.
+ */
+export function startingState(issue: EnrichCandidate | undefined): StoryState | undefined {
+  if (issue?.state === "read") return "read";
+  if (issue?.state === "archived" && !issue.autoArchived) return "read";
+  return undefined;
+}
+
+/**
+ * Bring every stored story since `sinceIso` to its effective shelf, a state and the `gsi2`
+ * attributes that follow, then derive every issue's shelf from its stories. Asks Jev nothing.
+ * Safe to run again: it writes only what differs.
+ */
+export async function deriveShelves(
+  store: Store,
+  opts: { sinceIso: string },
+): Promise<ShelfDeriveStats> {
+  const started = Date.now();
+  const [stories, issues, settings] = await Promise.all([
+    store.storyShelves(opts.sinceIso),
+    store.enrichCandidates(opts.sinceIso),
+    store.senderSettings(),
+  ]);
+  const byId = new Map(issues.map((i) => [i.id, i]));
+  const stats: ShelfDeriveStats = {
+    stories: stories.length,
+    storiesChanged: 0,
+    unreadLearning: 0,
+    issues: 0,
+    issuesChanged: 0,
+    skipped: 0,
+    durationMs: 0,
+  };
+  await mapLimit(stories, 8, async (s) => {
+    const next = storyShelf(s, settings.get(s.senderId)?.shelf);
+    const state = s.state ?? startingState(byId.get(s.issueId));
+    const index = storyIndexAttributes({ ...s, shelf: next.shelf, state });
+    if (next.shelf === "learning" && (state ?? "unread") === "unread") stats.unreadLearning++;
+    const same =
+      next.shelf === s.shelf &&
+      next.shelfSetBy === s.shelfSetBy &&
+      state === s.state &&
+      (index.set.gsi2pk !== undefined) === Boolean(s.indexed);
+    if (same) return;
+    if (await store.putStoryShelf(s, { ...next, state })) stats.storiesChanged++;
+    else stats.skipped++;
+  });
+  const storied = new Set(stories.map((s) => s.issueId));
+  stats.issues = storied.size;
+  stats.issuesChanged = await store.deriveIssueShelves(storied);
   stats.durationMs = Date.now() - started;
   return stats;
 }
