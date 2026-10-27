@@ -282,17 +282,20 @@ describe("API on dev", () => {
     await setSorted("fx-bytebytego", "learning", "Engineering");
     await setSorted("fx-pragmatic", "learning", "Engineering");
     await setSorted("fx-tldr", "news", "AI");
-    const shelf = (q: Record<string, string>) =>
-      call<IssueListResponse>("GET", "/issues", { query: q });
-    expect(ids(await shelf({ shelf: "learning" }))).toEqual(["fx-bytebytego", "fx-pragmatic"]);
-    expect(ids(await shelf({ shelf: "news" }))).toEqual([
-      "fx-platformer",
-      "fx-tldr",
-      "fx-lenny",
-      "fx-example",
-    ]);
-    expect(ids(await shelf({ shelf: "news", topic: "AI" }))).toEqual(["fx-tldr"]);
-    expect(ids(await shelf({ shelf: "learning", view: "all", topic: "Engineering" }))).toEqual([
+    // The lists read GSIs, which lag the writes above: wait for each to show them.
+    const shelf = async (q: Record<string, string>, want: string[]) =>
+      expect(
+        ids(
+          await eventually(
+            () => call<IssueListResponse>("GET", "/issues", { query: q }),
+            (r) => ids(r).join() === want.join(),
+          ),
+        ),
+      ).toEqual(want);
+    await shelf({ shelf: "learning" }, ["fx-bytebytego", "fx-pragmatic"]);
+    await shelf({ shelf: "news" }, ["fx-platformer", "fx-tldr", "fx-lenny", "fx-example"]);
+    await shelf({ shelf: "news", topic: "AI" }, ["fx-tldr"]);
+    await shelf({ shelf: "learning", view: "all", topic: "Engineering" }, [
       "fx-bytebytego",
       "fx-pragmatic",
     ]);
