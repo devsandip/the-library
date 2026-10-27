@@ -58,12 +58,17 @@ function fakeStore(
   stories: ShelfCandidate[],
   opts: {
     moved?: string[];
+    /** Stories whose index read was stale: their first write fails, the table has them. */
+    stale?: string[];
+    /** Stories gone from the table since the index read. */
+    gone?: string[];
     senderShelf?: Record<string, Shelf>;
     issues?: Partial<EnrichCandidate>[];
   } = {},
 ) {
   const put: Put[] = [];
   const derived: string[][] = [];
+  const stale = new Set(opts.stale);
   const store = {
     storyShelves: vi.fn(async () => stories),
     enrichCandidates: vi.fn(
@@ -89,11 +94,17 @@ function fakeStore(
         jev?: { learning: number },
       ) => {
         const ref = `${s.issueId} ${s.n}`;
-        if (opts.moved?.includes(ref)) return false;
+        if (opts.moved?.includes(ref) || opts.gone?.includes(ref)) return false;
+        if (stale.delete(ref)) return false;
         put.push({ ref, ...next, ...(jev ? { learning: jev.learning } : {}) });
         return true;
       },
     ),
+    storyShelf: vi.fn(async (s: ShelfCandidate) => {
+      const ref = `${s.issueId} ${s.n}`;
+      if (opts.gone?.includes(ref)) return undefined;
+      return opts.moved?.includes(ref) ? { ...s, shelfSetBy: "sandip" as const } : s;
+    }),
     deriveIssueShelves: vi.fn(async (ids: Iterable<string>) => {
       derived.push([...ids]);
       return derived.at(-1)!.length;
@@ -169,6 +180,18 @@ describe("shelveStories", () => {
     });
     expect(put).toEqual([]);
     expect(stats).toMatchObject({ checked: 3, shelved: 0, deferred: 3 });
+  });
+
+  it("writes again from the table when the index read was stale; a story gone is left", async () => {
+    const { store, put, spies } = fakeStore([story("a", 1), story("a", 2)], {
+      stale: ["a 1"],
+      gone: ["a 2"],
+    });
+    const { port } = fakeJev({ "a 1": 0.8, "a 2": 0.8 });
+    const stats = await shelveStories(store, async () => port, { sinceIso: since });
+    expect(put.map((p) => p.ref)).toEqual(["a 1"]);
+    expect(spies.storyShelf).toHaveBeenCalledTimes(2);
+    expect(stats).toMatchObject({ checked: 2, shelved: 1, errors: 0 });
   });
 
   it("puts a story on its newsletter's setting, keeping Jev's answer beside it", async () => {

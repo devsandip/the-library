@@ -104,9 +104,19 @@ export async function shelveStories(
       );
       stats.inputTokens += d.inputTokens;
       const learning = learningProbability(d.answers.craft);
-      const next = storyShelf({ ...s, learning }, settings.get(s.senderId)?.shelf);
-      // False when Sandip moved or read it meanwhile: the next run asks again.
-      if (!(await store.putStoryShelf(s, next, { learning, model: d.model || JEV_MODEL }))) return;
+      const jevSaid = { learning, model: d.model || JEV_MODEL };
+      const write = (c: ShelfCandidate) =>
+        store.putStoryShelf(
+          c,
+          storyShelf({ ...c, learning }, settings.get(c.senderId)?.shelf),
+          jevSaid,
+        );
+      // The index read can be stale, or Sandip moved or read it meanwhile: read it again from the
+      // table once. A story gone since is left alone.
+      if (!(await write(s))) {
+        const fresh = await store.storyShelf(s);
+        if (!fresh || !(await write(fresh))) return;
+      }
       touched.add(s.issueId);
       stats.shelved++;
       if (shelfFor(learning) === "learning") stats.learning++;
@@ -176,8 +186,17 @@ export async function deriveShelves(
       state === s.state &&
       (index.set.gsi2pk !== undefined) === Boolean(s.indexed);
     if (same) return;
-    if (await store.putStoryShelf(s, { ...next, state })) stats.storiesChanged++;
-    else stats.skipped++;
+    if (await store.putStoryShelf(s, { ...next, state })) {
+      stats.storiesChanged++;
+      return;
+    }
+    // A stale index read, or Sandip changed it meanwhile: once more from the table itself.
+    const fresh = await store.storyShelf(s);
+    if (!fresh) return;
+    const again = storyShelf(fresh, settings.get(fresh.senderId)?.shelf);
+    if (await store.putStoryShelf(fresh, { ...again, state: fresh.state ?? state })) {
+      stats.storiesChanged++;
+    } else stats.skipped++;
   });
   const storied = new Set(stories.map((s) => s.issueId));
   stats.issues = storied.size;

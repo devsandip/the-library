@@ -980,6 +980,38 @@ export class Store {
   }
 
   /**
+   * One story's shelf fields read from the table itself, not an index, for a write whose index
+   * read turned out stale. Undefined when the story is gone.
+   */
+  async storyShelf(s: Pick<ShelfCandidate, "issueId" | "n">): Promise<ShelfCandidate | undefined> {
+    const res = await this.ddb.send(
+      new GetCommand({
+        TableName: this.table,
+        Key: storyKey(s.issueId, s.n),
+        ProjectionExpression:
+          "id, n, senderId, receivedAt, headline, summary, shelf, shelfSetBy, learning, #st, gsi2pk",
+        ExpressionAttributeNames: { "#st": "state" },
+        ConsistentRead: true,
+      }),
+    );
+    const i = res.Item;
+    if (!i) return undefined;
+    return {
+      issueId: i.id as string,
+      n: i.n as number,
+      senderId: i.senderId as string,
+      receivedAt: i.receivedAt as string,
+      headline: i.headline as string,
+      summary: i.summary as string,
+      shelf: i.shelf as Shelf | undefined,
+      shelfSetBy: i.shelfSetBy as StoryShelfSetBy | undefined,
+      learning: i.learning as number | undefined,
+      state: i.state as StoryState | undefined,
+      indexed: i.gsi2pk !== undefined,
+    };
+  }
+
+  /**
    * Write a story's shelf and state, the `gsi2` attributes that follow from them, and Jev's answer
    * when there is one, provided its shelf's setter and its state are still those `s` was read
    * with. Returns false when they changed meanwhile (Sandip moved or read it) or it is gone.
