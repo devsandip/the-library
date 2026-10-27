@@ -2,7 +2,7 @@
  * Integration: the story index against the dev table and bucket, on the fixture issues' stored
  * HTML, with a fake model (no Claude calls).
  */
-import { GetCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
 import { issueKey, storyKey, storyText, toVector } from "@library/core";
 import type { ModelPort } from "../src/bedrock.js";
@@ -99,6 +99,29 @@ describe("story index on dev", () => {
     expect(await get(storyKey(id, 2))).toBeUndefined();
     expect(await get(storyKey(id, 1))).toMatchObject({ headline: "Only" });
     expect(await get(issueKey(id))).toMatchObject({ storyCount: 1 });
+
+    // A redo keeps Sandip's move and the story's read state, by headline here (#98).
+    await ddb.send(
+      new UpdateCommand({
+        TableName: stack.tableName,
+        Key: storyKey(id, 1),
+        UpdateExpression: "SET shelf = :l, shelfSetBy = :sandip, #st = :read",
+        ExpressionAttributeNames: { "#st": "state" },
+        ExpressionAttributeValues: { ":l": "learning", ":sandip": "sandip", ":read": "read" },
+      }),
+    );
+    await store.putStories(issue, [story(1, "New first"), story(2, "only")]);
+    expect(await get(storyKey(id, 2))).toMatchObject({
+      headline: "only",
+      shelf: "learning",
+      shelfSetBy: "sandip",
+      state: "read",
+    });
+    // Read, so not in the unread Learning index; the other story carries nothing.
+    expect((await get(storyKey(id, 2)))?.gsi2pk).toBeUndefined();
+    expect((await get(storyKey(id, 1)))?.shelfSetBy).toBeUndefined();
+    // Back to one story, as the tests below expect.
+    await store.putStories(issue, [story(1, "Only")]);
   });
 
   it("moves an issue's stories along when a sender rebuild re-keys the issue", async () => {

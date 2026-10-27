@@ -13,7 +13,7 @@ import {
   storyText,
   type EventCandidate,
 } from "@library/core";
-import type { StoryStats } from "@library/core/types";
+import type { Shelf, StoryState, StoryStats } from "@library/core/types";
 import type { ModelPort, ToolRequest } from "./bedrock.js";
 import type { EnrichCandidate } from "./enrich.js";
 import type { Store } from "./store.js";
@@ -37,6 +37,46 @@ export interface NewStory extends ParsedStory {
   n: number;
   vector: number[];
   eventId: string;
+}
+
+/** What a story carries from before a re-split (#98): Sandip's move, and its own read state. */
+export interface Carried {
+  shelf?: Shelf;
+  shelfSetBy?: "sandip";
+  state?: Exclude<StoryState, "unread">;
+}
+
+/** An issue's story as it was before a re-split, with what Sandip did to it. */
+export interface OldStory {
+  link?: string;
+  headline: string;
+  shelf?: Shelf;
+  shelfSetBy?: string;
+  state?: StoryState;
+}
+
+const sameWords = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/**
+ * What a new story keeps from the issue's old stories when a forced re-split replaces them: the
+ * old story with the same link, or else the same headline, gives its move and its read state.
+ * Jev reads every new story again; a carried move still beats it.
+ */
+export function carriedOver(s: ParsedStory, old: OldStory[]): Carried {
+  const match =
+    (s.link ? old.find((o) => o.link === s.link) : undefined) ??
+    old.find((o) => sameWords(o.headline) === sameWords(s.headline));
+  if (!match) return {};
+  return {
+    ...(match.shelfSetBy === "sandip" && match.shelf
+      ? { shelf: match.shelf, shelfSetBy: "sandip" as const }
+      : {}),
+    ...(match.state === "read" || match.state === "archived" ? { state: match.state } : {}),
+  };
 }
 
 /** A stored story as linking reads it. */
