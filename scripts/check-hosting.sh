@@ -51,6 +51,7 @@ for p in "/" "/x/y" "/senders/a.b" "/auth/callback?code=abc&state=xyz"; do
 done
 check "exactly one CSP header" '[[ "$(header "$BASE/" content-security-policy | wc -l | tr -d " ")" == 1 ]]'
 check "CSP keeps scripts to self" 'header "$BASE/" content-security-policy | grep -q "script-src '"'"'self'"'"'"'
+check "CSP loads fonts only from self" 'header "$BASE/" content-security-policy | grep -q "font-src '"'"'self'"'"' data:;"'
 check "X-Robots-Tag noindex" 'header "$BASE/" x-robots-tag | grep -qi noindex'
 check "index.html is not cacheable" 'header "$BASE/" cache-control | grep -qi no-cache'
 asset="$(curl -s "$BASE/" | grep -oE '/nutgraf/assets/[^"]+\.js' | head -1)"
