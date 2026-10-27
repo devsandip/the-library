@@ -1,5 +1,7 @@
 import type {
   AskResponse,
+  Follow,
+  FollowingResponse,
   HistoryResponse,
   IssueDetailResponse,
   IssueListItem,
@@ -110,6 +112,14 @@ export interface AskPort {
   ask(q: string): Promise<AskResponse>;
 }
 
+/** Followed stories (#22): follow a story's event, list them, unfollow, mark them seen. */
+export interface FollowPort {
+  list(): Promise<FollowingResponse>;
+  follow(id: string, n: number): Promise<Follow>;
+  unfollow(id: string, n: number): Promise<void>;
+  seen(): Promise<void>;
+}
+
 export interface Services {
   repo: RepoPort;
   search: SearchPort;
@@ -118,6 +128,7 @@ export interface Services {
   takes: TakesPort;
   sources: SourcePort;
   ask: AskPort;
+  following: FollowPort;
   /** Fire-and-forget ingest run ("refresh now"). */
   startIngest(): Promise<void>;
 }

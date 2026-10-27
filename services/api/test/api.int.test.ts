@@ -9,6 +9,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   embeddingKey,
   eventKey,
+  followKey,
   INTERESTS_KEY,
   issueIndexAttributes,
   issueKey,
@@ -28,6 +29,8 @@ import {
 } from "@library/core";
 import type {
   AskResponse,
+  Follow,
+  FollowingResponse,
   SourceResponse,
   TakesResponse,
   LearningListResponse,
@@ -1404,5 +1407,93 @@ describe("API on dev", () => {
       ),
       ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: sourceKey("fx-tldr", 51) })),
     ]);
+  });
+
+  it("follow: a story's event, listed with its point, new moves until seen, unfollowed (#22)", async () => {
+    const platformer = (await getItem("fx-platformer"))!;
+    const summary = "A chipmaker's new accelerator ships to three cloud providers this quarter.";
+    await ddb.send(
+      new PutCommand({
+        TableName: stack.tableName,
+        Item: {
+          ...storyKey("fx-platformer", 1),
+          id: "fx-platformer",
+          n: 1,
+          senderId: platformer.senderId,
+          receivedAt: platformer.receivedAt,
+          headline: "A new accelerator ships",
+          summary,
+          names: ["Chipmaker"],
+          eventId: storyRef("fx-platformer", 1),
+        },
+      }),
+    );
+    const eventId = storyRef("fx-platformer", 1);
+    const path = "/issues/fx-platformer/stories/1/follow";
+    try {
+      expect((await call<FollowingResponse>("GET", "/following")).body).toEqual({
+        items: [],
+        unseen: 0,
+      });
+      const followed = await call<Follow>("POST", path);
+      expect(followed.status).toBe(200);
+      const f = followed.body;
+      expect(f).toMatchObject({
+        eventId,
+        issueId: "fx-platformer",
+        n: 1,
+        headline: "A new accelerator ships",
+        unseen: 0,
+        quiet: false,
+        stories: [eventId],
+      });
+      expect(f.points).toEqual([
+        {
+          at: platformer.receivedAt,
+          text: summary,
+          sources: [{ issueId: "fx-platformer", publication: platformer.publication }],
+          current: true,
+        },
+      ]);
+      // Following it again is the same follow, and it is listed at once.
+      expect((await call<Follow>("POST", path)).body).toEqual(f);
+      expect((await call<FollowingResponse>("GET", "/following")).body).toEqual({
+        items: [f],
+        unseen: 0,
+      });
+
+      // A move, added the way the check after an ingest adds one, is new until Following is seen.
+      const move = {
+        at: platformer.receivedAt,
+        text: "A second cloud provider starts renting the accelerator.",
+        sources: [{ issueId: "fx-lenny", publication: "Lenny's Newsletter" }],
+        added: new Date(Date.parse(f.followedAt) + 1).toISOString(),
+      };
+      await ddb.send(
+        new UpdateCommand({
+          TableName: stack.tableName,
+          Key: followKey(eventId),
+          UpdateExpression: "SET points = list_append(points, :p), movedAt = :m",
+          ExpressionAttributeValues: { ":p": [move], ":m": move.at },
+        }),
+      );
+      const moved = (await call<FollowingResponse>("GET", "/following")).body;
+      expect(moved.unseen).toBe(1);
+      expect(moved.items[0]!).toMatchObject({ unseen: 1, movedAt: move.at });
+      expect(moved.items[0]!.stories).toEqual([eventId, storyRef("fx-lenny", 1)]);
+      expect((await call("POST", "/following/seen")).status).toBe(204);
+      expect((await call<FollowingResponse>("GET", "/following")).body.unseen).toBe(0);
+
+      expect((await call("DELETE", path)).status).toBe(204);
+      expect((await call<FollowingResponse>("GET", "/following")).body.items).toEqual([]);
+      expect((await call("POST", "/issues/fx-platformer/stories/2/follow")).status).toBe(404);
+    } finally {
+      await Promise.all([
+        ddb.send(
+          new DeleteCommand({ TableName: stack.tableName, Key: storyKey("fx-platformer", 1) }),
+        ),
+        ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: followKey(eventId) })),
+      ]);
+    }
   });
 });

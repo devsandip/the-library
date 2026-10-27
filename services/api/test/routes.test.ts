@@ -114,6 +114,23 @@ function setup(overrides: Partial<RepoPort> = {}) {
         cents: 0.4,
       })),
     },
+    following: {
+      list: vi.fn(async () => ({ items: [], unseen: 0 })),
+      follow: vi.fn(async (issueId: string, n: number) => ({
+        eventId: `${issueId}#0${n}`,
+        issueId,
+        n,
+        headline: "A story",
+        publication: "X",
+        followedAt: "2026-10-27T10:00:00.000Z",
+        points: [],
+        unseen: 0,
+        quiet: false,
+        stories: [`${issueId}#0${n}`],
+      })),
+      unfollow: vi.fn(async () => undefined),
+      seen: vi.fn(async () => undefined),
+    },
     startIngest: vi.fn(async () => undefined),
   };
   const handler = createHandler(svc);
@@ -271,6 +288,23 @@ describe("routing and validation", () => {
     expect(ran.body).toEqual({ none: "This story has no source link to check." });
     expect(svc.sources.run).toHaveBeenCalledWith("abc123", 2);
     expect((await call("DELETE", "/issues/abc123/stories/2/source")).status).toBe(405);
+  });
+
+  it("follows and unfollows a story, lists what is followed, marks it seen (#22)", async () => {
+    const { call, svc } = setup();
+    const followed = await call("POST", "/issues/abc123/stories/2/follow");
+    expect(followed).toMatchObject({ status: 200, body: { eventId: "abc123#02", n: 2 } });
+    expect(svc.following.follow).toHaveBeenCalledWith("abc123", 2);
+    expect(await call("GET", "/following")).toMatchObject({
+      status: 200,
+      body: { items: [], unseen: 0 },
+    });
+    expect((await call("POST", "/following/seen")).status).toBe(204);
+    expect(svc.following.seen).toHaveBeenCalled();
+    expect((await call("DELETE", "/issues/abc123/stories/2/follow")).status).toBe(204);
+    expect(svc.following.unfollow).toHaveBeenCalledWith("abc123", 2);
+    expect((await call("GET", "/issues/abc123/stories/2/follow")).status).toBe(405);
+    expect((await call("DELETE", "/following")).status).toBe(405);
   });
 
   it("reads a story's kept takes, and writes them only on POST (#17)", async () => {

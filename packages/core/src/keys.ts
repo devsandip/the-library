@@ -34,6 +34,9 @@ export const sourceKey = (id: string, n: number) => ({
 });
 /** How each newsletter covered an event (#17), kept for the event like its timeline. */
 export const takesKey = (eventId: string) => ({ pk: `TAKES#${eventId}`, sk: "META" });
+/** A followed story (#22), by its event; all of them are one partition, read in one query. */
+export const FOLLOWING_PK = "FOLLOWING";
+export const followKey = (eventId: string) => ({ pk: FOLLOWING_PK, sk: eventId });
 
 export const INDEX = {
   /** INBOX (unread + read) | ARCHIVE | SENDERS | STORIES | OPENS */

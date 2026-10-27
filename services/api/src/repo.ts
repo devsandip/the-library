@@ -8,6 +8,7 @@ import {
   QueryCommand,
   TransactWriteCommand,
   UpdateCommand,
+  DeleteCommand,
   type BatchGetCommandOutput,
   type QueryCommandInput,
   type QueryCommandOutput,
@@ -19,6 +20,8 @@ import {
   DIGEST_DAYS,
   DIGEST_SIZE,
   digestKey,
+  followKey,
+  FOLLOWING_PK,
   embeddingKey,
   eventKey,
   INDEX,
@@ -52,9 +55,11 @@ import {
   EMBED_DIMENSIONS,
   type InterestVector,
   type RelatedMatch,
+  type StoredFollow,
 } from "@library/core";
 import type {
   DigestStats,
+  FollowPoint,
   HistoryItem,
   HistoryResponse,
   IssueDetailResponse,
@@ -93,6 +98,7 @@ import { badRequest, conflict, notFound } from "./errors.js";
 import type { ListOptions, RepoPort } from "./port.js";
 import type { CorpusIssue, CorpusSource, CorpusStory } from "./corpus.js";
 import type { OwnStory, RelatedSource } from "./related.js";
+import type { FollowStore } from "./following.js";
 import type { SearchSource } from "./search.js";
 import type { SourceStore, SourceStory, StoredSource } from "./source.js";
 import type { StoredTakes, TakesStore } from "./takes.js";
@@ -306,7 +312,8 @@ export class DynamoRepo
     RelatedSource,
     TimelineStore,
     TakesStore,
-    SourceStore
+    SourceStore,
+    FollowStore
 {
   private readonly ddb: DynamoDBDocumentClient;
   private readonly s3: S3Client;
@@ -1376,6 +1383,66 @@ export class DynamoRepo
     await this.ddb.send(
       new PutCommand({ TableName: this.table, Item: { ...timelineKey(eventId), ...timeline } }),
     );
+  }
+
+  // ---------- follow a story (#22) ----------
+
+  /** Every followed story: one partition, read consistently, so a follow lists at once. */
+  async listFollows(): Promise<StoredFollow[]> {
+    const items = await this.queryAll({
+      KeyConditionExpression: "pk = :p",
+      ExpressionAttributeValues: { ":p": FOLLOWING_PK },
+      ConsistentRead: true,
+    });
+    return items.map((f) => ({
+      eventId: f.eventId as string,
+      issueId: f.issueId as string,
+      n: f.n as number,
+      headline: f.headline as string,
+      publication: f.publication as string,
+      followedAt: f.followedAt as string,
+      ...(typeof f.movedAt === "string" ? { movedAt: f.movedAt } : {}),
+      seenAt: f.seenAt as string,
+      points: f.points as FollowPoint[],
+      checked: (f.checked as string[] | undefined) ?? [],
+    }));
+  }
+
+  async addFollow(follow: StoredFollow): Promise<boolean> {
+    try {
+      await this.ddb.send(
+        new PutCommand({
+          TableName: this.table,
+          Item: { ...followKey(follow.eventId), ...follow },
+          ConditionExpression: "attribute_not_exists(pk)",
+        }),
+      );
+      return true;
+    } catch (err) {
+      if (isConditionFailure(err)) return false;
+      throw err;
+    }
+  }
+
+  async deleteFollow(eventId: string): Promise<void> {
+    await this.ddb.send(new DeleteCommand({ TableName: this.table, Key: followKey(eventId) }));
+  }
+
+  async seeFollow(eventId: string, at: string): Promise<void> {
+    try {
+      await this.ddb.send(
+        new UpdateCommand({
+          TableName: this.table,
+          Key: followKey(eventId),
+          UpdateExpression: "SET seenAt = :at",
+          ConditionExpression: "attribute_exists(pk)",
+          ExpressionAttributeValues: { ":at": at },
+        }),
+      );
+    } catch (err) {
+      // Unfollowed in the meantime: nothing to mark.
+      if (!isConditionFailure(err)) throw err;
+    }
   }
 
   // ---------- search (#53) and related stories (#20) ----------
