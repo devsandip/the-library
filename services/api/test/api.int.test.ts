@@ -25,6 +25,7 @@ import {
   vectorBytes,
 } from "@library/core";
 import type {
+  AskResponse,
   LearningListResponse,
   HistoryResponse,
   IssueDetailResponse,
@@ -1185,6 +1186,74 @@ describe("API on dev", () => {
             Key: storyKey(id as string, n as number),
           }),
         ),
+      ),
+    );
+  });
+
+  it("ask: answers from the newsletters, citing the story, or says there is nothing (#21)", async () => {
+    // Two stories in the TLDR fixture, embedded by Titan the way ingest embeds them.
+    const titan = new TitanEmbedder();
+    const tldr = (await getItem("fx-tldr"))!;
+    const put = async (n: number, headline: string, summary: string, names: string[]) => {
+      const vector = await titan.embed([headline, summary, names.join(", ")].join("\n\n"));
+      await ddb.send(
+        new PutCommand({
+          TableName: stack.tableName,
+          Item: {
+            ...storyKey("fx-tldr", n),
+            id: "fx-tldr",
+            n,
+            senderId: tldr.senderId,
+            receivedAt: tldr.receivedAt,
+            headline,
+            summary,
+            names,
+            vector: vectorBytes(vector),
+            dims: vector.length,
+            gsi1pk: "STORIES",
+            gsi1sk: `${tldr.receivedAt as string}#${storyRef("fx-tldr", n)}`,
+          },
+        }),
+      );
+    };
+    await put(
+      31,
+      "OpenAI ships agents that book travel",
+      "The new agents plan a trip, compare fares and book flights and hotels on their own.",
+      ["OpenAI"],
+    );
+    await put(
+      32,
+      "Anthropic publishes interpretability research",
+      "A paper traces how a model represents concepts inside its layers.",
+      ["Anthropic"],
+    );
+
+    const found = await call<AskResponse>("POST", "/ask", {
+      body: { q: "What have my newsletters said about AI agents that book travel?" },
+    });
+    expect(found.status).toBe(200);
+    expect(found.body.paragraphs.length).toBeGreaterThan(0);
+    expect(found.body.paragraphs.flatMap((p) => p.sources)).toContainEqual(
+      expect.objectContaining({
+        issueId: "fx-tldr",
+        story: { n: 31, headline: "OpenAI ships agents that book travel" },
+      }),
+    );
+    expect(found.body.searches.length).toBeGreaterThan(0);
+    expect(found.body.cents).toBeGreaterThan(0);
+
+    const nothing = await call<AskResponse>("POST", "/ask", {
+      body: { q: "What do my newsletters say about knitting patterns for winter scarves?" },
+    });
+    expect(nothing.status).toBe(200);
+    expect(nothing.body.paragraphs).toEqual([]);
+    expect(nothing.body.none).toMatch(/\S/);
+    expect((await call("POST", "/ask", { body: { q: "x" } })).status).toBe(400);
+
+    await Promise.all(
+      [31, 32].map((n) =>
+        ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: storyKey("fx-tldr", n) })),
       ),
     );
   });

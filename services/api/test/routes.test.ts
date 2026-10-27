@@ -96,6 +96,16 @@ function setup(overrides: Partial<RepoPort> = {}) {
       get: vi.fn(async () => ({})),
       run: vi.fn(async () => ({ none: "Nothing close." })),
     },
+    ask: {
+      ask: vi.fn(async (q: string) => ({
+        q,
+        paragraphs: [{ text: "An answer.", sources: [{ issueId: "abc123", publication: "X" }] }],
+        searches: ["agent evals"],
+        stories: 4,
+        ms: 900,
+        cents: 0.4,
+      })),
+    },
     startIngest: vi.fn(async () => undefined),
   };
   const handler = createHandler(svc);
@@ -286,6 +296,18 @@ describe("routing and validation", () => {
     expect(
       (await call("PATCH", "/issues/abc123/stories/0", { body: { state: "read" } })).status,
     ).toBe(404);
+  });
+
+  it("asks a question, trimmed, and turns away one too short or too long (#21)", async () => {
+    const { svc, call } = setup();
+    const res = await call("POST", "/ask", { body: { q: "  agent   evals this month? " } });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ q: "agent evals this month?", stories: 4 });
+    expect(svc.ask.ask).toHaveBeenCalledWith("agent evals this month?");
+    for (const body of [{}, { q: "hi" }, { q: "x".repeat(301) }, { q: 42 }]) {
+      expect((await call("POST", "/ask", { body })).status).toBe(400);
+    }
+    expect((await call("GET", "/ask")).status).toBe(405);
   });
 
   it("serves an issue's stories", async () => {

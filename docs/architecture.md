@@ -211,6 +211,7 @@ HTTP API, one route `ANY /nutgraf/api/{proxy+}` behind the Cognito JWT authorize
 | GET | `/nutgraf/api/issues/{id}/stories/{n}/timeline` | How this evolved (#19, section 11): `{ timeline? }`, the timeline kept for the story's event, if one was written. 404 for a story the issue does not have. |
 | POST | `/nutgraf/api/issues/{id}/stories/{n}/timeline` | Writes the story's timeline now, keeps it for the event (replacing any earlier one) and answers like the GET; with nothing close enough to tell, `{ none }` says why and nothing is kept. One Claude call of 4 to 9 seconds, about half a cent; the web calls it only when Sandip asks. |
 | GET | `/nutgraf/api/search?q=&sort=best\|newest` | Search (#53, section 11): the issues that hold the query's words, then those only close in meaning, each group best match first or newest first, up to 50. Each hit carries `match` (`words`, `meaning` or `both`) and, inside a digest, the matching `story`'s headline; the response carries the query's `terms` as matched, for highlighting, and `byMeaning: false` when Titan was unavailable (words alone). Filtered mail, promos and muted newsletters are left out; archived issues are in. 400 for an empty `q` or one over 200 characters. |
+| POST | `/nutgraf/api/ask` | `{ "q" }`, 3 to 300 characters (#21, section 11): an answer from the newsletters, `{ q, paragraphs, none?, searches, stories, ms, cents }`. Each paragraph carries its `sources` (issue, newsletter, and the story inside a digest); `none` says why there is no answer. Nothing is kept. |
 | GET | `/nutgraf/api/senders` | All senders with counts, mute state, unsubscribe link. |
 | GET | `/nutgraf/api/senders/{senderId}` | Sender + its issues. |
 | PATCH | `/nutgraf/api/senders/{senderId}` | `{ "muted"?, "mustRead"?, "shelf"?: "news" \| "learning" \| null }`, at least one. Setting `shelf` moves the sender's stories there (except ones Sandip moved) and their issues follow; `null` hands each story back to Jev's call (#81). An issue with no stories takes the setting itself. |
@@ -341,6 +342,15 @@ What the newsletters said, across every listed issue (unread, read, saved, archi
 - **One list.** The issues that hold the words come first, ordered by reciprocal rank fusion with the meaning list (1 / (60 + rank) from each list an issue is in), then the issues only close in meaning, closest first. Fused together, a story just over the meaning cutoff ranked beside exact matches ("Size Limit measures bundle size" came second for "rate limiting"). Newest first reorders each group by date.
 - **Reading.** The corpus (`services/api/src/corpus.ts`, shared with related stories: every listed issue's words; every story's text and embedding, about 5 MB for 2,242 stories) is read once and kept in the warm Lambda for 5 minutes, so a query typed a few letters at a time reads DynamoDB once; stories are read a week at a time, eight weeks at once, rather than one 1 MB page after another. Dev reads it every time, since integration tests rewrite it between searches. The rows shown (state, rating, saved) are read fresh for the hits, and one Claude has since found to be a promo is dropped. Ranking takes under 15 ms. When a full read gets slow, the next step is an S3 Vectors index written by the ingest run beside the story items (`docs/features/story-index.md`).
 - **For Ask the Library (#21):** `searchIssues` and the API's `Search` are the archive searches its agent will call.
+
+### Ask the Library (`services/api/src/ask.ts`, issue #21)
+
+A question answered from the newsletters; decisions in `docs/features/ask.md`.
+
+- **Plan:** one forced tool call to Haiku (`plan_searches`) gives one to three searches, each a few words and, when the question names a time, days. Checked: real days no later than today; the question itself when nothing is usable.
+- **Search:** each runs over the corpus (section 11, search) story by story, by words and by meaning (`searchIssues` with documents and embeddings keyed `<issueId>#<n>`), muted newsletters and promos left out, within its days. The searches share 30 stories, taken in turn. When a search's days rule out every match, the answer says when the latest arrived.
+- **Answer:** a second call (`answer`) reads them oldest first and answers in one to five paragraphs citing story ids, or gives `none`. Ids are checked; a paragraph's sources are its stories' issues, with the story inside a digest. No stories found means no second call.
+- **Time and cost:** two Haiku calls and up to three Titan embeddings: 3 to 17 seconds and 0.1 to 0.8 cents on prod's archive (2026-10-27), inside the API Lambda's 28. Nothing is stored; the log has counts only.
 
 ### Story index (`services/ingest/src/stories.ts`, `packages/core/src/stories.ts`, issue #15)
 

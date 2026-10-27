@@ -1,4 +1,5 @@
 import type {
+  AskResponse,
   HistoryResponse,
   IssueDetailResponse,
   IssueListItem,
@@ -90,11 +91,17 @@ export interface TimelinePort {
   run(id: string, n: number): Promise<TimelineResponse>;
 }
 
+/** A question answered from the newsletters (#21). */
+export interface AskPort {
+  ask(q: string): Promise<AskResponse>;
+}
+
 export interface Services {
   repo: RepoPort;
   search: SearchPort;
   related: RelatedPort;
   timelines: TimelinePort;
+  ask: AskPort;
   /** Fire-and-forget ingest run ("refresh now"). */
   startIngest(): Promise<void>;
 }
