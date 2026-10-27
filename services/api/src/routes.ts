@@ -212,6 +212,33 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     handler: async (svc, _req, p) => ok(await svc.sources.run(param(p, 0), Number(param(p, 1)))),
   },
   {
+    method: "POST",
+    pattern: new RegExp(`^/issues/${ISSUE_ID}/stories/${STORY_N}/follow$`),
+    handler: async (svc, _req, p) =>
+      ok(await svc.following.follow(param(p, 0), Number(param(p, 1)))),
+  },
+  {
+    method: "DELETE",
+    pattern: new RegExp(`^/issues/${ISSUE_ID}/stories/${STORY_N}/follow$`),
+    handler: async (svc, _req, p) => {
+      await svc.following.unfollow(param(p, 0), Number(param(p, 1)));
+      return { status: 204 };
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/following$/,
+    handler: async (svc) => ok(await svc.following.list()),
+  },
+  {
+    method: "POST",
+    pattern: /^\/following\/seen$/,
+    handler: async (svc) => {
+      await svc.following.seen();
+      return { status: 204 };
+    },
+  },
+  {
     method: "GET",
     pattern: /^\/search$/,
     handler: async (svc, req) => {

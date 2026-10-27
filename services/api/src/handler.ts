@@ -2,6 +2,7 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 }
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { Asks } from "./ask.js";
 import { HttpError } from "./errors.js";
+import { Following } from "./following.js";
 import type { Services } from "./port.js";
 import { BedrockClaude } from "./claude.js";
 import { TitanEmbedder } from "./embed.js";
@@ -107,6 +108,7 @@ export const handler = createHandler({
   takes: new Takes(repo, corpus, claude),
   sources: new Sources(repo, claude),
   ask: new Asks(repo, corpus, new TitanEmbedder(), claude),
+  following: new Following(repo),
   startIngest: async () => {
     await lambda.send(
       new InvokeCommand({

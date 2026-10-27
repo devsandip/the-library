@@ -316,6 +316,43 @@ export interface TimelineResponse {
   none?: string;
 }
 
+/** A step of a followed story (#22): one it was followed with, or a move added since. */
+export interface FollowPoint extends TimelinePoint {
+  /** When the check after an ingest added it; absent for the points it was followed with. */
+  added?: string;
+}
+
+/**
+ * A followed story (#22): its event's dated points, from its kept timeline or the story itself,
+ * then each real move the check after an ingest found in the newsletters.
+ */
+export interface Follow {
+  eventId: string;
+  /** The story followed, which Following opens. */
+  issueId: string;
+  n: number;
+  headline: string;
+  publication: string;
+  followedAt: string;
+  /** When the newest move came: its story's date. Absent before the first move. */
+  movedAt?: string;
+  /** Oldest first. */
+  points: FollowPoint[];
+  /** Points added since Sandip last looked at Following. */
+  unseen: number;
+  /** No movement for 30 days: listed apart and no longer checked. */
+  quiet: boolean;
+  /** Every story its points draw on, and the story followed ("<issueId>#<nn>"). */
+  stories: string[];
+}
+
+/** GET /following: followed stories, moving ones first, latest movement first. */
+export interface FollowingResponse {
+  items: Follow[];
+  /** New points across them all. */
+  unseen: number;
+}
+
 /** Search's order (#53): best match first, or newest first. */
 export type SearchSort = "best" | "newest";
 
