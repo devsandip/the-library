@@ -371,3 +371,63 @@ Append-only session log. Newest entry at the bottom.
 - The stored rating stays `1` or `-1`, so past ratings keep training the ranking. Only `DigestStats` changed fields, to `useful` and `notUseful`.
 - A thumb changes only the rating. Swipes only move. Later saves the issue and moves on.
 - Story shelves use the field `shelf`, as issues do, rather than #81's `kind`. Each environment has its own Jev key, and dev has none.
+
+## 2026-10-27 — Tidy git on main, open PR 92 for AGENTS.md, and CI billing blocker
+
+**Did:**
+- Reconciled local `main` with `origin/main` after discovering `b64c678` was committed locally without a branch or pull request.
+- Created branch `agents-md`, cherry-picked `b64c678`, pushed to origin, and opened PR 92 ("Make AGENTS.md the canonical agent instructions").
+- Added PR 92 to the Nutgraf project board as "In review", "Ops" via `pnpm track`.
+- Ran local validation (typecheck passed, Prettier passed on AGENTS.md/CLAUDE.md, 2,220 unit tests passed). Discovered GitHub Actions failed immediately on account billing / spending limit.
+
+**State now:**
+- Local `main` is clean and tracks `origin/main`.
+- PR 92 is open and waiting for review and CI.
+- GitHub Actions CI is currently blocked across the repo due to GitHub account spending limit / failed payment.
+- Six stale worktrees under `.claude/worktrees/` are causing root Vitest / ESLint to report errors due to missing dependencies in worktree paths.
+
+**Next:**
+- Update GitHub account billing/spending limit under GitHub Settings -> Billing & plans to unblock Actions runs.
+- Re-run CI on PR 92, squash-merge, and run `pnpm sync-main`.
+- Clean up old worktrees in `.claude/worktrees/` once branches are verified merged/pushed.
+
+**Decisions:**
+- Isolated `b64c678` into branch `agents-md` rather than pushing directly to `main`, maintaining the invariant that every change goes through a branch, PR, and CI.
+
+## 2026-10-27: Learning lists stories, Ask Nutgraf and Takes, built overnight (#92 to #113)
+
+Sandip asked me to build milestone by milestone through the night and make the calls myself.
+
+**Did:**
+
+- CI was blocked: GitHub would not start Actions jobs on the private repository ("recent account payments have failed or your spending limit needs to be increased"). After an audit (gitleaks over every commit and every pull request head found no secrets; the personal details are Sandip's email, the AWS account id in old Actions logs, and his reading list), Sandip made the repository public, which gives free Actions minutes. Then #93 shipped (`font-src` without `https:`, #83; none of the 150 newest issues used a web font) and #92 (AGENTS.md).
+- A rule in `~/AGENTS.md`, for every project: build one GitHub milestone at a time, one issue per pull request, each with a done-when line.
+- Milestone 1, [Learning lists stories (#81)](https://github.com/devsandip/the-library/milestone/1), closed: #94 (PR 99) stories carry the effective shelf and an issue's shelf follows its stories, with `pnpm shelves --derive` run on prod (560 issues, 428 unread Learning stories); #95 (PR 100) the API; #96 (PR 101) Learning lists stories on both devices; #97 (PR 102) the day in brief reads story shelves and Claude is no longer asked for a shelf. PR 105 and PR 111 fixed two integration tests that read GSIs before they caught up; each had stopped a Deploy in dev, and prod waited until the fix.
+- Milestone 2, [Ask the Library (#21)](https://github.com/devsandip/the-library/milestone/2), archive only, closed: #103 (PR 106) `POST /ask`; #104 (PR 107) Ask Nutgraf on both devices (Library, Search for a question, ⌘K).
+- Milestone 3, [Takes from your newsletters (#17, first layer)](https://github.com/devsandip/the-library/milestone/3): #108 (PR 110) the API; #109 (PR 112) the Takes tab, with Timeline and Takes now sharing one deep-dive store and panel.
+- #98 (PR 113): a forced re-split keeps Sandip's story moves and read state.
+
+**State now:**
+
+- Prod runs d67f0f3 (#113, PR 113's Deploy), which carries #112. Three Deploys failed in dev tonight and none reached prod: the two GSI flakes above, both fixed, and PR 112's, where Bedrock answered "ServiceUnavailableException" to two Claude calls; the next Deploy passed.
+- On prod, read-only through the API Lambda: Learning lists 428 unread stories; Ask answered in 11.6 s warm for 0.8¢ (30 stories, 5 paragraphs, 16 sources); Takes on an event six issues carried gave 4 newsletters in 2 groups in 8.3 s for 0.3¢.
+- None of tonight's screens has been used on a real phone or Mac signed in; each was checked in mock mode on the phone (390 px) and the Mac, light and dark.
+- The day in brief now draws News stories only; the next scheduled version is the first to show it.
+- Haiku 5.5 is still not available on the account (#85, checked tonight).
+- The main checkout has the entry above uncommitted in its `WORKLOG.md`; this pull request carries it, so the local copy can go (`git -C ~/Developer/the-library checkout WORKLOG.md`) before `pnpm sync-main`.
+
+**Next:**
+
+- Sandip tries Learning (Browse's Learning on the phone, 2 on the Mac): read a craft story from inside a TLDR digest and check the digest stays unread in News. Then Ask Nutgraf with a real question, and the Takes tab on a story several newsletters carried. File what is off as issues.
+- Read tomorrow's day in brief for Learning stories that should not be there.
+- The next milestone, my pick: #23 (check a story's claim against its source), which needs only public page fetches with size and time limits. The web layers of #16 and #17 need a search provider account, which is Sandip's call.
+
+**Decisions:**
+
+- The repository went public to get Actions minutes back, after the audit; Sandip agreed.
+- #81's three questions, settled by the proposals on Sandip's word to use judgement: reading a Learning story marks the story, not its issue; Learning stories do not expire; Archive and the shelf move act on the story and thumbs rate the issue; no Save on stories, since unread Learning stays anyway.
+- A visit that starts on a story never marks its issue read, so one craft essay does not mark a whole digest read.
+- A newsletter's "always" setting is stamped on its stories, not applied where they are read, because listing and counting Learning needs the shelf in an index.
+- Ask is two calls (plan the searches, then answer), not an agent loop, to stay inside the API's 28 seconds with no job; nothing is kept and the log has counts only.
+- Takes answers in the request like the timeline: the event's stories, then stories within three days that read alike, one per newsletter.
+- Every pull request tonight was merged by me on Sandip's standing word for the night.

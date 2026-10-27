@@ -1,13 +1,13 @@
 # Nutgraf: Journal
 
-Last refreshed: 2026-10-19 11:35
-Latest entry: [2026-10-19-1135-thumbs-instead-of-relevant.md](entries/2026-10-19-1135-thumbs-instead-of-relevant.md)
+Last refreshed: 2026-10-27 22:30
+Latest entry: [2026-10-27-2230-learning-ask-and-takes.md](entries/2026-10-27-2230-learning-ask-and-takes.md)
 
 A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Called The Library until 2026-10-12. Live at https://sandip.dev/nutgraf/.
 
 ## Where we are now
 
-The reader is live on both devices and does what the brief asked of Phase 1: ingest every two hours, clean reading, and a thumbs up or down for whether an issue was useful. Claude sorts every issue into News or Learning and a topic; rules archive promos and week-old news, and since 2026-10-11 keep account mail, like sign-in codes, out of the list.
+The reader is live on both devices and does what the brief asked of Phase 1: ingest every two hours, clean reading, and a thumbs up or down for whether an issue was useful. Claude gives every issue a line and a topic, and Jev sorts every story into News or Learning; rules archive promos and week-old news, and since 2026-10-11 keep account mail, like sign-in codes, out of the list.
 
 Ranking runs when Today opens, and Today leads with the day in brief, written from the stories every issue is split into. Since 2026-10-11 search finds any issue or story in the archive, by its words or by what it means, and under every newsletter Related lists the closest stories from before and since; a digest lists them for each of its stories. Spend is about $5.50 a month, mostly Claude.
 
@@ -19,10 +19,13 @@ Since 2026-10-11 both devices have one look, from a Claude Design redesign brief
 
 Since 2026-10-12 the app is Nutgraf, at sandip.dev/nutgraf, and every /thelibrary link redirects there. A second handoff gave it Apple's type and colour (SF Pro, true black, no blue, yellow the one highlight) and a logo: a folded page over an n. A tap on a row's title opens the issue. The repository and the AWS resources keep the old name. None of the redesign has been tried on a real iPhone yet.
 
+Since 2026-10-27 Learning lists stories, not issues: Jev calls each story craft or news, so a how-to inside a TLDR digest shows up in Learning while the digest stays in News, and reading it leaves the digest unread. An issue is Learning only when all its stories are, and the day in brief takes News stories by their own shelf. Ask Nutgraf answers a question from the archive with a link to every story it used, and a story's Takes tab shows how each of my newsletters covered the same news, beside its Timeline (#19, since 2026-10-23). All three were built overnight on 2026-10-27 and checked through the API on prod, not yet by me on a device. The repository is public since then, to keep GitHub Actions free, and work runs one GitHub milestone at a time.
+
 Since 2026-10-19 the thumbs ask one thing: was it useful? Relevant and Irrelevant are gone. Ratings had stalled at 12 in ten days, none for six, and a swipe both rated a card and cleared it. Now a swipe on Today only moves to the next card or back, and a thumb changes nothing but the rating. Work is tracked on the GitHub project Nutgraf (#86). Jev, TypeSafe's decision model, is to sort each story into News or Learning (#81): its scoring script shipped (#87) and the step after ingest waits to merge (#88).
 
 ## Recent entries
 
+- [2026-10-27 22:30: Learning lists stories, Ask, and Takes](entries/2026-10-27-2230-learning-ask-and-takes.md)
 - [2026-10-19 11:35: Thumbs instead of Relevant](entries/2026-10-19-1135-thumbs-instead-of-relevant.md)
 - [2026-10-12 09:51: Nutgraf](entries/2026-10-12-0951-nutgraf.md)
 - [2026-10-11 14:44: Today, Browse and the console](entries/2026-10-11-1444-today-browse-and-the-console.md)
@@ -42,7 +45,8 @@ Since 2026-10-19 the thumbs ask one thing: was it useful? Relevant and Irrelevan
 
 - Thumbs plus my five interests are enough to put things I find useful in the top 5 at least 3 times in 5 after two weeks (`docs/prd.md`; measured since 2026-10-10, as Relevant until 2026-10-19).
 - A thumb that only judges, apart from the swipe that moves on, gets used where Relevant did not (2026-10-19).
-- The story, not the issue, is the right unit for following news across newsletters (#15).
+- The story, not the issue, is the right unit for following news across newsletters (#15), and for what to keep: Learning lists stories since 2026-10-27 (#81).
+- My own archive is enough to answer most questions about the last two months, without the web (#21, 2026-10-27).
 - Haiku is good enough for sorting, story splitting and the brief at about a cent an issue (`docs/architecture.md`, sections 11 and 12).
 - Brute-force similarity is enough at this volume for years; a vector index waits until a feature needs to search everything at once (`docs/features/story-index.md`).
 - Search can read every story's vector into the API's memory for a while: about 5 MB now, growing about 55 MB a year (`docs/features/search.md`).
@@ -51,8 +55,9 @@ Since 2026-10-19 the thumbs ask one thing: was it useful? Relevant and Irrelevan
 
 - Will ranking hit the 60% aim once thumbs are used? On 2026-10-19 the five stood at 6 of 29 useful, 23 not rated (#5).
 - How do the day in brief's threads and cost hold up on a weekday, with about 90 news stories?
-- Will Claude be able to merge its own pull requests, as I asked, or does auto mode keep treating it as self-approval?
-- Jev sorts story shelves (#81). Is it the model for the other bounded calls too (#27)?
+- Jev sorts story shelves (#81, live since 2026-10-23, listing since 2026-10-27). Is it the model for the other bounded calls too (#27)?
+- Will I work through Learning's unread stories (428 on 2026-10-27, none expiring), or will it become a backlog to archive?
+- Which search provider, if any, for the web halves of Ask, Backstory and Takes (#16, #17)?
 - What to do about `robots.txt` on `sandip.dev` (#7)?
 - When does the AWS account get Haiku 5.5?
 
