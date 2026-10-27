@@ -431,3 +431,34 @@ Sandip asked me to build milestone by milestone through the night and make the c
 - Ask is two calls (plan the searches, then answer), not an agent loop, to stay inside the API's 28 seconds with no job; nothing is kept and the log has counts only.
 - Takes answers in the request like the timeline: the event's stories, then stories within three days that read alike, one per newsletter.
 - Every pull request tonight was merged by me on Sandip's standing word for the night.
+
+## 2026-10-27: Check the source and Follow a story, built overnight (#115 to #125)
+
+Sandip's standing word for the night held: build milestone by milestone and make the calls.
+
+**Did:**
+
+- Milestone 4, [Check the source (#23)](https://github.com/devsandip/the-library/milestone/4), closed: #115 (PR 117) the API reads the story's link safely and checks its claims, quotes confirmed on the page; #116 (PR 118) the Source tab on the phone and C on the Mac. #23 stays open in Backlog for the agent part: following links from a news page to the primary source.
+- PR 119: the API's Bedrock clients get a third attempt, after Bedrock refused two calls during PR 112's Deploy.
+- Milestone 5, [Follow a story (#22)](https://github.com/devsandip/the-library/milestone/5), closed: #120 (PR 123) follow, list and unfollow, a follow being the story's event; #121 (PR 124) the check after each ingest, which adds a followed story's real moves; #122 (PR 125) Follow on the story sheet and F on the Mac, and Following in Library and ⌘K. #22 waits on #16 for its daily web check.
+- Probed the check on prod, read-only (`scratch/follow-probe.ts`): five stories followed as of 20 October, a week replayed. Asked only for moves, Haiku took a company's other news and a recap for moves; naming each follow's matter and giving every candidate a kind fixed both (`docs/features/follow.md`).
+
+**State now:**
+
+- Prod runs 5770781 (PR 125's Deploy); every Deploy tonight since PR 113 passed dev and prod.
+- `GET /following` answers on prod with no followed stories. The check after each ingest has run only in tests and the probe; the first scheduled run with a follow will be its first real one (its log line is `follows done`).
+- Source, Follow and Following were checked in mock mode on the phone (375 px, light and dark) and the Mac; none of tonight's screens has been used signed in on a device.
+- The main checkout still has the other session's `WORKLOG.md` edit, now on main word for word, so `git -C ~/Developer/the-library checkout WORKLOG.md` clears the way for `pnpm sync-main`.
+
+**Next:**
+
+- Sandip follows two or three live stories on the phone (story sheet, Follow), then reads Library › Following after the next day's ingests: does a new step say something new, and did anything that should be there not arrive? File misses as issues against #22.
+- Try Check source on a few stories with links, and Learning, Ask and Takes from the first night.
+- The next milestone, my pick: #23's agent part (follow links from a news page to its primary source, up to five pages), which needs no new account. The web layers of #16, #17 and #22 wait for a search provider, Sandip's call.
+
+**Decisions:**
+
+- A follow is the story's event (#15), starting from its kept timeline or the story itself, with no Claude call; at most 20.
+- Moves come only from the check after each ingest, over the last three days so a late split still counts; every candidate is remembered so nothing is asked twice; one call for all follows, none without candidates.
+- The check names each follow's matter and gives every candidate a kind before wording moves; only stories called moves count.
+- Unfollow is by story, not event id, so no `#` travels in a path; the web learns which stories are followed from the list, not a request per story.
