@@ -4,7 +4,7 @@ import { EMBED_DIMENSIONS, EMBED_MODEL } from "@library/core";
 import type { Embedder } from "./search.js";
 
 export class TitanEmbedder implements Embedder {
-  constructor(private readonly client = new BedrockRuntimeClient({ maxAttempts: 2 })) {}
+  constructor(private readonly client = new BedrockRuntimeClient({ maxAttempts: 3 })) {}
 
   async embed(text: string): Promise<Float32Array> {
     const res = await this.client.send(
