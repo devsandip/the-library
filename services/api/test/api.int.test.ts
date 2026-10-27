@@ -20,12 +20,14 @@ import {
   storyIndexAttributes,
   storyKey,
   storyRef,
+  takesKey,
   timelineKey,
   TOPICS_KEY,
   vectorBytes,
 } from "@library/core";
 import type {
   AskResponse,
+  TakesResponse,
   LearningListResponse,
   HistoryResponse,
   IssueDetailResponse,
@@ -1256,5 +1258,85 @@ describe("API on dev", () => {
         ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: storyKey("fx-tldr", n) })),
       ),
     );
+  });
+
+  it("takes: how two newsletters covered one event, kept for it; one newsletter is none (#17)", async () => {
+    const titan = new TitanEmbedder();
+    const put = async (
+      id: string,
+      n: number,
+      headline: string,
+      summary: string,
+      eventId: string,
+    ) => {
+      const issue = (await getItem(id))!;
+      const names = ["Anthropic"];
+      const vector = await titan.embed([headline, summary, names.join(", ")].join("\n\n"));
+      await ddb.send(
+        new PutCommand({
+          TableName: stack.tableName,
+          Item: {
+            ...storyKey(id, n),
+            id,
+            n,
+            senderId: issue.senderId,
+            receivedAt: issue.receivedAt,
+            headline,
+            summary,
+            names,
+            eventId,
+            vector: vectorBytes(vector),
+            dims: vector.length,
+            gsi1pk: "STORIES",
+            gsi1sk: `${issue.receivedAt as string}#${storyRef(id, n)}`,
+          },
+        }),
+      );
+    };
+    await put(
+      "fx-tldr",
+      41,
+      "Anthropic files for an IPO",
+      "The filing shows revenue tripled in a year, and the company plans to list next spring.",
+      "int-ipo",
+    );
+    await put(
+      "fx-platformer",
+      41,
+      "Anthropic's IPO raises safety questions",
+      "Going public could pressure Anthropic to ship faster than its safety research allows.",
+      "int-ipo",
+    );
+    await put(
+      "fx-lenny",
+      41,
+      "How to run discovery interviews",
+      "A step-by-step guide to customer interviews that find real problems.",
+      "int-lenny",
+    );
+
+    const before = await call<TakesResponse>("GET", "/issues/fx-tldr/stories/41/takes");
+    expect(before.body).toEqual({});
+    const ran = await call<TakesResponse>("POST", "/issues/fx-tldr/stories/41/takes");
+    expect(ran.status).toBe(200);
+    const takes = ran.body.takes!;
+    expect(takes.newsletters).toBe(2);
+    const all = takes.groups.flatMap((g) => g.takes);
+    expect(all.map((t) => t.source.issueId).sort()).toEqual(["fx-platformer", "fx-tldr"]);
+    expect(all.find((t) => t.current)?.source.issueId).toBe("fx-tldr");
+    // Kept for the event: Platformer's story of it opens the same takes.
+    const other = await call<TakesResponse>("GET", "/issues/fx-platformer/stories/41/takes");
+    expect(other.body.takes?.gist).toBe(takes.gist);
+
+    const alone = await call<TakesResponse>("POST", "/issues/fx-lenny/stories/41/takes");
+    expect(alone.body.none).toMatch(/^Only .+ carried this in your newsletters\.$/);
+    expect((await call("GET", "/issues/fx-lenny/stories/99/takes")).status).toBe(404);
+
+    await Promise.all([
+      ...["fx-tldr", "fx-platformer", "fx-lenny"].map((id) =>
+        ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: storyKey(id, 41) })),
+      ),
+      ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: takesKey("int-ipo") })),
+    ]);
   });
 });

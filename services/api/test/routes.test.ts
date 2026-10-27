@@ -96,6 +96,10 @@ function setup(overrides: Partial<RepoPort> = {}) {
       get: vi.fn(async () => ({})),
       run: vi.fn(async () => ({ none: "Nothing close." })),
     },
+    takes: {
+      get: vi.fn(async () => ({})),
+      run: vi.fn(async () => ({ none: "Only ByteByteGo carried this in your newsletters." })),
+    },
     ask: {
       ask: vi.fn(async (q: string) => ({
         q,
@@ -252,6 +256,21 @@ describe("routing and validation", () => {
       expect((await call("GET", `/issues/abc123/stories/${n}/timeline`)).status).toBe(404);
     }
     expect((await call("DELETE", "/issues/abc123/stories/2/timeline")).status).toBe(405);
+  });
+
+  it("reads a story's kept takes, and writes them only on POST (#17)", async () => {
+    const { call, svc } = setup();
+    expect(await call("GET", "/issues/abc123/stories/2/takes")).toMatchObject({
+      status: 200,
+      body: {},
+    });
+    expect(svc.takes.get).toHaveBeenCalledWith("abc123", 2);
+    expect(svc.takes.run).not.toHaveBeenCalled();
+    const ran = await call("POST", "/issues/abc123/stories/3/takes");
+    expect(ran.body).toEqual({ none: "Only ByteByteGo carried this in your newsletters." });
+    expect(svc.takes.run).toHaveBeenCalledWith("abc123", 3);
+    expect((await call("GET", "/issues/abc123/stories/0/takes")).status).toBe(404);
+    expect((await call("PUT", "/issues/abc123/stories/2/takes")).status).toBe(405);
   });
 
   it("lists Learning stories: unread by default, the shared filters, no Saved view (#81)", async () => {

@@ -191,6 +191,17 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
   },
   {
     method: "GET",
+    pattern: new RegExp(`^/issues/${ISSUE_ID}/stories/${STORY_N}/takes$`),
+    handler: async (svc, _req, p) => ok(await svc.takes.get(param(p, 0), Number(param(p, 1)))),
+  },
+  {
+    // Never on its own: only when the reader asks (one Claude call, about a cent).
+    method: "POST",
+    pattern: new RegExp(`^/issues/${ISSUE_ID}/stories/${STORY_N}/takes$`),
+    handler: async (svc, _req, p) => ok(await svc.takes.run(param(p, 0), Number(param(p, 1)))),
+  },
+  {
+    method: "GET",
     pattern: /^\/search$/,
     handler: async (svc, req) => {
       const q = (req.query.q ?? "").trim();

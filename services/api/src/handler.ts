@@ -10,6 +10,7 @@ import { API_PREFIX, route, type Request } from "./routes.js";
 import { CorpusCache } from "./corpus.js";
 import { Related } from "./related.js";
 import { Search } from "./search.js";
+import { Takes } from "./takes.js";
 import { Timelines } from "./timeline.js";
 
 type Event = APIGatewayProxyEventV2WithJWTAuthorizer;
@@ -102,6 +103,7 @@ export const handler = createHandler({
   search: new Search(repo, new TitanEmbedder(), corpus),
   related: new Related(repo, corpus),
   timelines: new Timelines(repo, corpus, claude),
+  takes: new Takes(repo, corpus, claude),
   ask: new Asks(repo, corpus, new TitanEmbedder(), claude),
   startIngest: async () => {
     await lambda.send(

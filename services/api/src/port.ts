@@ -20,6 +20,7 @@ import type {
   StatusResponse,
   StoryPatch,
   SummaryResponse,
+  TakesResponse,
   TimelineResponse,
   Topic,
   UnreadCountsResponse,
@@ -91,6 +92,12 @@ export interface TimelinePort {
   run(id: string, n: number): Promise<TimelineResponse>;
 }
 
+/** How each newsletter covered a story's event (#17): kept takes, or new ones written now. */
+export interface TakesPort {
+  get(id: string, n: number): Promise<TakesResponse>;
+  run(id: string, n: number): Promise<TakesResponse>;
+}
+
 /** A question answered from the newsletters (#21). */
 export interface AskPort {
   ask(q: string): Promise<AskResponse>;
@@ -101,6 +108,7 @@ export interface Services {
   search: SearchPort;
   related: RelatedPort;
   timelines: TimelinePort;
+  takes: TakesPort;
   ask: AskPort;
   /** Fire-and-forget ingest run ("refresh now"). */
   startIngest(): Promise<void>;
