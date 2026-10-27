@@ -10,10 +10,13 @@ import { useReadingPlace } from "./components/now-reading.js";
  * One open issue, on either device. Opening it marks it read and makes it the Continue item
  * (rules 18 and 19); the place is kept as a share of the issue while it scrolls (#44) and put
  * back on the next visit. The actions change it here and tell the list beside it (`onChange`).
+ * A visit that starts on one of its stories (`onStory`: from Learning, #81) reads that story, not
+ * the issue, so the issue keeps its state.
  */
 export function useOpenIssue(
   id: string,
   onChange?: (id: string, change: Partial<IssueListItem>) => void,
+  onStory = false,
 ) {
   const { api } = useApp();
   const { counts, nowReading } = useLibrary();
@@ -34,6 +37,7 @@ export function useOpenIssue(
     opened.current = data.id;
     // The open also points Continue at this issue (#44).
     void api.logOpen(data.id).then(nowReading.reload, () => undefined);
+    if (onStory) return;
     if (data.state === "unread") {
       issue.set({ ...data, state: "read" });
       latest.current?.(data.id, { state: "read" });

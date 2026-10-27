@@ -1565,6 +1565,11 @@ dialog {
   margin-top: 12px;
 }
 
+/* The story's own shelf and Archive (#81), under the source and related buttons. */
+.story-own {
+  margin-top: 6px;
+}
+
 .section-label {
   display: flex;
   justify-content: space-between;
@@ -2559,6 +2564,11 @@ dialog {
 
 .index-note {
   padding-left: 0;
+}
+
+.index-shelf {
+  margin-top: 5px;
+  padding-left: 18px;
 }
 
 .key-grid {

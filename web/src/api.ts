@@ -4,6 +4,8 @@ import type {
   IssueListItem,
   IssueListResponse,
   IssueStoriesResponse,
+  IssueStory,
+  LearningListResponse,
   NowReadingResponse,
   Rating,
   ReaderState,
@@ -16,6 +18,7 @@ import type {
   SenderPatch,
   Shelf,
   StatusResponse,
+  StoryPatch,
   SummaryResponse,
   TimelineResponse,
   TopicListResponse,
@@ -36,9 +39,22 @@ export interface ListIssuesOptions {
   limit?: number;
 }
 
+/** Learning's list (#81): stories, so no Saved view and no shelf. */
+export interface ListLearningOptions {
+  view: Exclude<View, "saved">;
+  topics?: string[];
+  senders?: string[];
+  cursor?: string;
+  limit?: number;
+}
+
 /** What the UI needs from the backend. The HTTP client and the dev mock both implement it. */
 export interface LibraryApi {
   listIssues(opts: ListIssuesOptions): Promise<IssueListResponse>;
+  /** Learning stories (#81), newest issue first, each with its issue as a row. */
+  listLearning(opts: ListLearningOptions): Promise<LearningListResponse>;
+  /** A story's own state, or moving it to the other shelf (#81). */
+  setStory(id: string, n: number, patch: StoryPatch): Promise<IssueStory>;
   getIssue(id: string): Promise<IssueDetailResponse>;
   setState(id: string, state: ReaderState): Promise<IssueListItem>;
   /** Move an issue to the other shelf; Claude never moves it back. */
@@ -131,6 +147,21 @@ export class HttpLibraryApi implements LibraryApi {
     if (opts.cursor) q.set("cursor", opts.cursor);
     if (opts.limit) q.set("limit", String(opts.limit));
     return this.request<IssueListResponse>("GET", `/issues?${q}`);
+  }
+  listLearning(opts: ListLearningOptions) {
+    const q = new URLSearchParams({ view: opts.view });
+    if (opts.topics?.length) q.set("topic", opts.topics.join(","));
+    if (opts.senders?.length) q.set("sender", opts.senders.join(","));
+    if (opts.cursor) q.set("cursor", opts.cursor);
+    if (opts.limit) q.set("limit", String(opts.limit));
+    return this.request<LearningListResponse>("GET", `/learning?${q}`);
+  }
+  setStory(id: string, n: number, patch: StoryPatch) {
+    return this.request<IssueStory>(
+      "PATCH",
+      `/issues/${encodeURIComponent(id)}/stories/${n}`,
+      patch,
+    );
   }
   getIssue(id: string) {
     return this.request<IssueDetailResponse>("GET", `/issues/${encodeURIComponent(id)}`);

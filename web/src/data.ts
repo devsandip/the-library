@@ -1,6 +1,7 @@
 import type {
   IssueListItem,
   IssueStoriesResponse,
+  IssueStory,
   RelatedItem,
   RelatedResponse,
   SenderListItem,
@@ -10,6 +11,7 @@ import type {
 import type { LibraryApi } from "./api.js";
 import { facets, type Facets } from "./counts.js";
 import { useApp } from "./context.js";
+import { useEffect } from "preact/hooks";
 import { useAsync } from "./hooks.js";
 
 /**
@@ -31,15 +33,43 @@ function once<T>(cache: Map<string, Promise<T>>, id: string, load: () => Promise
 }
 
 export const storiesOf = (api: LibraryApi, id: string) => once(stories, id, () => api.stories(id));
+
+type StoryPatch = (id: string, n: number, change: Partial<IssueStory>) => void;
+const storyViews = new Set<StoryPatch>();
+const patched = (r: IssueStoriesResponse, n: number, change: Partial<IssueStory>) => ({
+  stories: r.stories.map((s) => (s.n === n ? { ...s, ...change } : s)),
+});
+
+/**
+ * A story changed here (#81: read, archived, moved): the shared copy and every view showing the
+ * issue's stories follow.
+ */
+export function patchStory(id: string, n: number, change: Partial<IssueStory>) {
+  const p = stories.get(id);
+  if (p)
+    stories.set(
+      id,
+      p.then((r) => patched(r, n, change)),
+    );
+  for (const view of storyViews) view(id, n, change);
+}
 export const relatedOf = (api: LibraryApi, id: string) => once(related, id, () => api.related(id));
 
 export function useStories(id: string | undefined) {
   const { api } = useApp();
-  return useAsync(
+  const list = useAsync(
     () => (id ? storiesOf(api, id) : Promise.resolve({ stories: [] })),
     [id],
     id ? `stories:${id}` : undefined,
   );
+  useEffect(() => {
+    const view: StoryPatch = (sid, n, change) => {
+      if (sid === id) list.set((r) => patched(r, n, change));
+    };
+    storyViews.add(view);
+    return () => void storyViews.delete(view);
+  }, [id]);
+  return list;
 }
 
 export function useRelated(id: string | undefined) {
@@ -69,7 +99,10 @@ export function alsoIn(items: RelatedItem[], self: string): string[] {
   return names;
 }
 
-/** The unread tally for one shelf and its filters; muted senders are left out unless picked. */
+/**
+ * The unread tally for one shelf and its filters; muted senders are left out unless picked.
+ * News counts issues, Learning counts stories (#81).
+ */
 export function tally(
   counts: UnreadCountsResponse | undefined,
   senders: SenderListItem[],
@@ -77,7 +110,8 @@ export function tally(
 ): Facets | undefined {
   if (!counts) return undefined;
   const muted = new Set(senders.filter((s) => s.muted).map((s) => s.senderId));
-  return facets(counts.counts, f, muted);
+  const news = counts.counts.filter((c) => (c.shelf ?? "news") === "news");
+  return facets([...news, ...counts.learning], f, muted);
 }
 
 /** One issue's fields replaced, for lists that follow what a view changes. */

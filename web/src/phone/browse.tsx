@@ -5,6 +5,7 @@ import type { SenderListItem } from "@library/core/types";
 import { useApp } from "../context.js";
 import { tally } from "../data.js";
 import { clock, dateShort } from "../format.js";
+import { useLearningList } from "../learning.js";
 import { useLibrary } from "../library.js";
 import { useIssueList } from "../list.js";
 import { useScrollMemory } from "../nav.js";
@@ -31,6 +32,7 @@ import {
 import { SearchIcon } from "../components/icons.js";
 import { ContinuePill } from "../components/now-reading.js";
 import { Row } from "../components/row.js";
+import { StoryRow } from "../components/story-row.js";
 import { Empty, Failed, LoadMore, PullToRefresh, Sheet, Skeleton } from "../components/ui.js";
 
 type Picking = "show" | "topics" | "senders" | undefined;
@@ -67,8 +69,9 @@ export function Word({
 }
 
 /**
- * Browse (P2): every unread issue, News or Learning, Must Read first with ★. The sentence on top
- * is the filter bar. A tap peeks, a double tap opens (#41).
+ * Browse (P2): every unread issue in News, Must Read first with ★, or every unread Learning story
+ * (#81), newest first. The sentence on top is the filter bar. On an issue a tap peeks and a double
+ * tap opens (#41); a story opens at a tap, in its issue.
  */
 export function Browse({ filters }: { filters: BrowseFilters }) {
   const { api } = useApp();
@@ -85,17 +88,19 @@ export function Browse({ filters }: { filters: BrowseFilters }) {
     lib.topics.status !== "loading" &&
     (!filters.senders.length || lib.senders.status !== "loading");
   const key = browseHref(filters);
-  const list = useIssueList(known ? key : "", (cursor) =>
-    known
-      ? api.listIssues({
-          view: filters.show,
-          shelf: filters.kind,
-          topics: names,
-          senders: ids,
-          cursor,
-        })
-      : new Promise<never>(() => undefined),
+  const learning = filters.kind === "learning";
+  const never = () => new Promise<never>(() => undefined);
+  const issues = useIssueList(known && !learning ? key : "", (cursor) =>
+    known && !learning
+      ? api.listIssues({ view: filters.show, shelf: "news", topics: names, senders: ids, cursor })
+      : never(),
   );
+  const stories = useLearningList(known && learning ? key : "", (cursor) =>
+    known && learning
+      ? api.listLearning({ view: filters.show, topics: names, senders: ids, cursor })
+      : never(),
+  );
+  const list = learning ? stories : issues;
   useScrollMemory(list.status === "ok");
 
   const f = tally(lib.counts.data, senderList, {
@@ -170,22 +175,34 @@ export function Browse({ filters }: { filters: BrowseFilters }) {
           ) : (
             <p class="empty-text">
               {filters.show === "unread"
-                ? `Nothing unread in ${KIND_WORD[filters.kind]}. New issues arrive every two hours.`
+                ? `Nothing unread in ${KIND_WORD[filters.kind]}. New ${learning ? "stories" : "issues"} arrive every two hours.`
                 : "Nothing here."}
             </p>
           )}
         </Empty>
       )}
       <ul class="rows">
-        {list.items.map((i) => (
-          <Row
-            key={i.id}
-            issue={i}
-            href={issueHref(i.id)}
-            onChange={list.patch}
-            dim={list.kept.has(i.id) || stale(i)}
-          />
-        ))}
+        {learning
+          ? stories.items.map((r) => (
+              <StoryRow
+                key={r.id}
+                row={r}
+                href={issueHref(r.issue.id, r.story.n)}
+                dim={
+                  stories.kept.has(r.id) ||
+                  (filters.show === "unread" && r.story.state !== undefined)
+                }
+              />
+            ))
+          : issues.items.map((i) => (
+              <Row
+                key={i.id}
+                issue={i}
+                href={issueHref(i.id)}
+                onChange={issues.patch}
+                dim={issues.kept.has(i.id) || stale(i)}
+              />
+            ))}
       </ul>
       <LoadMore has={list.hasMore} loading={list.loadingMore} onMore={list.loadMore} />
 
