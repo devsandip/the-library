@@ -251,8 +251,8 @@ HTTP API, one route `ANY /nutgraf/api/{proxy+}` behind the Cognito JWT authorize
 - `config.json` (written by CDK at deploy time) supplies API base, Cognito domain, client ID, redirect URIs. A mock API (`VITE_MOCK=1`) lets the UI run with no AWS.
 - **Rendering newsletters:** `<iframe sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" srcdoc=...>`. No `allow-scripts`, so nothing in an email executes; `allow-same-origin` only lets the app measure the content height to size the frame. Injected viewport meta and `img { max-width: 100% }`; a newsletter wider than the column (a 600 px table on a phone) is scaled down with CSS `zoom`, so there is no sideways scroll. Always a white page, never recoloured; dark mode dims it to 94%.
 - **CSP** (srcdoc frames inherit it, so it must allow email images and styles):
-  `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:; connect-src 'self' https://thelibrary-sandip.auth.us-east-1.amazoncognito.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests`
-  (`upgrade-insecure-requests` also fixes `http:` images in old newsletters.)
+  `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' data:; connect-src 'self' https://thelibrary-sandip.auth.us-east-1.amazoncognito.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests`
+  (`upgrade-insecure-requests` also fixes `http:` images in old newsletters. Fonts come only from the app: a newsletter's own web font, in a `@font-face` rule, falls back to its font stack. None of the 150 newest issues had one on 2026-10-27, #83.)
 
 ## 9. Infrastructure
 

@@ -16,14 +16,16 @@ export const PUBLIC_ORIGIN = "https://sandip.dev";
 
 /**
  * srcdoc iframes inherit this policy, so it must allow newsletter images and inline styles.
- * Scripts stay locked to the app's own files. See docs/architecture.md section 8.
+ * Scripts stay locked to the app's own files. Fonts too: the app uses system fonts, and a
+ * newsletter's own web font falls back to its font stack (none of 150 issues had one, #83).
+ * See docs/architecture.md section 8.
  */
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' https: data:",
-  "font-src 'self' https: data:",
+  "font-src 'self' data:",
   `connect-src 'self' ${COGNITO_DOMAIN}`,
   "object-src 'none'",
   "base-uri 'none'",
