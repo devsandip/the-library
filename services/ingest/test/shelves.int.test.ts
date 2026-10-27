@@ -24,6 +24,17 @@ let store: Store;
 const ddb = docClient();
 const since = "2020-01-01T00:00:00.000Z";
 
+/** GSIs are eventually consistent: retry a read until it matches. */
+async function eventually<T>(read: () => Promise<T>, ok: (v: T) => boolean): Promise<T> {
+  let last: T | undefined;
+  for (let i = 0; i < 20; i++) {
+    last = await read();
+    if (ok(last)) return last;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return last as T;
+}
+
 const get = (key: Record<string, string>) =>
   ddb
     .send(new GetCommand({ TableName: stack.tableName, Key: key, ConsistentRead: true }))
@@ -59,6 +70,11 @@ beforeAll(async () => {
 describe("story shelves on dev", () => {
   it("shelves every story once, and keeps a move by Sandip through a forced rerun", async () => {
     const n = FIXTURE_NEWSLETTER_IDS.length;
+    // Shelving reads stories through a GSI, which lags the split's writes: wait for all of them.
+    await eventually(
+      () => store.storyShelves(since),
+      (stories) => stories.length === n && stories.every((s) => s.learning === undefined),
+    );
     const stats = await shelveStories(store, async () => jevSaying(0.8), { sinceIso: since });
     expect(stats).toMatchObject({ checked: n, shelved: n, learning: n, errors: 0 });
 
