@@ -20,6 +20,8 @@ import {
   EMBED_DIMENSIONS,
   embeddingKey,
   eventKey,
+  followKey,
+  FOLLOWING_PK,
   INDEX,
   INGEST_STATE_KEY,
   INTERESTS_KEY,
@@ -41,9 +43,11 @@ import {
   vectorBytes,
   type IngestStats,
   type ProcessedMessage,
+  type StoredFollow,
 } from "@library/core";
 import type {
   EnrichStats,
+  FollowPoint,
   Rating,
   Shelf,
   ShelfSetBy,
@@ -55,6 +59,7 @@ import type {
 } from "@library/core/types";
 import { MODELS } from "./bedrock.js";
 import type { Classification, EnrichCandidate } from "./enrich.js";
+import type { RecentStory } from "./follow.js";
 import { mapLimit } from "./ingest.js";
 import type { SenderFields, SenderPlan, StoredIssue, StoredSender } from "./senders.js";
 import type { StoredNarrative, StoryText } from "./narrative.js";
@@ -1152,6 +1157,159 @@ export class Store {
       start = res.LastEvaluatedKey;
     } while (start);
     return out;
+  }
+
+  // ---------- follow a story (#22) ----------
+
+  /** Every followed story, read consistently. */
+  async follows(): Promise<StoredFollow[]> {
+    const out: StoredFollow[] = [];
+    let start: Record<string, unknown> | undefined;
+    do {
+      const res: QueryCommandOutput = await this.ddb.send(
+        new QueryCommand({
+          TableName: this.table,
+          KeyConditionExpression: "pk = :p",
+          ExpressionAttributeValues: { ":p": FOLLOWING_PK },
+          ConsistentRead: true,
+          ExclusiveStartKey: start,
+        }),
+      );
+      for (const f of res.Items ?? []) {
+        out.push({
+          eventId: f.eventId as string,
+          issueId: f.issueId as string,
+          n: f.n as number,
+          headline: f.headline as string,
+          publication: f.publication as string,
+          followedAt: f.followedAt as string,
+          ...(typeof f.movedAt === "string" ? { movedAt: f.movedAt } : {}),
+          seenAt: f.seenAt as string,
+          points: f.points as FollowPoint[],
+          checked: (f.checked as string[] | undefined) ?? [],
+        });
+      }
+      start = res.LastEvaluatedKey;
+    } while (start);
+    return out;
+  }
+
+  /** Stories received since `fromIso`, oldest first, with what the check reads. */
+  async recentStories(fromIso: string): Promise<RecentStory[]> {
+    const items = await this.queryStories(
+      fromIso,
+      "9999-12-31T23:59:59.999Z",
+      "senderId, headline, summary, vector",
+    );
+    return items.map((i) => {
+      const key = storyRef(i.id as string, i.n as number);
+      return {
+        key,
+        issueId: i.id as string,
+        n: i.n as number,
+        senderId: i.senderId as string,
+        receivedAt: i.receivedAt as string,
+        eventId: (i.eventId as string | undefined) ?? key,
+        headline: i.headline as string,
+        summary: (i.summary as string | undefined) ?? "",
+        names: (i.names as string[] | undefined) ?? [],
+        vector: i.vector instanceof Uint8Array ? toVector(i.vector) : new Float32Array(0),
+      };
+    });
+  }
+
+  /** The embeddings of some stories, by story ref ("<issueId>#<nn>"); missing ones left out. */
+  async storyVectors(refs: string[]): Promise<Map<string, Float32Array>> {
+    const found = new Map<string, Float32Array>();
+    const keys = refs.map((r) => {
+      const at = r.lastIndexOf("#");
+      return storyKey(r.slice(0, at), Number(r.slice(at + 1)));
+    });
+    for (let i = 0; i < keys.length; i += 100) {
+      let batch: Record<string, unknown>[] | undefined = keys.slice(i, i + 100);
+      while (batch?.length) {
+        const res: BatchGetCommandOutput = await this.ddb.send(
+          new BatchGetCommand({
+            RequestItems: {
+              [this.table]: { Keys: batch, ProjectionExpression: "id, n, vector" },
+            },
+          }),
+        );
+        for (const s of res.Responses?.[this.table] ?? []) {
+          if (s.vector instanceof Uint8Array) {
+            found.set(storyRef(s.id as string, s.n as number), toVector(s.vector));
+          }
+        }
+        batch = res.UnprocessedKeys?.[this.table]?.Keys;
+      }
+    }
+    return found;
+  }
+
+  /** Each issue's newsletter and story count, for the check's points and prompt. */
+  async issueBriefs(
+    ids: string[],
+  ): Promise<Map<string, { publication: string; storyCount: number }>> {
+    const found = new Map<string, { publication: string; storyCount: number }>();
+    for (let i = 0; i < ids.length; i += 100) {
+      let batch: Record<string, unknown>[] | undefined = ids.slice(i, i + 100).map(issueKey);
+      while (batch?.length) {
+        const res: BatchGetCommandOutput = await this.ddb.send(
+          new BatchGetCommand({
+            RequestItems: {
+              [this.table]: {
+                Keys: batch,
+                ProjectionExpression: "id, publication, storyCount",
+              },
+            },
+          }),
+        );
+        for (const issue of res.Responses?.[this.table] ?? []) {
+          found.set(issue.id as string, {
+            publication: (issue.publication as string | undefined) ?? "",
+            storyCount: (issue.storyCount as number | undefined) ?? 0,
+          });
+        }
+        batch = res.UnprocessedKeys?.[this.table]?.Keys;
+      }
+    }
+    return found;
+  }
+
+  /**
+   * A follow's moves appended, its checked stories replaced and its movement time set, if it is
+   * still followed. Sandip's `seenAt` is never touched, so new moves stay new.
+   */
+  async addMoves(
+    eventId: string,
+    moves: FollowPoint[],
+    checked: string[],
+    movedAt?: string,
+  ): Promise<void> {
+    const sets = ["checked = :c"];
+    const values: Record<string, unknown> = { ":c": checked };
+    if (moves.length) {
+      sets.push("points = list_append(points, :p)");
+      values[":p"] = moves;
+    }
+    if (movedAt) {
+      sets.push("movedAt = :m");
+      values[":m"] = movedAt;
+    }
+    try {
+      await this.ddb.send(
+        new UpdateCommand({
+          TableName: this.table,
+          Key: followKey(eventId),
+          UpdateExpression: `SET ${sets.join(", ")}`,
+          ConditionExpression: "attribute_exists(pk)",
+          ExpressionAttributeValues: values,
+        }),
+      );
+    } catch (err) {
+      // Unfollowed while the check ran.
+      if ((err as { name?: string }).name !== "ConditionalCheckFailedException") throw err;
+    }
   }
 
   // ---------- read history (#42) ----------

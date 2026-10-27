@@ -371,12 +371,13 @@ How each of the newsletters covered the same event, grouped by where they land; 
 - **Write:** one forced tool call to Haiku (`group_takes`): one to four groups under short labels, one sentence per newsletter, and a gist. Ids are checked and each newsletter counts once; fewer than two newsletters is `none`, kept nowhere.
 - **Keep:** under the event (`TAKES#<eventId>`), written only on `POST`, which the web sends only when Sandip asks.
 
-### Follow a story (`services/api/src/following.ts`, `packages/core/src/follow.ts`, issue #22)
+### Follow a story (`services/api/src/following.ts`, `services/ingest/src/follow.ts`, `packages/core/src/follow.ts`, issue #22)
 
 A followed story is its event (#15) with dated points; decisions in `docs/features/follow.md`.
 
 - **Follow:** the event's kept timeline (#19) is its starting points, or the story itself as one point; nothing is written by Claude. At most 20 followed stories.
-- **Moves:** added only by the check after each ingest (#121, to come); the API lists, marks seen and unfollows.
+- **Moves:** added only by the check after each ingest, after shelving and before the day in brief, never failing the run. Every followed story that is not quiet against the stories of the last three days: its event's, or at a cosine of 0.45 or more to the story followed or its six newest point stories; not its own, not checked before, not from a muted newsletter; the closest 8. With any candidates, one forced tool call to Haiku for all follows (`record_moves`) names each follow's matter narrowly, gives every candidate a kind (`move`, `repeat`, `other`) and words the moves, each citing stories of kind `move` under its own follow; a move's date is its earliest story's. Moves are appended with `added`; every candidate goes into `checked` (the newest 300), so nothing is asked about twice. No candidates, no call.
+- **API:** lists, marks seen and unfollows; it never adds a move.
 - **New and quiet:** a point added after `seenAt` is new until `POST /following/seen`; a story with no movement for 30 days is quiet, listed last.
 
 ### Ask the Library (`services/api/src/ask.ts`, issue #21)
@@ -421,6 +422,7 @@ Today's news as 3 to 6 threads, each a short paragraph naming the newsletters it
 | Story index: Haiku 4.5 reading whole issues (#15) | n/a | ~$3 |
 | The day in brief, up to 4 versions a day (#18) | n/a | ~$1 |
 | Timelines (#19), only when asked, about half a cent each | n/a | < $0.20 |
+| Following (#22): a call only when a followed story has new candidates, about a third of a cent | n/a | < $0.30 |
 | **Total** | **~$0.20/month** | **~$5.40 to $6/month** |
 
 An AWS Budget filtered on `project=thelibrary` alerts at $8 (set up in R9, once the cost-allocation tag is active; it was $2 before the story index and the day in brief).
