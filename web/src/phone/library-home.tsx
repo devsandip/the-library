@@ -4,7 +4,14 @@ import { useApp } from "../context.js";
 import { clock } from "../format.js";
 import { useAsync } from "../hooks.js";
 import { useLibrary } from "../library.js";
-import { historyHref, newslettersHref, searchHref, settingsHref, statusHref } from "../paths.js";
+import {
+  askHref,
+  historyHref,
+  newslettersHref,
+  searchHref,
+  settingsHref,
+  statusHref,
+} from "../paths.js";
 import { useTheme } from "../theme.js";
 import { SearchIcon } from "../components/icons.js";
 import { ContinuePill } from "../components/now-reading.js";
@@ -23,7 +30,7 @@ export function health(s: StatusResponse | undefined): { word: string; tone: str
 }
 
 /**
- * Library (P6): Search on top, then History, Newsletters, Status and Settings; under them the
+ * Library (P6): Search on top, then Ask, History, Newsletters, Status and Settings; under them the
  * places still to come. New destinations arrive here, so the tab bar never grows.
  */
 export function LibraryHome() {
@@ -46,6 +53,13 @@ export function LibraryHome() {
         <span>Search everything you received</span>
       </a>
       <nav class="group" aria-label="Library">
+        <a class="group-row" href={askHref()}>
+          <span class="group-name">Ask Nutgraf</span>
+          <span class="label">About 1¢ a question</span>
+          <span class="chev" aria-hidden="true">
+            ›
+          </span>
+        </a>
         <a class="group-row" href={historyHref()}>
           <span class="group-name">History</span>
           <span class="label">{history.data ? `${history.data.items.length} today` : ""}</span>
@@ -86,10 +100,6 @@ export function LibraryHome() {
         <li class="group-row">
           <span class="group-name">Following</span>
           <span class="label">Stories you track</span>
-        </li>
-        <li class="group-row">
-          <span class="group-name">Ask Nutgraf</span>
-          <span class="label">5–20¢ a question</span>
         </li>
         <li class="group-row">
           <span class="group-name">Predictions</span>

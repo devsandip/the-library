@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { useLocation } from "preact-iso";
+import { question } from "../pages/search.js";
 
 export interface Command {
   label: string;
@@ -8,20 +9,22 @@ export interface Command {
 }
 
 /**
- * ⌘K (and /): search everything, or go to a place by name: History, Newsletters, Status,
- * Settings, the three queues. Typing filters the places; Enter runs the highlighted line, ↑ ↓
- * move, Esc closes.
+ * ⌘K (and /): search everything, ask Nutgraf (#21), or go to a place by name: History,
+ * Newsletters, Status, Settings, the three queues. Typing filters the places; Enter runs the
+ * highlighted line, ↑ ↓ move, Esc closes.
  */
 export function Palette({
   open,
   onClose,
   commands,
   search,
+  ask,
 }: {
   open: boolean;
   onClose: () => void;
   commands: Command[];
   search: (q: string) => string;
+  ask: (q: string) => string;
 }) {
   const { route } = useLocation();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -39,13 +42,22 @@ export function Palette({
   }, [open]);
 
   const text = q.trim();
+  const searchLine = {
+    label: `Search for “${text}”`,
+    hint: "Everything you received",
+    href: search(text),
+  };
+  const askLine = {
+    label: `Ask Nutgraf “${text}”`,
+    hint: "An answer from your newsletters · ~1¢",
+    href: ask(text),
+  };
   const places = commands.filter(
     (c) => !text || c.label.toLowerCase().includes(text.toLowerCase()),
   );
   const lines: Command[] = [
-    ...(text
-      ? [{ label: `Search for “${text}”`, hint: "Everything you received", href: search(text) }]
-      : []),
+    // A question puts Ask first; words to find put Search first.
+    ...(text ? (question(text) ? [askLine, searchLine] : [searchLine, askLine]) : []),
     ...places,
   ];
   const run = (c: Command | undefined) => {
