@@ -11,6 +11,13 @@ A question answered from my own newsletters, with a link to every story it draws
 - **Checked by the code.** Every story id must be one it sent; a paragraph with none is dropped. A paragraph's sources are its stories' issues, oldest first, with the story inside a digest (the same shape as a timeline point's). With no paragraph left, the answer is Claude's `none` or "Nothing in your newsletters matches this." No story found means no second call; when the question's days ruled out every match, the answer says when the latest arrived ("Nothing in your newsletters from 2026-10-20 to 2026-10-27. The latest on this arrived 2026-10-19.").
 - **The answer carries** the searches it ran (with their days), how many stories it read, the time and the cost. Nothing is kept.
 
+## The page (#104)
+
+- **One page on both devices**, `/library/ask?q=` (`web/src/pages/ask.tsx`): a question box (Enter asks, Shift+Enter is a new line), what it reads and costs (`Your newsletters · about 1¢ · 5 to 20 seconds`), then "Asking · 0:07" with the seconds so far, then the paragraphs with their sources as chips: the newsletter, and the story's headline inside a digest. A chip opens the issue at its story: the reader on the phone, the console on the Mac. Under the answer, a receipt: what it looked for, stories read, time and cost. "Nothing in your newsletters" comes with "Search for these words".
+- **Ways in.** Library lists Ask Nutgraf (it was under "Coming later"). Search shows "A question? Ask Nutgraf instead" when the query reads as a question (ends in ?, or starts with what, how, why, who and the like). On the Mac, ⌘K offers "Ask Nutgraf “…”" beside Search, first when the text reads as a question.
+- **Kept for the page's life, not refetched.** The question is in the URL so Back and a link work, and the answer is held per question while the page is open, so coming back costs nothing. The app's usual cached view refreshes in the background, which here would ask and pay again; asking the same question again on purpose does ask again.
+- **Mock mode** answers from the mock stories that hold the question's words, after a pause.
+
 ## Decisions
 
 - **Two calls, not an agent loop.** #21 describes an agent that searches, reads and decides whether to search again. Planning the searches up front covers the question's parts and its dates, and the answer call reads every story found, so one round answers most questions. It keeps the request to 3 to 17 seconds on the probe below, inside the API's 28, with no background job or polling. A second round is the next step if answers come back thin.

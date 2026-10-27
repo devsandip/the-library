@@ -8,6 +8,7 @@ import { clock, dateShort, narrativeLine } from "../format.js";
 import { useLibrary } from "../library.js";
 import { PANES, useMedia } from "../media.js";
 import {
+  askHref,
   DEFAULT_QUEUE,
   historyHref,
   newslettersHref,
@@ -341,12 +342,14 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
           { label: "Learning", hint: "2", href: queueHref("learning") },
           { label: "Saved", hint: "3", href: queueHref("saved") },
           { label: "The day in brief", hint: "News", href: queueHref("news") },
+          { label: "Ask Nutgraf", hint: "An answer from your newsletters", href: askHref() },
           { label: "History", hint: "What you read", href: historyHref() },
           { label: "Newsletters", hint: "Stars and mutes", href: newslettersHref() },
           { label: "Status", hint: h.at ? `${h.word} · ${h.at}` : h.word, href: statusHref() },
           { label: "Settings", hint: "Theme", href: settingsHref() },
         ]}
         search={(q) => searchHref(q)}
+        ask={(q) => askHref(q)}
       />
     </div>
   );

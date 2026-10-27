@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  askHref,
   browseHref,
   DEFAULT_QUEUE,
   issueHref,
@@ -155,5 +156,12 @@ describe("redirect", () => {
     expect(redirect("/saved", {}, true)).toBeUndefined();
     expect(redirect("/library/status", {}, true)).toBeUndefined();
     expect(redirect("/news/x", {}, true)).toBeUndefined();
+  });
+});
+
+describe("Ask (#21)", () => {
+  it("lives under Library with its question in the URL", () => {
+    expect(askHref()).toBe("/library/ask");
+    expect(at(askHref("agent evals?"))).toEqual({ name: "ask", q: "agent evals?" });
   });
 });

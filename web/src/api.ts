@@ -1,4 +1,5 @@
 import type {
+  AskResponse,
   HistoryResponse,
   IssueDetailResponse,
   IssueListItem,
@@ -65,6 +66,8 @@ export interface LibraryApi {
   unreadCounts(): Promise<UnreadCountsResponse>;
   /** The most relevant unread News, best first. */
   summary(): Promise<SummaryResponse>;
+  /** A question answered from the newsletters (#21). */
+  ask(q: string): Promise<AskResponse>;
   history(day?: string): Promise<HistoryResponse>;
   rate(id: string, value: Rating | 0): Promise<IssueListItem>;
   logOpen(id: string): Promise<void>;
@@ -183,6 +186,9 @@ export class HttpLibraryApi implements LibraryApi {
   }
   summary() {
     return this.request<SummaryResponse>("GET", "/summary");
+  }
+  ask(q: string) {
+    return this.request<AskResponse>("POST", "/ask", { q });
   }
   history(day?: string) {
     return this.request<HistoryResponse>("GET", day ? `/history?day=${day}` : "/history");

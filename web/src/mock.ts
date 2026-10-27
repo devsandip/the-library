@@ -5,6 +5,7 @@
 import { readerDay } from "@library/core/days";
 import { issueDoc, queryTerms, rankByWords, storyDoc } from "@library/core/search";
 import type {
+  AskResponse,
   DigestStats,
   HistoryResponse,
   IssueDetailResponse,
@@ -669,6 +670,48 @@ export class MockLibraryApi implements LibraryApi {
     const limit = opts.limit ?? 30;
     const page = all.slice(start, start + limit).map((i) => withStar(strip(i)));
     return { items: page, cursor: start + limit < all.length ? String(start + limit) : undefined };
+  }
+  /**
+   * A stand-in for Ask (#21): the mock's stories that hold the question's words, best first, as
+   * one paragraph each, after a pause like the real two calls.
+   */
+  async ask(q: string): Promise<AskResponse> {
+    await delay(2500);
+    const terms = queryTerms(q);
+    const listed = issues.filter((i) => !i.promo);
+    const stories = listed.flatMap((i) =>
+      mockStories(i).stories.map((s) => ({ i, s, digest: mockStories(i).stories.length > 1 })),
+    );
+    const docs = stories.map(({ i, s }) => ({
+      ...storyDoc({ ...s, id: i.id }, i.publication),
+      issueId: `${i.id}#${s.n}`,
+    }));
+    const hits = rankByWords(terms, docs).slice(0, 3);
+    const base = {
+      q,
+      searches: [q.replace(/[?.!]+$/, "")],
+      stories: hits.length,
+      ms: 2500,
+      cents: 0.6,
+    };
+    if (!hits.length)
+      return { ...base, paragraphs: [], none: "Nothing in your newsletters matches this." };
+    return {
+      ...base,
+      paragraphs: hits.map((h) => {
+        const { i, s, digest } = stories.find((x) => `${x.i.id}#${x.s.n}` === h.issueId)!;
+        return {
+          text: `A stand-in from mock mode: ${i.publication} says ${s.headline.charAt(0).toLowerCase()}${s.headline.slice(1)}. ${s.summary}`,
+          sources: [
+            {
+              issueId: i.id,
+              publication: i.publication,
+              ...(digest ? { story: { n: s.n, headline: s.headline } } : {}),
+            },
+          ],
+        };
+      }),
+    };
   }
   async listLearning(opts: ListLearningOptions): Promise<LearningListResponse> {
     await delay();

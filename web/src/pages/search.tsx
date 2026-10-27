@@ -6,7 +6,7 @@ import { useApp } from "../context.js";
 import { patchIssue } from "../data.js";
 import { useAsync } from "../hooks.js";
 import { useScrollMemory } from "../nav.js";
-import { searchHref } from "../paths.js";
+import { askHref, searchHref } from "../paths.js";
 import { SearchIcon } from "../components/icons.js";
 import { Row } from "../components/row.js";
 import { Failed, Skeleton } from "../components/ui.js";
@@ -14,6 +14,11 @@ import { openHref, Page } from "./page.js";
 
 /** A pause in typing this long runs the search (#53). */
 const PAUSE_MS = 300;
+
+/** Reads like a question rather than words to find: Search offers Ask (#21). */
+export const question = (q: string) =>
+  /\?\s*$/.test(q) ||
+  /^(what|how|why|who|when|where|which|did|does|is|are|has|have|any)\b/i.test(q.trim());
 
 /**
  * Search (#53): every issue and story that matches, across everything received (unread, read,
@@ -118,6 +123,11 @@ export function Search({ q, sort, wide }: { q: string; sort: SearchSort; wide: b
           </button>
         </div>
       )}
+      {q && question(q) && (
+        <a class="ask-instead label" href={askHref(q)}>
+          A question? Ask Nutgraf instead ›
+        </a>
+      )}
       {!q && (
         <p class="search-hint">
           Subjects, Claude's lines and every story inside a digest, read or not, archived or not. A
@@ -128,7 +138,9 @@ export function Search({ q, sort, wide }: { q: string; sort: SearchSort; wide: b
       {q && results.status === "error" && <Failed message={results.error} retry={results.reload} />}
       {q && data && items.length === 0 && (
         <div class="empty">
-          <p class="empty-text">Nothing matches "{q}". Try other words, or ask Nutgraf.</p>
+          <p class="empty-text">
+            Nothing matches "{q}". Try other words, or <a href={askHref(q)}>ask Nutgraf</a>.
+          </p>
         </div>
       )}
       {data && !data.byMeaning && items.length > 0 && (

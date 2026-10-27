@@ -37,6 +37,7 @@ export type Screen =
   | { name: "saved" }
   | { name: "library" }
   | { name: "search"; q: string; sort: SearchSort }
+  | { name: "ask"; q: string }
   | { name: "history"; day?: string }
   | { name: "newsletters" }
   | { name: "newsletter"; slug: string }
@@ -155,6 +156,8 @@ export const searchHref = (q = "", sort: SearchSort = "best") =>
     ["q", q],
     ["sort", sort === "best" ? undefined : sort],
   ])}`;
+/** Ask Nutgraf (#21): the question in the URL, so Back and a link bring its answer back. */
+export const askHref = (q = "") => `${BASE}/library/ask${queryString([["q", q]])}`;
 export const historyHref = (day?: string) =>
   `${BASE}/library/history${queryString([["day", day]])}`;
 export const newslettersHref = () => `${BASE}/library/newsletters`;
@@ -179,6 +182,7 @@ export function parse(path: string, q: Query): Screen {
       if (!a) return { name: "library" };
       if (b && !(a === "newsletters" && !c)) break;
       if (a === "search") return { name: "search", q: q.q ?? "", sort: sortOf(q.sort) };
+      if (a === "ask") return { name: "ask", q: q.q ?? "" };
       if (a === "history") return { name: "history", day: q.day || undefined };
       if (a === "newsletters") return b ? { name: "newsletter", slug: b } : { name: "newsletters" };
       if (a === "status") return { name: "status" };
