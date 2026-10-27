@@ -3,10 +3,15 @@
  * Loaded with a dynamic import, so production bundles never include it.
  */
 import { readerDay } from "@library/core/days";
+import { followOrder, followView, type StoredFollow } from "@library/core/follow";
+import { storyRef } from "@library/core/stories";
 import { issueDoc, queryTerms, rankByWords, storyDoc } from "@library/core/search";
 import type {
   AskResponse,
   DigestStats,
+  Follow,
+  FollowingResponse,
+  FollowPoint,
   HistoryResponse,
   IssueDetailResponse,
   IssueListItem,
@@ -641,6 +646,70 @@ function namesIn(text: string): { names?: string[] } {
 const timelines = new Map<string, Timeline>();
 const takesKept = new Map<string, Takes>();
 const checksKept = new Map<string, SourceCheck>();
+/** Followed stories in mock mode (#22), by event; seeded on first read. */
+const follows = new Map<string, StoredFollow>();
+
+/** A story as a follow's point: the story itself, opening at it inside a digest. */
+function storyPoint(i: IssueListItem, n: number, at = i.receivedAt): FollowPoint {
+  const own = mockStories(i).stories;
+  const s = own.find((x) => x.n === n)!;
+  return {
+    at,
+    text: s.summary || s.headline,
+    sources: [
+      {
+        issueId: i.id,
+        publication: i.publication,
+        ...(own.length > 1 ? { story: { n, headline: s.headline } } : {}),
+      },
+    ],
+  };
+}
+
+/**
+ * Two followed stories to try the screens with: one a newer issue moved an hour ago (one new
+ * point), and one quiet for over 30 days.
+ */
+function seedFollows() {
+  if (follows.size) return;
+  const storied = issues
+    .filter((i) => !i.promo && mockStories(i).stories.length)
+    .sort((a, b) => a.receivedAt.localeCompare(b.receivedAt));
+  const [first, later, old] = [storied[0], storied[storied.length - 1], storied[1]];
+  if (!first || !later || !old) return;
+  const iso = (ms: number) => new Date(ms).toISOString();
+  const moved: StoredFollow = {
+    eventId: storyRef(first.id, 1),
+    issueId: first.id,
+    n: 1,
+    headline: mockStories(first).stories[0]!.headline,
+    publication: first.publication,
+    followedAt: first.receivedAt,
+    seenAt: iso(now - 2 * HOUR),
+    movedAt: later.receivedAt,
+    points: [
+      { ...storyPoint(first, 1), current: true },
+      { ...storyPoint(later, 1), added: iso(now - HOUR) },
+    ],
+    checked: [],
+  };
+  const quiet: StoredFollow = {
+    eventId: storyRef(old.id, 1),
+    issueId: old.id,
+    n: 1,
+    headline: mockStories(old).stories[0]!.headline,
+    publication: old.publication,
+    followedAt: iso(now - 45 * 24 * HOUR),
+    seenAt: iso(now - 35 * 24 * HOUR),
+    movedAt: iso(now - 35 * 24 * HOUR),
+    points: [
+      { ...storyPoint(old, 1, iso(now - 45 * 24 * HOUR)), current: true },
+      { ...storyPoint(old, 1, iso(now - 35 * 24 * HOUR)), added: iso(now - 35 * 24 * HOUR) },
+    ],
+    checked: [],
+  };
+  for (const f of [moved, quiet]) follows.set(f.eventId, f);
+}
 
 export class MockLibraryApi implements LibraryApi {
   async listIssues(opts: ListIssuesOptions): Promise<IssueListResponse> {
@@ -935,6 +1004,51 @@ export class MockLibraryApi implements LibraryApi {
     };
     timelines.set(`${id}#${n}`, timeline);
     return { timeline };
+  }
+
+  async following(): Promise<FollowingResponse> {
+    await delay();
+    seedFollows();
+    const at = Date.now();
+    const items = [...follows.values()].map((f) => followView(f, at)).sort(followOrder);
+    return { items, unseen: items.reduce((sum, f) => sum + f.unseen, 0) };
+  }
+
+  /** Follows the story's event, starting from its mock timeline or the story itself. */
+  async follow(id: string, n: number): Promise<Follow> {
+    await delay(300);
+    seedFollows();
+    const me = find(id);
+    const story = mockStories(me).stories.find((s) => s.n === n);
+    if (!story) throw new Error("issue has no such story");
+    const eventId = storyRef(id, n);
+    const at = new Date().toISOString();
+    const kept = follows.get(eventId) ?? {
+      eventId,
+      issueId: id,
+      n,
+      headline: story.headline,
+      publication: me.publication,
+      followedAt: at,
+      seenAt: at,
+      points: timelines.get(`${id}#${n}`)?.points ?? [{ ...storyPoint(me, n), current: true }],
+      checked: [],
+    };
+    follows.set(eventId, kept);
+    return followView(kept, Date.now());
+  }
+
+  async unfollow(id: string, n: number): Promise<void> {
+    await delay(200);
+    for (const [k, f] of follows) {
+      if (k === storyRef(id, n) || (f.issueId === id && f.n === n)) follows.delete(k);
+    }
+  }
+
+  async seenFollowing(): Promise<void> {
+    await delay(100);
+    const at = new Date().toISOString();
+    for (const f of follows.values()) f.seenAt = at;
   }
 
   async source(id: string, n: number): Promise<SourceResponse> {

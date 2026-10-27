@@ -6,7 +6,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./days": "./src/days.ts",
+    "./follow": "./src/follow.ts",
     "./search": "./src/search.ts",
+    "./stories": "./src/stories.ts",
     "./types": "./src/types.ts"
   },
   "scripts": {

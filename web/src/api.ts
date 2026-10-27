@@ -1,5 +1,7 @@
 import type {
   AskResponse,
+  Follow,
+  FollowingResponse,
   HistoryResponse,
   IssueDetailResponse,
   IssueListItem,
@@ -98,6 +100,13 @@ export interface LibraryApi {
   source(id: string, n: number): Promise<SourceResponse>;
   /** Checks the story against its source now: a page read and one Claude call. Only when asked. */
   checkSource(id: string, n: number): Promise<SourceResponse>;
+  /** Followed stories (#22), moving ones first, with how many points are new. */
+  following(): Promise<FollowingResponse>;
+  /** Follows the story's event: free, no Claude call. */
+  follow(id: string, n: number): Promise<Follow>;
+  unfollow(id: string, n: number): Promise<void>;
+  /** Marks every new point of every followed story seen. */
+  seenFollowing(): Promise<void>;
   /** What the newsletters said (#53): by words, then by meaning. */
   search(q: string, sort: SearchSort): Promise<SearchResponse>;
   listSenders(): Promise<SenderListResponse>;
@@ -261,6 +270,18 @@ export class HttpLibraryApi implements LibraryApi {
       "POST",
       `/issues/${encodeURIComponent(id)}/stories/${n}/source`,
     );
+  }
+  following() {
+    return this.request<FollowingResponse>("GET", "/following");
+  }
+  follow(id: string, n: number) {
+    return this.request<Follow>("POST", `/issues/${encodeURIComponent(id)}/stories/${n}/follow`);
+  }
+  unfollow(id: string, n: number) {
+    return this.request<void>("DELETE", `/issues/${encodeURIComponent(id)}/stories/${n}/follow`);
+  }
+  seenFollowing() {
+    return this.request<void>("POST", "/following/seen");
   }
   search(q: string, sort: SearchSort) {
     const query = new URLSearchParams({ q });

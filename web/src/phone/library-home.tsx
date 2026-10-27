@@ -2,10 +2,12 @@ import { readerDay } from "@library/core/days";
 import type { StatusResponse } from "@library/core/types";
 import { useApp } from "../context.js";
 import { clock } from "../format.js";
+import { useFollowing } from "../following.js";
 import { useAsync } from "../hooks.js";
 import { useLibrary } from "../library.js";
 import {
   askHref,
+  followingHref,
   historyHref,
   newslettersHref,
   searchHref,
@@ -30,14 +32,19 @@ export function health(s: StatusResponse | undefined): { word: string; tone: str
 }
 
 /**
- * Library (P6): Search on top, then Ask, History, Newsletters, Status and Settings; under them the
- * places still to come. New destinations arrive here, so the tab bar never grows.
+ * Library (P6): Search on top, then Ask, Following, History, Newsletters, Status and Settings;
+ * under them the places still to come. New destinations arrive here, so the tab bar never grows.
  */
 export function LibraryHome() {
   const { api } = useApp();
   const { senders, status } = useLibrary();
   const { pref } = useTheme();
   const today = readerDay(Date.now());
+  const followed = useFollowing().state;
+  const following =
+    followed.status === "ok"
+      ? { unseen: followed.data.unseen, count: followed.data.items.length }
+      : { unseen: 0, count: 0 };
   const history = useAsync(() => api.history(today), [today], `history:${today}`);
   const all = senders.data?.items ?? [];
   const h = health(status.data);
@@ -56,6 +63,19 @@ export function LibraryHome() {
         <a class="group-row" href={askHref()}>
           <span class="group-name">Ask Nutgraf</span>
           <span class="label">About 1¢ a question</span>
+          <span class="chev" aria-hidden="true">
+            ›
+          </span>
+        </a>
+        <a class="group-row" href={followingHref()}>
+          <span class="group-name">Following</span>
+          <span class={`label${following.unseen ? " follow-new" : ""}`}>
+            {following.unseen
+              ? `${following.unseen} new`
+              : following.count
+                ? `${following.count} ${following.count === 1 ? "story" : "stories"}`
+                : "Stories you track"}
+          </span>
           <span class="chev" aria-hidden="true">
             ›
           </span>
@@ -97,10 +117,6 @@ export function LibraryHome() {
       </nav>
       <p class="group-label label">Coming later</p>
       <ul class="group later" aria-label="Coming later">
-        <li class="group-row">
-          <span class="group-name">Following</span>
-          <span class="label">Stories you track</span>
-        </li>
         <li class="group-row">
           <span class="group-name">Predictions</span>
           <span class="label">Who called it</span>
