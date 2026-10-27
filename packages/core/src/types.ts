@@ -211,6 +211,39 @@ export interface AskResponse {
   cents: number;
 }
 
+/** How a claim stands against its source (#23). */
+export type SourceVerdict = "holds" | "further" | "missing";
+
+/** One of the story's claims, checked against the page it links to. */
+export interface SourceClaim {
+  /** What the newsletter says. */
+  claim: string;
+  /** What the page says about it. */
+  source: string;
+  /** The page's own words, checked against the page; absent when Claude's did not match. */
+  quote?: string;
+  verdict: SourceVerdict;
+}
+
+/** A story checked against its source (#23), kept per story. */
+export interface SourceCheck {
+  /** The page read, after redirects. */
+  url: string;
+  verdict: SourceVerdict | "mixed";
+  claims: SourceClaim[];
+  /** Anything worth knowing about the page, in one sentence ("It reports another site's story"). */
+  note?: string;
+  at: string;
+  ms: number;
+  cents: number;
+}
+
+/** GET and POST /issues/{id}/stories/{n}/source: the kept check, or why there is none. */
+export interface SourceResponse {
+  check?: SourceCheck;
+  none?: string;
+}
+
 /** One newsletter's take on an event (#17): what it says or stresses, and its story. */
 export interface Take {
   text: string;

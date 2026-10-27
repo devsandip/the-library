@@ -27,6 +27,11 @@ export const storyKey = (id: string, n: number) => ({
 });
 /** How an event's story evolved (#19), kept for the event so its other stories open it free. */
 export const timelineKey = (eventId: string) => ({ pk: `TIMELINE#${eventId}`, sk: "META" });
+/** A story checked against its source (#23), kept per story: the link is the story's own. */
+export const sourceKey = (id: string, n: number) => ({
+  pk: `SOURCE#${id}#${String(n).padStart(2, "0")}`,
+  sk: "META",
+});
 /** How each newsletter covered an event (#17), kept for the event like its timeline. */
 export const takesKey = (eventId: string) => ({ pk: `TAKES#${eventId}`, sk: "META" });
 

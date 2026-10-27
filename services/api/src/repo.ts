@@ -44,6 +44,7 @@ import {
   storyKey,
   storyRef,
   storyShelf,
+  sourceKey,
   takesKey,
   timelineKey,
   TOPICS_KEY,
@@ -75,6 +76,7 @@ import type {
   SenderPatch,
   Shelf,
   ShelfSetBy,
+  SourceCheck,
   StatusResponse,
   StoryPatch,
   StoryShelfSetBy,
@@ -92,6 +94,7 @@ import type { ListOptions, RepoPort } from "./port.js";
 import type { CorpusIssue, CorpusSource, CorpusStory } from "./corpus.js";
 import type { OwnStory, RelatedSource } from "./related.js";
 import type { SearchSource } from "./search.js";
+import type { SourceStore, SourceStory, StoredSource } from "./source.js";
 import type { StoredTakes, TakesStore } from "./takes.js";
 import type { StoredTimeline, TimelineStore, TimelineStory } from "./timeline.js";
 
@@ -296,7 +299,14 @@ function decodePhase(cursor: string | undefined): { phase: 1 | 2; cursor?: strin
 }
 
 export class DynamoRepo
-  implements RepoPort, CorpusSource, SearchSource, RelatedSource, TimelineStore, TakesStore
+  implements
+    RepoPort,
+    CorpusSource,
+    SearchSource,
+    RelatedSource,
+    TimelineStore,
+    TakesStore,
+    SourceStore
 {
   private readonly ddb: DynamoDBDocumentClient;
   private readonly s3: S3Client;
@@ -1288,6 +1298,70 @@ export class DynamoRepo
       ms: t.ms as number,
       cents: t.cents as number,
     };
+  }
+
+  /** A story as the source check reads it (#23): its link, and its issue's text while kept. */
+  async sourceStory(id: string, n: number): Promise<SourceStory | undefined> {
+    const [issue, story] = await Promise.all([
+      this.ddb.send(
+        new GetCommand({
+          TableName: this.table,
+          Key: issueKey(id),
+          ProjectionExpression: "#pub, #st",
+          ExpressionAttributeNames: { "#pub": "publication", "#st": "state" },
+        }),
+      ),
+      this.ddb.send(
+        new GetCommand({
+          TableName: this.table,
+          Key: storyKey(id, n),
+          ProjectionExpression: "#h, #s, #nm, #l",
+          ExpressionAttributeNames: {
+            "#h": "headline",
+            "#s": "summary",
+            "#nm": "names",
+            "#l": "link",
+          },
+        }),
+      ),
+    ]);
+    const s = story.Item;
+    if (!issue.Item || issue.Item.state === "filtered" || !s) return undefined;
+    const text = await this.readObject(s3Keys(id).text);
+    return {
+      issueId: id,
+      n,
+      publication: issue.Item.publication as string,
+      headline: s.headline as string,
+      summary: (s.summary as string | undefined) ?? "",
+      names: (s.names as string[] | undefined) ?? [],
+      ...(typeof s.link === "string" ? { link: s.link } : {}),
+      ...(text ? { text } : {}),
+    };
+  }
+
+  async getSource(id: string, n: number): Promise<SourceCheck | undefined> {
+    const res = await this.ddb.send(
+      new GetCommand({ TableName: this.table, Key: sourceKey(id, n) }),
+    );
+    const c = res.Item;
+    if (!c) return undefined;
+    return {
+      url: c.url as string,
+      verdict: c.verdict as SourceCheck["verdict"],
+      claims: c.claims as SourceCheck["claims"],
+      ...(typeof c.note === "string" ? { note: c.note } : {}),
+      at: c.at as string,
+      ms: c.ms as number,
+      cents: c.cents as number,
+    };
+  }
+
+  /** Keeps a source check for its story (#23), replacing any earlier one. */
+  async putSource(id: string, n: number, check: StoredSource): Promise<void> {
+    await this.ddb.send(
+      new PutCommand({ TableName: this.table, Item: { ...sourceKey(id, n), ...check } }),
+    );
   }
 
   /** Keeps takes for their event (#17), replacing any earlier ones. */

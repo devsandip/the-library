@@ -100,6 +100,10 @@ function setup(overrides: Partial<RepoPort> = {}) {
       get: vi.fn(async () => ({})),
       run: vi.fn(async () => ({ none: "Only ByteByteGo carried this in your newsletters." })),
     },
+    sources: {
+      get: vi.fn(async () => ({})),
+      run: vi.fn(async () => ({ none: "This story has no source link to check." })),
+    },
     ask: {
       ask: vi.fn(async (q: string) => ({
         q,
@@ -256,6 +260,17 @@ describe("routing and validation", () => {
       expect((await call("GET", `/issues/abc123/stories/${n}/timeline`)).status).toBe(404);
     }
     expect((await call("DELETE", "/issues/abc123/stories/2/timeline")).status).toBe(405);
+  });
+
+  it("reads a story's kept source check, and runs one only on POST (#23)", async () => {
+    const { call, svc } = setup();
+    expect((await call("GET", "/issues/abc123/stories/2/source")).body).toEqual({});
+    expect(svc.sources.get).toHaveBeenCalledWith("abc123", 2);
+    expect(svc.sources.run).not.toHaveBeenCalled();
+    const ran = await call("POST", "/issues/abc123/stories/2/source");
+    expect(ran.body).toEqual({ none: "This story has no source link to check." });
+    expect(svc.sources.run).toHaveBeenCalledWith("abc123", 2);
+    expect((await call("DELETE", "/issues/abc123/stories/2/source")).status).toBe(405);
   });
 
   it("reads a story's kept takes, and writes them only on POST (#17)", async () => {
