@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   askHref,
   followingHref,
+  predictionsHref,
   browseHref,
   DEFAULT_QUEUE,
   issueHref,
@@ -172,5 +173,10 @@ describe("Following (#22)", () => {
     expect(followingHref()).toBe("/library/following");
     expect(at(followingHref())).toEqual({ name: "following" });
     expect(at("/library/following/x")).toEqual({ name: "not-found" });
+    expect(predictionsHref()).toBe("/library/predictions");
+    expect(at(predictionsHref())).toEqual({ name: "predictions", view: "open" });
+    expect(at(predictionsHref("settled"))).toEqual({ name: "predictions", view: "settled" });
+    expect(at("/library/predictions/other")).toEqual({ name: "not-found" });
+    expect(at("/library/predictions/settled/x")).toEqual({ name: "not-found" });
   });
 });

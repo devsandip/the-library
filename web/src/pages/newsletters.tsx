@@ -12,9 +12,11 @@ import {
   newsletterHref,
   newslettersHref,
   queueHref,
+  predictionsHref,
 } from "../paths.js";
 import { senderIds, senderSlug } from "../sentence.js";
 import { Row } from "../components/row.js";
+import { recordLine } from "./predictions.js";
 import { Empty, Failed, Skeleton } from "../components/ui.js";
 import { openHref, Page } from "./page.js";
 
@@ -203,6 +205,13 @@ export function Newsletter({ slug, wide }: { slug: string; wide: boolean }) {
             : ""}
       </p>
       {error && <p class="error-line">{error}</p>}
+      {s.record && (
+        <p class="sender-record">
+          <a class="label" href={predictionsHref("settled")}>
+            Its own calls: {recordLine(s.record)}
+          </a>
+        </p>
+      )}
       <p class="label section-label">Issues</p>
       {s.issues.length === 0 && <p class="empty-text">No issues stored.</p>}
       <ul class="rows">

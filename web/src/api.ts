@@ -2,6 +2,10 @@ import type {
   AskResponse,
   Follow,
   FollowingResponse,
+  Prediction,
+  PredictionStatus,
+  PredictionsResponse,
+  PredictionView,
   HistoryResponse,
   IssueDetailResponse,
   IssueListItem,
@@ -107,6 +111,10 @@ export interface LibraryApi {
   unfollow(id: string, n: number): Promise<void>;
   /** Marks every new point of every followed story seen. */
   seenFollowing(): Promise<void>;
+  /** Who called it (#24): open predictions by due date, or settled ones latest first. */
+  predictions(view: PredictionView): Promise<PredictionsResponse>;
+  /** Sandip's verdict on a prediction, or null to hand it back to settling. */
+  setVerdict(id: string, verdict: Exclude<PredictionStatus, "open"> | null): Promise<Prediction>;
   /** What the newsletters said (#53): by words, then by meaning. */
   search(q: string, sort: SearchSort): Promise<SearchResponse>;
   listSenders(): Promise<SenderListResponse>;
@@ -282,6 +290,14 @@ export class HttpLibraryApi implements LibraryApi {
   }
   seenFollowing() {
     return this.request<void>("POST", "/following/seen");
+  }
+  predictions(view: PredictionView) {
+    return this.request<PredictionsResponse>("GET", `/predictions?view=${view}`);
+  }
+  setVerdict(id: string, verdict: Exclude<PredictionStatus, "open"> | null) {
+    return this.request<Prediction>("PATCH", `/predictions/${encodeURIComponent(id)}`, {
+      verdict,
+    });
   }
   search(q: string, sort: SearchSort) {
     const query = new URLSearchParams({ q });

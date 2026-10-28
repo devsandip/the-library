@@ -3,6 +3,7 @@
  * Loaded with a dynamic import, so production bundles never include it.
  */
 import { readerDay } from "@library/core/days";
+import { trackRecord } from "@library/core/predictions";
 import { followOrder, followView, type StoredFollow } from "@library/core/follow";
 import { storyRef } from "@library/core/stories";
 import { issueDoc, queryTerms, rankByWords, storyDoc } from "@library/core/search";
@@ -48,6 +49,10 @@ import type {
   UnreadCount,
   UnreadCountsResponse,
   View,
+  Prediction,
+  PredictionStatus,
+  PredictionsResponse,
+  PredictionView,
 } from "@library/core/types";
 import type { LibraryApi, ListIssuesOptions, ListLearningOptions } from "./api.js";
 
@@ -714,6 +719,104 @@ function seedFollows() {
   for (const f of [moved, quiet]) follows.set(f.eventId, f);
 }
 
+/** Predictions in mock mode (#24): open, due and settled ones, seeded on first read. */
+const predictions = new Map<string, Prediction>();
+
+function seedPredictions() {
+  if (predictions.size) return;
+  const at = (ms: number) => new Date(ms).toISOString();
+  const day = (ms: number) => at(ms).slice(0, 10);
+  const DAY = 24 * HOUR;
+  const by = (publication: string) =>
+    issues.find((i) => i.publication === publication) ?? issues[0]!;
+  const evidence = (publication: string) => {
+    const i = by(publication);
+    const s = mockStories(i).stories[0];
+    return {
+      issueId: i.id,
+      n: 1,
+      publication: i.publication,
+      headline: s?.headline ?? i.subject,
+      receivedAt: i.receivedAt,
+    };
+  };
+  const base = (publication: string, over: Partial<Prediction>): Prediction => {
+    const i = by(publication);
+    return {
+      id: `${i.id}.1`,
+      issueId: i.id,
+      n: 1,
+      senderId: i.senderId,
+      publication: i.publication,
+      saidAt: i.receivedAt,
+      text: "",
+      who: i.publication,
+      own: false,
+      kind: "forecast",
+      quote: "",
+      by: "2027",
+      due: day(now + 300 * DAY),
+      status: "open",
+      ...over,
+    };
+  };
+  for (const p of [
+    base("Fortune 500 Digest", {
+      text: "Nscale's shares will trade above their IPO price by the end of the year.",
+      who: "Fortune 500 Digest",
+      own: true,
+      quote: "we expect Nscale to trade above its IPO price by year end",
+      by: "2026-12",
+      due: day(now + 60 * DAY),
+    }),
+    base("TLDR Dev", {
+      text: "Google will make Gemini 4 Argon the default model in Workspace by March.",
+      who: "Google",
+      kind: "promise",
+      quote: "Argon becomes the default across Workspace by March",
+      by: "2027-03",
+      due: day(now - 2 * DAY),
+    }),
+    base("WSJ What's News", {
+      text: "The Fed will raise interest rates by a quarter point at its next meeting.",
+      who: "Interest-rate futures market",
+      quote: "futures put the odds of a quarter-point rise at 70%",
+      by: "2026-09",
+      due: day(now - 40 * DAY),
+      status: "right",
+      why: "The Fed raised rates by a quarter point at its September meeting, four stories show.",
+      evidence: [evidence("Fortune 500 Digest"), evidence("WSJ What's News")],
+      settledAt: at(now - 3 * DAY),
+    }),
+    base("The Ken", {
+      text: "HDFC Bank will pass its state-owned peer in market value by October.",
+      who: "The Ken",
+      own: true,
+      quote: "HDFC Bank will be worth more than SBI by October",
+      by: "2026-10",
+      due: day(now - 10 * DAY),
+      status: "wrong",
+      why: "SBI was still the larger of the two at the end of October, one story shows.",
+      evidence: [evidence("Business Insider")],
+      settledAt: at(now - 2 * DAY),
+    }),
+    base("TLDR AI", {
+      text: "OpenAI will open booking agents to free users before the end of the quarter.",
+      who: "OpenAI",
+      kind: "promise",
+      quote: "free users get booking agents before the quarter is out",
+      by: "2026-Q3",
+      due: day(now - 30 * DAY),
+      status: "unclear",
+      why: "Nothing in your newsletters since has mentioned it.",
+      evidence: [],
+      settledAt: at(now - 1 * DAY),
+    }),
+  ]) {
+    predictions.set(p.id, p);
+  }
+}
+
 export class MockLibraryApi implements LibraryApi {
   async listIssues(opts: ListIssuesOptions): Promise<IssueListResponse> {
     await delay();
@@ -1054,6 +1157,36 @@ export class MockLibraryApi implements LibraryApi {
     for (const f of follows.values()) f.seenAt = at;
   }
 
+  async predictions(view: PredictionView): Promise<PredictionsResponse> {
+    await delay();
+    seedPredictions();
+    const today = readerDay(Date.now());
+    const all = [...predictions.values()];
+    const open = all.filter((p) => p.status === "open");
+    const items =
+      view === "open"
+        ? open.sort((a, b) => a.due.localeCompare(b.due))
+        : all
+            .filter((p) => p.status !== "open")
+            .sort((a, b) => (b.settledAt ?? "").localeCompare(a.settledAt ?? ""));
+    return { items, due: open.filter((p) => p.due <= today).length };
+  }
+
+  async setVerdict(
+    id: string,
+    verdict: Exclude<PredictionStatus, "open"> | null,
+  ): Promise<Prediction> {
+    await delay(120);
+    const p = predictions.get(id);
+    if (!p) throw new Error("no such prediction");
+    const { setBy: _s, why: _w, evidence: _e, settledAt: _a, ...rest } = p;
+    const next: Prediction = verdict
+      ? { ...p, status: verdict, setBy: "sandip", settledAt: new Date().toISOString() }
+      : { ...rest, status: "open" };
+    predictions.set(id, next);
+    return next;
+  }
+
   async source(id: string, n: number): Promise<SourceResponse> {
     await delay();
     const key = `${id}#${n}`;
@@ -1311,8 +1444,11 @@ export class MockLibraryApi implements LibraryApi {
     await delay();
     const s = senders.find((x) => x.senderId === senderId);
     if (!s) throw new Error("sender not found");
+    seedPredictions();
+    const record = trackRecord([...predictions.values()], senderId);
     return {
       ...s,
+      ...(record ? { record } : {}),
       addresses: [s.senderKey],
       issues: issues
         .filter((i) => i.senderId === senderId)

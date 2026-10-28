@@ -1,4 +1,4 @@
-import type { SearchSort, Shelf } from "@library/core/types";
+import type { PredictionView, SearchSort, Shelf } from "@library/core/types";
 import { BASE } from "./config.js";
 
 /**
@@ -39,6 +39,7 @@ export type Screen =
   | { name: "search"; q: string; sort: SearchSort }
   | { name: "ask"; q: string }
   | { name: "following" }
+  | { name: "predictions"; view: PredictionView }
   | { name: "history"; day?: string }
   | { name: "newsletters" }
   | { name: "newsletter"; slug: string }
@@ -161,6 +162,9 @@ export const searchHref = (q = "", sort: SearchSort = "best") =>
 export const askHref = (q = "") => `${BASE}/library/ask${queryString([["q", q]])}`;
 /** Followed stories (#22). */
 export const followingHref = () => `${BASE}/library/following`;
+/** Who called it (#24): open predictions by due date, or settled ones. */
+export const predictionsHref = (view: PredictionView = "open") =>
+  `${BASE}/library/predictions${view === "open" ? "" : "/settled"}`;
 export const historyHref = (day?: string) =>
   `${BASE}/library/history${queryString([["day", day]])}`;
 export const newslettersHref = () => `${BASE}/library/newsletters`;
@@ -183,6 +187,9 @@ export function parse(path: string, q: Query): Screen {
       break;
     case "library":
       if (!a) return { name: "library" };
+      if (a === "predictions" && (!b || (b === "settled" && !c))) {
+        return { name: "predictions", view: b ? "settled" : "open" };
+      }
       if (b && !(a === "newsletters" && !c)) break;
       if (a === "search") return { name: "search", q: q.q ?? "", sort: sortOf(q.sort) };
       if (a === "ask") return { name: "ask", q: q.q ?? "" };
