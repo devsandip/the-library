@@ -1,20 +1,27 @@
 /**
- * Check the source (#23, the first version): a story against the page it links to. The page is
- * read safely (`./page.ts`) and turned into text; one Claude call lists the story's claims, each
- * with what the page says, a quote and a verdict: holds up, goes further than the source, or not
- * in the source. Quotes are checked against the page, so a quote shown is the page's own words.
+ * Check the source (#23): a story against the page its claims come from. From the page the story
+ * links to, the hunt (`./hunt.ts`) follows links to the original (the paper, filing, company post)
+ * when that page only reports it, up to five pages; the page is read safely (`./page.ts`) and
+ * turned into text; one Claude call lists the story's claims, each with what the page says, a
+ * quote and a verdict: holds up, goes further than the source, or not in the source. Quotes are
+ * checked against the page, so a quote shown is the page's own words.
  *
  * A check runs in the jobs Lambda (`./jobs.ts`), so it is not held to the API's 28 seconds: the
- * API starts it and answers at once, and GET says it is running until it is kept or says why not.
- *
- * One page: the hunt for the primary source behind a news report is the next step. Written only
- * when the reader asks, and kept for the story.
+ * API starts it and answers at once, and GET says it is running, with the pages read so far,
+ * until it is kept or says why not. Written only when the reader asks, and kept for the story.
  */
 import { CLAUDE_MODEL, claudeCents, htmlToCleanText, READER } from "@library/core";
-import type { SourceCheck, SourceClaim, SourceResponse, SourceVerdict } from "@library/core/types";
+import type {
+  SourceCheck,
+  SourceClaim,
+  SourceHop,
+  SourceResponse,
+  SourceVerdict,
+} from "@library/core/types";
 import type { ClaudePort, ToolRequest } from "./claude.js";
 import { notFound } from "./errors.js";
-import { fetchPage, PageError, type Page } from "./page.js";
+import { hunt } from "./hunt.js";
+import { fetchPage, type Page } from "./page.js";
 import type { Job, SourcePort } from "./port.js";
 
 /** The page's text Claude reads at most, and the newsletter's. */
@@ -51,6 +58,8 @@ export interface SourceStore {
   getSource(id: string, n: number): Promise<{ check?: SourceCheck; run?: SourceRunItem }>;
   /** Marks a run started; false when one started after `staleBefore` is still running. */
   startRun(id: string, n: number, since: string, staleBefore: string): Promise<boolean>;
+  /** The pages the run has tried so far, and the one it is reading. */
+  progressRun(id: string, n: number, pages: SourceHop[], reading?: string): Promise<void>;
   /** Ends the run with no check: why there is none, or nothing when it failed. */
   endRun(id: string, n: number, none?: string): Promise<void>;
   /** Keeps the check, replacing any earlier one, and ends its run. */
@@ -68,6 +77,8 @@ export interface SourceRunItem {
   status: "running" | "none" | "failed";
   since: string;
   none?: string;
+  pages?: SourceHop[];
+  reading?: string;
 }
 
 const words = (s: string) => s.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? [];
@@ -98,7 +109,16 @@ export function pageText(page: Page): string {
   return text.replace(/\n{3,}/g, "\n\n").trim();
 }
 
-export function sourceRequest(story: SourceStory, page: string, url: string): ToolRequest {
+/**
+ * The check's call. `from` is the story's own link when the page is the original the hunt reached
+ * from it, so the note can say the newsletter linked to a report of it.
+ */
+export function sourceRequest(
+  story: SourceStory,
+  page: string,
+  url: string,
+  from?: string,
+): ToolRequest {
   return {
     system: [
       `You check what one reader's newsletter said against the page it links to. ${READER}`,
@@ -128,6 +148,12 @@ export function sourceRequest(story: SourceStory, page: string, url: string): To
       "The newsletter's passage:",
       story.text ? passage(story.text, story) : "(not kept)",
       "",
+      ...(from
+        ? [
+            `The story links to ${from}, which reports it; this page is the original that ` +
+              "page leads to.",
+          ]
+        : []),
       `The page (${url}):`,
       page.slice(0, PAGE_CHARS),
     ].join("\n"),
@@ -221,7 +247,9 @@ export class Sources implements SourcePort {
     const { check, run } = await this.store.getSource(id, n);
     if (run?.status === "running") {
       const fresh = this.now() - Date.parse(run.since) < RUN_LIMIT_MS;
-      return fresh ? { running: { since: run.since } } : { none: STOPPED };
+      if (!fresh) return { none: STOPPED };
+      const { since, pages, reading } = run;
+      return { running: { since, ...(pages ? { pages } : {}), ...(reading ? { reading } : {}) } };
     }
     // A kept check ends its run, so a run still here is newer than any check.
     if (run) return { none: run.none ?? STOPPED };
@@ -280,43 +308,48 @@ export class SourceChecker {
     const story = await this.store.sourceStory(id, n);
     if (!story) throw notFound(`issue ${id} has no story ${n}`);
     if (!story.link) return { none: NO_LINK };
-    let page: Page;
-    try {
-      page = await this.read(story.link);
-    } catch (err) {
-      if (err instanceof PageError)
-        return { none: `The source could not be read: ${err.message}.` };
-      throw err;
+    const said = story.text ? passage(story.text, story) : undefined;
+    const found = await hunt({ ...story, link: story.link }, said, {
+      read: this.read,
+      claude: this.claude,
+      now: this.now,
+      progress: (pages, reading) => this.store.progressRun(id, n, pages, reading),
+    });
+    if (!found.page) {
+      return { none: found.failed ? `The source could not be read: ${found.failed}.` : UNREADABLE };
     }
-    const text = pageText(page);
-    if (text.length < 200) return { none: UNREADABLE };
-
-    const res = await this.claude.callTool(sourceRequest(story, text, page.url));
+    const text = pageText(found.page);
+    const from = found.original && found.path.length > 1 ? found.path[0]!.url : undefined;
+    const res = await this.claude.callTool(sourceRequest(story, text, found.page.url, from));
     const parsed = parseSource(res.input, text.slice(0, PAGE_CHARS));
     if (!parsed) return { none: UNREADABLE };
+    const calls = [...found.calls, res];
+    const inputTokens = calls.reduce((t, c) => t + c.inputTokens, 0);
+    const outputTokens = calls.reduce((t, c) => t + c.outputTokens, 0);
     const check: SourceCheck = {
-      url: page.url,
+      url: found.page.url,
+      original: found.original,
+      path: found.path,
       ...parsed,
       at: new Date(started).toISOString(),
       ms: this.now() - started,
-      cents: claudeCents(res.inputTokens, res.outputTokens),
+      cents: claudeCents(inputTokens, outputTokens),
     };
-    await this.store.putSource(id, n, {
-      ...check,
-      model: CLAUDE_MODEL,
-      inputTokens: res.inputTokens,
-      outputTokens: res.outputTokens,
-    });
+    await this.store.putSource(id, n, { ...check, model: CLAUDE_MODEL, inputTokens, outputTokens });
     console.log(
       JSON.stringify({
         level: "info",
         msg: "source checked",
         story: `${id}#${n}`,
         verdict: check.verdict,
+        original: found.original,
+        pages: found.path.length,
+        unread: found.path.filter((p) => p.failed).length,
         claims: check.claims.length,
         quotes: check.claims.filter((c) => c.quote).length,
-        inputTokens: res.inputTokens,
-        outputTokens: res.outputTokens,
+        calls: calls.length,
+        inputTokens,
+        outputTokens,
         ms: check.ms,
       }),
     );

@@ -1406,6 +1406,9 @@ describe("API on dev", () => {
     expect(ran.body.running?.since).toBeDefined();
     const check = (await sourceSettled("/issues/fx-tldr/stories/51/source")).check!;
     expect(check.url).toBe("https://www.rfc-editor.org/rfc/rfc2606.txt");
+    // The hunt (#128) starts at the story's own link; the RFC links nowhere, so it ends there.
+    expect(check.path?.[0]?.url).toBe("https://www.rfc-editor.org/rfc/rfc2606.txt");
+    expect(typeof check.original).toBe("boolean");
     expect(check.claims.length).toBeGreaterThan(0);
     expect(["holds", "further", "mixed"]).toContain(check.verdict);
     // Every quote shown is on the page.

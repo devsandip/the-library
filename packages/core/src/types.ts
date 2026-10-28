@@ -225,10 +225,26 @@ export interface SourceClaim {
   verdict: SourceVerdict;
 }
 
+/** A page the source check read on its way to the original (#128). */
+export interface SourceHop {
+  /** Where it ended up, after redirects. */
+  url: string;
+  /** What the page before called it, for a page the hunt followed ("the paper"). */
+  why?: string;
+  /** What it is, for the original ("the paper on arXiv"). */
+  what?: string;
+  /** Why it could not be read. */
+  failed?: string;
+}
+
 /** A story checked against its source (#23), kept per story. */
 export interface SourceCheck {
-  /** The page read, after redirects. */
+  /** The page checked, after redirects: the original when the hunt found it. */
   url: string;
+  /** Whether the page checked is the original (#128); absent on checks before the hunt. */
+  original?: boolean;
+  /** Every page tried, in order, the story's own link first (#128). */
+  path?: SourceHop[];
   verdict: SourceVerdict | "mixed";
   claims: SourceClaim[];
   /** Anything worth knowing about the page, in one sentence ("It reports another site's story"). */
@@ -238,9 +254,13 @@ export interface SourceCheck {
   cents: number;
 }
 
-/** A source check running in the background (#23), since when. */
+/** A source check running in the background (#23): since when, and the pages read so far. */
 export interface SourceRun {
   since: string;
+  /** The pages tried so far (#128). */
+  pages?: SourceHop[];
+  /** The page being read now. */
+  reading?: string;
 }
 
 /**
