@@ -45,9 +45,23 @@ Each proposal is replayed over the newsletter's stored stories: `fixes`, the mov
 - **Empty:** says what counts and that three moves one way make a rule.
 - Mock mode has two proposals (ByteByteGo always Learning, The Juggernaut always News) and four newsletters with corrections, one of them only promos.
 
+## Checked against prod (#160)
+
+Prod's archive on 28 October, by a read-only probe from the laptop running this code (`readTuneup`, then the rules), and a scan of the table for what the tune-up does not count:
+
+- **No corrections yet.** 639 issues, 3,536 stories from 33 newsletters, every story on the shelf Jev picked: none moved by me, so none against Jev and none unsure. Nothing the tune-up leaves out either: no `shelf` event anywhere in the table (5,929 items scanned), no issue I shelved myself, no newsletter with an "always" setting, none muted. I have read in Nutgraf since 9 October without moving a story or an issue to the other shelf.
+- **Promos:** 65 issues archived by the promo rule, none pulled back. So no newsletter has two or more, and no "never a promo" setting is filed.
+- **So the page shows its empty state** ("0 corrections", what counts, and that three moves one way make a rule), and no threshold can be checked against a correction.
+- **What the share rule allows instead.** By Jev's calls, 25 of the 29 newsletters with stories have 75% or more on one shelf, 17 of them all; between them, 73 stories are on the other shelf. The other 4 are mixed, 53% to 66% on one shelf, with 252 on the other. A rule at 75% finishes a pattern, moving a handful of stories; at 60%, three more newsletters qualify and a rule could overrule Jev on up to 171 stories of one of them.
+- **Jev is unsure** (0.4 to 0.6) **on 227 stories, 6%.** 451 are on Learning (13%) and 3,085 on News.
+- **The read** is every story stored: 11 pages, about 10 MB (each story carries its embedding) and 1,282 read units an open, a fraction of a cent. From the laptop it took 13.8 s, each page 0.6 to 0.8 s against a 0.3 s round trip, so roughly 3 to 6 s in the API. Not measured there: the page has not been opened on prod. It grows by about 520 stories a week and would near the API's 28 s in roughly 7 to 10 months, so bounding it is #163.
+
+So the thresholds stay as they are: 3 moves against Jev, none the other way, 75% on the shelf already. With no corrections, nothing argues for moving them; 75% is where Jev's own split divides the near-uniform newsletters from the mixed ones; and with 73 stories across 25 newsletters on the minority shelf, one or two moves would propose a rule after nearly any correction. Look again once I have moved stories for a few weeks. Per-newsletter numbers stay out of this public repo.
+
 ## Decisions
 
 - **Rules, not wording** (2026-10-28): Jev's question stays as I left it on 2026-10-17, and Claude no longer picks the shelf. A rule is visible, mine, and undone by clearing the setting.
 - **Worked out when asked, no schedule.** A weekly run only matters once a model is called; the counts are always current this way.
-- **Promo pullbacks are counted, not acted on.** There is no "never a promo" setting; #160 files one if prod shows a newsletter with two or more pullbacks.
+- **Promo pullbacks are counted, not acted on.** There is no "never a promo" setting; #160 would have filed one for a newsletter with two or more pullbacks, and prod had none.
+- **The thresholds stayed after prod (#160).** Prod had no corrections to test them on; see above.
 - **The unsure band is shared with ingest** (`UNSURE` moved to `packages/core/src/shelves.ts`).
