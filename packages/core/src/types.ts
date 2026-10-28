@@ -519,6 +519,52 @@ export interface EnrichStats {
 }
 
 /** One run of the story index (#15). */
+/** Where a prediction stands (#24): open until settled right, wrong or unclear. */
+export type PredictionStatus = "open" | "right" | "wrong" | "unclear";
+
+/** A dated, checkable prediction from a newsletter (#24). */
+export interface Prediction {
+  /** `<issueId>.<k>`, unique and safe in a path. */
+  id: string;
+  issueId: string;
+  /** The story it belongs to, when Claude named one. */
+  n?: number;
+  senderId: string;
+  publication: string;
+  /** When the newsletter said it: the issue's arrival. */
+  saidAt: string;
+  /** What is predicted, in one sentence. */
+  text: string;
+  /** Who made it: a person or organisation, or the newsletter's writer. */
+  who: string;
+  /** The newsletter's own call, rather than one it reports. */
+  own: boolean;
+  /** The newsletter's words, found in the issue word for word. */
+  quote: string;
+  /** Its period as given (2027-03, 2027-Q3, 2027), and the day that period ends. */
+  by: string;
+  due: string;
+  status: PredictionStatus;
+}
+
+/** What spotting predictions did in a run (#24). */
+export interface PredictionStats {
+  /** Issues not screened yet (promos and muted newsletters are left out). */
+  checked: number;
+  /** Issues screened, with or without predictions. */
+  screened: number;
+  /** Screened issues with passages that looked forward, each one Claude call. */
+  called: number;
+  predictions: number;
+  /** Not started before the run's time budget ran out; picked up by the next run. */
+  deferred: number;
+  errors: number;
+  errorSamples: string[];
+  inputTokens: number;
+  outputTokens: number;
+  durationMs: number;
+}
+
 export interface StoryStats {
   /** Issues without stories yet (promos and muted newsletters are left out). */
   checked: number;

@@ -39,6 +39,12 @@ export const takesKey = (eventId: string) => ({ pk: `TAKES#${eventId}`, sk: "MET
 /** A followed story (#22), by its event; all of them are one partition, read in one query. */
 export const FOLLOWING_PK = "FOLLOWING";
 export const followKey = (eventId: string) => ({ pk: FOLLOWING_PK, sk: eventId });
+/** Predictions (#24), all in one partition, read in one query: a few a day at most. */
+export const PREDICTIONS_PK = "PREDICTIONS";
+export const predictionKey = (issueId: string, k: number) => ({
+  pk: PREDICTIONS_PK,
+  sk: `${issueId}#${String(k).padStart(2, "0")}`,
+});
 
 export const INDEX = {
   /** INBOX (unread + read) | ARCHIVE | SENDERS | STORIES | OPENS */

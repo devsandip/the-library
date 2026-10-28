@@ -27,6 +27,7 @@ import {
   INTERESTS_KEY,
   NARRATIVE_KEY,
   openIndexAttributes,
+  predictionKey,
   PARTITION,
   TOPICS_KEY,
   issueIndexAttributes,
@@ -63,6 +64,7 @@ import type { RecentStory } from "./follow.js";
 import { mapLimit } from "./ingest.js";
 import type { SenderFields, SenderPlan, StoredIssue, StoredSender } from "./senders.js";
 import type { StoredNarrative, StoryText } from "./narrative.js";
+import type { NewPrediction } from "./predictions.js";
 import type { ShelfCandidate } from "./shelves.js";
 import { carriedOver, type NewStory, type OldStory, type StoredStory } from "./stories.js";
 
@@ -540,7 +542,7 @@ export class Store {
             KeyConditionExpression: "gsi1pk = :p AND gsi1sk >= :since",
             ExpressionAttributeValues: { ":p": partition, ":since": sinceIso },
             ProjectionExpression:
-              "id, senderId, publication, subject, receivedAt, summary, shelf, shelfSetBy, enrichedAt, embeddedAt, promo, storiedAt, storyAttempts, #st, autoArchived",
+              "id, senderId, publication, subject, receivedAt, summary, shelf, shelfSetBy, enrichedAt, embeddedAt, promo, storiedAt, storyAttempts, predictedAt, predictionAttempts, #st, autoArchived",
             ExpressionAttributeNames: { "#st": "state" },
             ExclusiveStartKey: start,
           }),
@@ -560,6 +562,8 @@ export class Store {
             promo: i.promo === true,
             storied: Boolean(i.storiedAt),
             storyAttempts: (i.storyAttempts as number | undefined) ?? 0,
+            predicted: Boolean(i.predictedAt),
+            predictionAttempts: (i.predictionAttempts as number | undefined) ?? 0,
             state: i.state as EnrichCandidate["state"],
             autoArchived: i.autoArchived !== undefined,
           });
@@ -1434,6 +1438,69 @@ export class Store {
         TableName: this.table,
         Key: issueKey(id),
         UpdateExpression: "SET storyError = :e ADD storyAttempts :one",
+        ConditionExpression: "attribute_exists(pk)",
+        ExpressionAttributeValues: { ":e": message.slice(0, 300), ":one": 1 },
+      }),
+    );
+  }
+
+  /** An issue's stories as predictions name them (#24): number and headline. */
+  async issueStories(id: string): Promise<{ n: number; headline: string }[]> {
+    return (await this.oldStories(id))
+      .map((s) => ({ n: Number(s.sk.slice("STORY#".length)), headline: s.headline }))
+      .filter((s) => Number.isInteger(s.n))
+      .sort((a, b) => a.n - b.n);
+  }
+
+  /** An issue's predictions (#24), then the issue marked as screened. */
+  async putPredictions(
+    issue: { id: string; senderId: string; publication: string; receivedAt: string },
+    predictions: NewPrediction[],
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    await this.batchWrite(
+      predictions.map((p, k) => ({
+        PutRequest: {
+          Item: {
+            ...predictionKey(issue.id, k + 1),
+            id: `${issue.id}.${k + 1}`,
+            issueId: issue.id,
+            ...(p.n ? { n: p.n } : {}),
+            senderId: issue.senderId,
+            publication: issue.publication,
+            saidAt: issue.receivedAt,
+            text: p.text,
+            who: p.who,
+            own: p.own,
+            quote: p.quote,
+            by: p.by,
+            due: p.due,
+            status: "open",
+            model: MODELS.classify,
+            at: now,
+          },
+        },
+      })),
+    );
+    await this.ddb.send(
+      new UpdateCommand({
+        TableName: this.table,
+        Key: issueKey(issue.id),
+        UpdateExpression:
+          "SET predictedAt = :at, predictionCount = :n REMOVE predictionError, predictionAttempts",
+        ConditionExpression: "attribute_exists(pk)",
+        ExpressionAttributeValues: { ":at": now, ":n": predictions.length },
+      }),
+    );
+  }
+
+  /** A failed screening is counted, so an issue that keeps failing stops costing a call. */
+  async putPredictionError(id: string, message: string): Promise<void> {
+    await this.ddb.send(
+      new UpdateCommand({
+        TableName: this.table,
+        Key: issueKey(id),
+        UpdateExpression: "SET predictionError = :e ADD predictionAttempts :one",
         ConditionExpression: "attribute_exists(pk)",
         ExpressionAttributeValues: { ":e": message.slice(0, 300), ":one": 1 },
       }),
