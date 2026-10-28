@@ -3,6 +3,7 @@ import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { Asks } from "./ask.js";
 import { HttpError } from "./errors.js";
 import { Following } from "./following.js";
+import { Predictions } from "./predictions.js";
 import type { Services } from "./port.js";
 import { BedrockClaude } from "./claude.js";
 import { TitanEmbedder } from "./embed.js";
@@ -120,5 +121,6 @@ export const handler = createHandler({
   sources: new Sources(repo, (job) => invokeAsync(JOBS_FUNCTION!, job)),
   ask: new Asks(repo, corpus, new TitanEmbedder(), claude),
   following: new Following(repo),
+  predictions: new Predictions(repo),
   startIngest: () => invokeAsync(INGEST_FUNCTION!, {}),
 });

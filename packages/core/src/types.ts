@@ -483,6 +483,25 @@ export interface NowReadingResponse {
 export interface SenderDetailResponse extends SenderListItem {
   addresses: string[];
   issues: IssueListItem[];
+  /** Its own predictions' track record (#24), once it has made any. */
+  record?: TrackRecord;
+}
+
+/** A newsletter's own calls (#24): how many came true, did not, are unclear, and are still open. */
+export interface TrackRecord {
+  right: number;
+  wrong: number;
+  unclear: number;
+  open: number;
+}
+
+/** Which predictions to list (#140): open ones by due date, or settled ones latest first. */
+export type PredictionView = "open" | "settled";
+
+/** GET /predictions (#140). `due` counts the open ones due by today, waiting to be settled. */
+export interface PredictionsResponse {
+  items: Prediction[];
+  due: number;
 }
 
 export interface IngestStats {

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { forwardPassages, looksForward, periodEnd, quoteIn } from "../src/predictions.js";
+import {
+  forwardPassages,
+  looksForward,
+  periodEnd,
+  quoteIn,
+  trackRecord,
+} from "../src/predictions.js";
+import type { Prediction } from "../src/types.js";
 
 describe("looksForward", () => {
   it("is a sentence that looks forward and names a time", () => {
@@ -63,5 +70,36 @@ describe("quoteIn", () => {
     expect(quoteIn(text, '"we\'ll ship it by march."')).toBe(true);
     expect(quoteIn(text, "We will ship it by March")).toBe(false);
     expect(quoteIn(text, "ship")).toBe(false);
+  });
+});
+
+describe("trackRecord", () => {
+  const p = (senderId: string, own: boolean, status: Prediction["status"]): Prediction => ({
+    id: `${senderId}${status}.1`,
+    issueId: "i",
+    senderId,
+    publication: "Pub",
+    saidAt: "2026-09-01T08:00:00.000Z",
+    text: "t",
+    who: "w",
+    own,
+    quote: "q words here",
+    by: "2027",
+    due: "2027-12-31",
+    status,
+  });
+
+  it("counts a newsletter's own calls by how they came out, and nothing it only reported", () => {
+    const list = [
+      p("a", true, "right"),
+      p("a", true, "right"),
+      p("a", true, "wrong"),
+      p("a", true, "open"),
+      p("a", false, "wrong"),
+      p("b", true, "unclear"),
+    ];
+    expect(trackRecord(list, "a")).toEqual({ right: 2, wrong: 1, unclear: 0, open: 1 });
+    expect(trackRecord(list, "c")).toBeUndefined();
+    expect(trackRecord([p("d", false, "right")], "d")).toBeUndefined();
   });
 });

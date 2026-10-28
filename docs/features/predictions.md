@@ -32,6 +32,12 @@ Dated, checkable predictions from the newsletters, with who made them and when t
 - **Unclear is tried again** 14 days later, three tries in all, then stays unclear.
 - **Written** onto the prediction (`status`, `why`, `evidence`, `settledAt`, `tries`, `nextTry`), with a condition that Sandip has not set a verdict meanwhile (#140).
 
+## Listing and overruling (#140)
+
+- **`GET /predictions?view=open`:** the open ones by due date, soonest first, and `due`, how many of them are due by today and waiting for the morning's settling. **`view=settled`:** right, wrong and unclear ones, latest settled first. Settling's own bookkeeping (`tries`, `nextTry`) is not shown.
+- **`PATCH /predictions/{id}`** `{ verdict }`: Sandip's verdict (`setBy: sandip`, `settledAt` now), kept with settling's sentence and stories when there were any, and never settled again. `null` hands it back: open, with what settling wrote cleared, so the next morning's settling takes it if it is due.
+- **A newsletter's track record** on its sender page: its own calls (`own`), right, wrong, unclear and open. Predictions it only reported count for no one's record.
+
 ## Decisions
 
 - **Rides along with ingest, not with the story split.** Asking the split call for predictions too would change the story index's prompt and need every issue split again. A separate call that only sees forward-looking passages costs pennies a month and leaves the index alone.

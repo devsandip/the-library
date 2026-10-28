@@ -22,6 +22,7 @@ import {
   storyKey,
   sourceKey,
   sourceRunKey,
+  predictionKey,
   storyRef,
   takesKey,
   timelineKey,
@@ -29,6 +30,8 @@ import {
   vectorBytes,
 } from "@library/core";
 import type {
+  Prediction,
+  PredictionsResponse,
   AskResponse,
   Follow,
   FollowingResponse,
@@ -1435,6 +1438,80 @@ describe("API on dev", () => {
         ),
       ),
     ]);
+  });
+
+  it("predictions: listed open, settled, overruled, a newsletter's record, handed back (#140)", async () => {
+    const tldr = (await getItem("fx-tldr"))!;
+    const key = predictionKey("fx-tldr", 1);
+    await ddb.send(
+      new PutCommand({
+        TableName: stack.tableName,
+        Item: {
+          ...key,
+          id: "fx-tldr.1",
+          issueId: "fx-tldr",
+          senderId: tldr.senderId,
+          publication: tldr.publication,
+          saidAt: tldr.receivedAt,
+          text: "Acme will ship its robot by March 2027.",
+          who: "the newsletter",
+          own: true,
+          kind: "forecast",
+          quote: "Acme will ship its robot by March 2027",
+          by: "2027-03",
+          due: "2027-03-31",
+          status: "open",
+        },
+      }),
+    );
+    const open = await call<PredictionsResponse>("GET", "/predictions");
+    expect(open.body.items.map((p) => p.id)).toContain("fx-tldr.1");
+    expect(open.body.items.find((p) => p.id === "fx-tldr.1")).toMatchObject({
+      own: true,
+      due: "2027-03-31",
+    });
+
+    // Settled as the jobs Lambda settles it (#139).
+    await ddb.send(
+      new UpdateCommand({
+        TableName: stack.tableName,
+        Key: key,
+        UpdateExpression: "SET #st = :r, why = :w, evidence = :e, settledAt = :at, tries = :t",
+        ExpressionAttributeNames: { "#st": "status" },
+        ExpressionAttributeValues: {
+          ":r": "right",
+          ":w": "It shipped.",
+          ":e": [],
+          ":at": "2026-10-28T02:00:00.000Z",
+          ":t": 1,
+        },
+      }),
+    );
+    const settled = await call<PredictionsResponse>("GET", "/predictions", {
+      query: { view: "settled" },
+    });
+    const kept = settled.body.items.find((p) => p.id === "fx-tldr.1")!;
+    expect(kept).toMatchObject({ status: "right", why: "It shipped." });
+    expect(kept).not.toHaveProperty("tries");
+
+    const overruled = await call<Prediction>("PATCH", "/predictions/fx-tldr.1", {
+      body: { verdict: "wrong" },
+    });
+    expect(overruled.body).toMatchObject({ status: "wrong", setBy: "sandip" });
+    const sender = await call<SenderDetailResponse>("GET", `/senders/${tldr.senderId}`);
+    expect(sender.body.record).toEqual({ right: 0, wrong: 1, unclear: 0, open: 0 });
+
+    const back = await call<Prediction>("PATCH", "/predictions/fx-tldr.1", {
+      body: { verdict: null },
+    });
+    expect(back.body.status).toBe("open");
+    expect(back.body).not.toHaveProperty("setBy");
+    expect(back.body).not.toHaveProperty("why");
+    expect(
+      (await call("PATCH", "/predictions/fx-tldr.9", { body: { verdict: "right" } })).status,
+    ).toBe(404);
+
+    await ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: key }));
   });
 
   it("follow: a story's event, listed with its point, new moves until seen, unfollowed (#22)", async () => {
