@@ -49,6 +49,8 @@ import {
   storyShelf,
   sourceKey,
   sourceRunKey,
+  PREDICTIONS_PK,
+  predictionKeyFromId,
   takesKey,
   timelineKey,
   TOPICS_KEY,
@@ -102,6 +104,7 @@ import type { CorpusIssue, CorpusSource, CorpusStory } from "./corpus.js";
 import type { OwnStory, RelatedSource } from "./related.js";
 import type { FollowStore } from "./following.js";
 import type { SearchSource } from "./search.js";
+import type { Settlement, SettleStore, StoredPrediction } from "./settle.js";
 import type { SourceRunItem, SourceStore, SourceStory, StoredSource } from "./source.js";
 import type { StoredTakes, TakesStore } from "./takes.js";
 import type { StoredTimeline, TimelineStore, TimelineStory } from "./timeline.js";
@@ -315,7 +318,8 @@ export class DynamoRepo
     TimelineStore,
     TakesStore,
     SourceStore,
-    FollowStore
+    FollowStore,
+    SettleStore
 {
   private readonly ddb: DynamoDBDocumentClient;
   private readonly s3: S3Client;
@@ -1454,6 +1458,83 @@ export class DynamoRepo
         ],
       }),
     );
+  }
+
+  /** Every prediction (#24): one partition, a few a day at most. */
+  async listPredictions(): Promise<StoredPrediction[]> {
+    const out: StoredPrediction[] = [];
+    let start: Record<string, unknown> | undefined;
+    do {
+      const res = await this.query({
+        KeyConditionExpression: "pk = :p",
+        ExpressionAttributeValues: { ":p": PREDICTIONS_PK },
+        ExclusiveStartKey: start,
+      });
+      for (const i of res.Items ?? []) {
+        out.push({
+          id: i.id as string,
+          issueId: i.issueId as string,
+          ...(typeof i.n === "number" ? { n: i.n } : {}),
+          senderId: i.senderId as string,
+          publication: i.publication as string,
+          saidAt: i.saidAt as string,
+          text: i.text as string,
+          who: i.who as string,
+          own: i.own === true,
+          quote: i.quote as string,
+          by: i.by as string,
+          due: i.due as string,
+          status: i.status as StoredPrediction["status"],
+          ...(typeof i.settledAt === "string" ? { settledAt: i.settledAt } : {}),
+          ...(typeof i.why === "string" ? { why: i.why } : {}),
+          ...(Array.isArray(i.evidence)
+            ? { evidence: i.evidence as StoredPrediction["evidence"] }
+            : {}),
+          ...(i.setBy === "sandip" ? { setBy: "sandip" as const } : {}),
+          ...(typeof i.tries === "number" ? { tries: i.tries } : {}),
+          ...(typeof i.nextTry === "string" ? { nextTry: i.nextTry } : {}),
+        });
+      }
+      start = res.LastEvaluatedKey;
+    } while (start);
+    return out;
+  }
+
+  /** Writes a prediction's settlement (#139), unless Sandip has set its verdict meanwhile. */
+  async settlePrediction(id: string, s: Settlement): Promise<void> {
+    const key = predictionKeyFromId(id);
+    if (!key) throw new Error(`not a prediction id: ${id}`);
+    const set: Record<string, unknown> = {
+      status: s.status,
+      why: s.why,
+      evidence: s.evidence,
+      settledAt: s.settledAt,
+      tries: s.tries,
+      ...(s.nextTry ? { nextTry: s.nextTry } : {}),
+      ...(s.model ? { settleModel: s.model } : {}),
+      ...(s.inputTokens !== undefined ? { settleInputTokens: s.inputTokens } : {}),
+      ...(s.outputTokens !== undefined ? { settleOutputTokens: s.outputTokens } : {}),
+    };
+    const names = Object.keys(set);
+    try {
+      await this.ddb.send(
+        new UpdateCommand({
+          TableName: this.table,
+          Key: key,
+          UpdateExpression:
+            `SET ${names.map((n) => `#${n} = :${n}`).join(", ")}` +
+            (s.nextTry ? "" : " REMOVE #nextTry"),
+          ConditionExpression: "attribute_exists(pk) AND attribute_not_exists(setBy)",
+          ExpressionAttributeNames: Object.fromEntries(
+            [...names, "nextTry"].map((n) => [`#${n}`, n]),
+          ),
+          ExpressionAttributeValues: Object.fromEntries(names.map((n) => [`:${n}`, set[n]])),
+        }),
+      );
+    } catch (err) {
+      // Sandip set the verdict while it was being settled: his stands.
+      if (!isConditionFailure(err)) throw err;
+    }
   }
 
   /** Keeps takes for their event (#17), replacing any earlier ones. */

@@ -545,6 +545,38 @@ export interface Prediction {
   by: string;
   due: string;
   status: PredictionStatus;
+  /** Once settled (#139): when, what the later stories show in a sentence, and those stories. */
+  settledAt?: string;
+  why?: string;
+  evidence?: PredictionEvidence[];
+  /** Sandip's own verdict (#140), which is never settled again. */
+  setBy?: "sandip";
+}
+
+/** A later story that settles a prediction (#139). */
+export interface PredictionEvidence {
+  issueId: string;
+  n: number;
+  publication: string;
+  headline: string;
+  receivedAt: string;
+}
+
+/** What a day's settling did (#139). */
+export interface SettleStats {
+  /** Predictions due and not settled, or unclear and due to be tried again. */
+  due: number;
+  right: number;
+  wrong: number;
+  unclear: number;
+  /** Settled unclear with no call: nothing in the newsletters since mentioned them. */
+  nothingFound: number;
+  /** Left for the next day: over the day's limit. */
+  later: number;
+  errors: number;
+  inputTokens: number;
+  outputTokens: number;
+  ms: number;
 }
 
 /** What spotting predictions did in a run (#24). */

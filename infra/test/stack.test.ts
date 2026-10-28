@@ -141,6 +141,17 @@ describe("data and ingest", () => {
     expect(Object.keys(t.findOutputs("JobsFunction"))).toHaveLength(1);
   });
 
+  it("prod settles due predictions daily at 07:30 IST through the jobs Lambda (#139)", () => {
+    synth("prod").hasResourceProperties("AWS::Scheduler::Schedule", {
+      ScheduleExpression: "cron(30 7 * * ? *)",
+      ScheduleExpressionTimezone: "Asia/Kolkata",
+      Target: Match.objectLike({
+        Input: JSON.stringify({ kind: "settle" }),
+        RetryPolicy: Match.objectLike({ MaximumRetryAttempts: 0 }),
+      }),
+    });
+  });
+
   it("ingest, the API and its jobs may call Haiku 4.5 or 5.5 (any US region) and Titan", () => {
     const policies = Object.values(synth("prod").findResources("AWS::IAM::Policy"));
     const statements = policies.flatMap(

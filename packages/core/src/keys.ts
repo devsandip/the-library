@@ -45,6 +45,11 @@ export const predictionKey = (issueId: string, k: number) => ({
   pk: PREDICTIONS_PK,
   sk: `${issueId}#${String(k).padStart(2, "0")}`,
 });
+/** A prediction's key from its id, `<issueId>.<k>`; undefined for anything else. */
+export function predictionKeyFromId(id: string) {
+  const m = /^([A-Za-z0-9_-]{1,64})\.([1-9][0-9]?)$/.exec(id);
+  return m ? predictionKey(m[1]!, Number(m[2])) : undefined;
+}
 
 export const INDEX = {
   /** INBOX (unread + read) | ARCHIVE | SENDERS | STORIES | OPENS */

@@ -110,8 +110,11 @@ export interface SourcePort {
   run(id: string, n: number): Promise<SourceResponse>;
 }
 
-/** Work the API hands to the jobs Lambda (`./jobs.ts`), which may take longer than its 28 s. */
-export type Job = { kind: "source"; id: string; n: number };
+/**
+ * Work for the jobs Lambda (`./jobs.ts`), which may take longer than the API's 28 s: a source
+ * check the API starts, or the day's settling of predictions (#139), on a schedule or by hand.
+ */
+export type Job = { kind: "source"; id: string; n: number } | { kind: "settle"; limit?: number };
 
 /** A question answered from the newsletters (#21). */
 export interface AskPort {
