@@ -500,7 +500,7 @@ export type AuditVerdict = "drop" | "keep" | "new";
 
 /**
  * Why, in a word. Worth dropping: muted, rated not useful, hardly opened, or mostly stories another
- * newsletter carried first. Kept: Must Read, rated useful, or opened. Too new: too few issues.
+ * newsletter carried first. Kept: Must Read, rated useful, or opened. Too few to tell: too few issues.
  */
 export type AuditReason =
   "muted" | "notUseful" | "unopened" | "repeats" | "mustRead" | "useful" | "opened" | "few";
@@ -542,7 +542,7 @@ export interface AuditCard {
 
 /**
  * GET /audit (#150): the window (the last 30 days, never before the first open logged) and a card
- * for every newsletter with issues in it: worth dropping first, then kept, then too new to tell.
+ * for every newsletter with issues in it: worth dropping first, then kept, then too few to tell.
  */
 export interface AuditResponse {
   from: string;
