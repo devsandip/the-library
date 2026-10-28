@@ -497,3 +497,28 @@ Sandip said "continue", then "You merge them" for milestone 6, and asked for a s
 - The path's classes are prefixed `source-`: the app's global `.failed` (its error panel) was centring the path's unreadable pages.
 - Milestone 6 closes on the probe's evidence, not on its merged pull requests.
 - Every pull request today was merged by me on Sandip's word for milestone 6.
+
+## 2026-10-28, later: milestone 6 closed after the prod probes (#133, #135)
+
+**Did:**
+
+- Sandip signed in to AWS (`aws sso login --sso-session main`; `--profile main` names no profile). The probe ran read-only from the laptop: the hunt wandered inside one site on four of five readable links, because Claude saw only "[n]" and not where a link went.
+- #135 (PR 136): one page per site in code (a site read already, or one never a source, gets no number), each link shows its host, docs and specifications count as originals. Two more probes, recorded in `docs/features/source.md`; the Source tab says "~2¢ · under half a minute".
+- Closed #133, #135 and milestone 6; #23 is Waiting on the search provider for originals a page does not link to, and on PDFs. Updated `docs/status/2026-10-28-milestone-6.md` to the closed state.
+
+**State now:**
+
+- Prod runs 7c8024d (PR 136's Deploy, which passed dev, its integration tests and prod).
+- When the first page can be read, the hunt reaches an original in 4 of 8, 3 by following links, in 12 to 27 seconds for 1 to 3 cents. 14 of 22 first pages were refused (paywalls, 401, 429).
+- No milestone is open.
+
+**Next:**
+
+- Sandip: try Check source on a TLDR item on the phone, and decide the search provider.
+- The next milestone, with its issues listed for Sandip first: the search provider's layers (Backstory #16 on the jobs Lambda), or #24 without one.
+
+**Decisions:**
+
+- Withhold links in code rather than ask Claude to avoid them: it cannot avoid what it cannot see.
+- A short list of sites that are never sources (social networks, help desks, app stores), and no more: Fortune's junk picks would only move to the next site.
+- The probe measured digest stories as well as each newsletter's newest, since a digest item linking to someone else's report is the case the hunt is for.
