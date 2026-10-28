@@ -10,7 +10,7 @@
  * API starts it and answers at once, and GET says it is running, with the pages read so far,
  * until it is kept or says why not. Written only when the reader asks, and kept for the story.
  */
-import { CLAUDE_MODEL, claudeCents, htmlToCleanText, READER } from "@library/core";
+import { CLAUDE_MODEL, claudeCents, htmlToCleanText, quoteIn, READER } from "@library/core";
 import type {
   SourceCheck,
   SourceClaim,
@@ -198,10 +198,6 @@ const clean = (v: unknown, max: number) =>
         .slice(0, max)
     : "";
 
-/** Text compared for a quote: case, spacing and curly quotes set aside. */
-const comparable = (s: string) =>
-  s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ").trim();
-
 /**
  * Claude's check, checked. A claim needs its claim, what the source says and a known verdict; a
  * quote is kept only when the page holds it word for word. Undefined when the page was not an
@@ -213,7 +209,6 @@ export function parseSource(
 ): Pick<SourceCheck, "verdict" | "claims" | "note"> | undefined {
   const o = (input ?? {}) as Record<string, unknown>;
   if (o.readable === false || !Array.isArray(o.claims)) return undefined;
-  const onPage = comparable(page);
   const claims = o.claims.slice(0, MAX_CLAIMS).flatMap((c): SourceClaim[] => {
     const r = (c ?? {}) as Record<string, unknown>;
     const claim = clean(r.claim, 300);
@@ -221,7 +216,7 @@ export function parseSource(
     const verdict = VERDICTS.find((v) => v === r.verdict);
     if (!claim || !source || !verdict) return [];
     const quote = clean(r.quote, 300).replace(/^["“]|["”]$/g, "");
-    const real = quote.length >= 8 && onPage.includes(comparable(quote));
+    const real = quoteIn(page, quote);
     return [{ claim, source, ...(real ? { quote } : {}), verdict }];
   });
   if (!claims.length) return undefined;

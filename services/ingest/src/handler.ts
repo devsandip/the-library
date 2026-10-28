@@ -1,5 +1,5 @@
 import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
-import type { EnrichStats, ShelfStats, StoryStats } from "@library/core/types";
+import type { EnrichStats, PredictionStats, ShelfStats, StoryStats } from "@library/core/types";
 import { Bedrock } from "./bedrock.js";
 import { archiveOldNews, enrich, proposeTopics } from "./enrich.js";
 import { checkFollows } from "./follow.js";
@@ -7,6 +7,7 @@ import { Gmail, type GmailCredentials } from "./gmail.js";
 import { ingest } from "./ingest.js";
 import { Jev } from "./jev.js";
 import { writeNarrative } from "./narrative.js";
+import { spotPredictions } from "./predictions.js";
 import { reprocess } from "./reprocess.js";
 import { rebuildSenders } from "./senders.js";
 import { deriveShelves, shelveStories } from "./shelves.js";
@@ -91,6 +92,8 @@ export interface IngestEvent {
    * `derive` asks Jev nothing and brings shelves, states and issues in line (#81).
    */
   shelves?: { days?: number; force?: boolean; derive?: boolean };
+  /** Screen stored issues for predictions (`pnpm predictions`), those not screened yet (#24). */
+  predictions?: { days?: number };
   /** Write today's narrative now (`pnpm narrative`); `force` even if the last one is recent. */
   narrative?: { force?: boolean };
   /** Index opens logged before read history existed (`pnpm history-backfill`). */
@@ -136,6 +139,14 @@ export async function handler(event: IngestEvent = {}) {
       deadline: started + 9 * 60_000,
     });
     console.log(JSON.stringify({ level: "info", msg: "shelves done", ...stats }));
+    return stats;
+  }
+  if (event.predictions) {
+    const stats = await spotPredictions(store, bedrock, {
+      sinceIso: daysAgo(event.predictions.days ?? 30),
+      deadline: started + 8.5 * 60_000,
+    });
+    console.log(JSON.stringify({ level: "info", msg: "predictions done", ...stats }));
     return stats;
   }
   if (event.historyBackfill) {
@@ -228,6 +239,21 @@ export async function handler(event: IngestEvent = {}) {
     deadline: started + 8.75 * 60_000,
   }).catch(shelfFailed);
   console.log(JSON.stringify({ level: "info", msg: "shelves done", ...shelved }));
+  // Then predictions (#24), from the new issues' forward-looking sentences. Never fails the run.
+  if (Date.now() < started + 8.8 * 60_000) {
+    await spotPredictions(store, bedrock, {
+      sinceIso: daysAgo(14),
+      deadline: started + 8.8 * 60_000,
+    })
+      .then((s: PredictionStats) =>
+        console.log(JSON.stringify({ level: "info", msg: "predictions done", ...s })),
+      )
+      .catch((err: Error) =>
+        console.error(
+          JSON.stringify({ level: "error", msg: "predictions failed", error: String(err) }),
+        ),
+      );
+  }
   // Then followed stories (#22): a new story that moves one becomes a point. Like the steps
   // before it, it never fails the run.
   if (Date.now() < started + 8.9 * 60_000) {

@@ -217,6 +217,10 @@ export interface EnrichCandidate {
   storied?: boolean;
   /** Failed story splits so far; after a few the issue is left alone. */
   storyAttempts?: number;
+  /** Screened for predictions (#24). */
+  predicted?: boolean;
+  /** Failed screenings so far; after a few the issue is left alone. */
+  predictionAttempts?: number;
   state?: "unread" | "read" | "archived";
   /** Archived by a rule rather than by Sandip. */
   autoArchived?: boolean;

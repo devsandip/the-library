@@ -40,6 +40,7 @@ pnpm install
 | `pnpm --filter @library/web dev:mock` | Run the UI locally against an in-memory backend |
 | `AWS_PROFILE=admin pnpm topics` | Claude proposes the topic list (dry run; `--apply` stores it) |
 | `AWS_PROFILE=admin pnpm enrich` | Claude sorts and summarizes issues not done yet (`--days 30`, `--force`) |
+| `AWS_PROFILE=admin pnpm predictions` | Screen stored issues for dated, checkable predictions (`--days 120`); new ones are screened after every ingest run (#24) |
 | `AWS_PROFILE=admin pnpm shelves` | Jev puts stored stories without a shelf on News or Learning (`--days 30`, `--force`); new ones are shelved after every ingest run (#81) |
 | `AWS_PROFILE=admin pnpm jev:score <labels.json>` | Score Jev's News or Learning call against labelled stories (#81); stores nothing |
 | `AWS_PROFILE=admin pnpm rebuild-senders` | Re-key issues after a sender-rule change (dry run; `--apply`) |
