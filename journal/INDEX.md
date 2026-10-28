@@ -1,7 +1,7 @@
 # Nutgraf: Journal
 
-Last refreshed: 2026-10-28 09:05
-Latest entry: [2026-10-28-0905-the-hunt-on-real-links.md](entries/2026-10-28-0905-the-hunt-on-real-links.md)
+Last refreshed: 2026-10-28 10:50
+Latest entry: [2026-10-28-1050-who-called-it.md](entries/2026-10-28-1050-who-called-it.md)
 
 A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Called The Library until 2026-10-12. Live at https://sandip.dev/nutgraf/.
 
@@ -23,10 +23,13 @@ Since 2026-10-27 Learning lists stories, not issues: Jev calls each story craft 
 
 Since 2026-10-28 Check the source follows a news page's links to the original, the paper, filing or company post its claims come from, up to five pages, and checks the story against that. It runs in the background for up to two minutes, reads one page per site, and the Source tab lists each page as it is read and the way there once kept. On real links it reached an original in four of eight checks it could start, for 1 to 3 cents; 14 of 22 links were refused at the first page, mostly paywalls. Milestone 6 is closed. After every milestone I now get a status report, filed in `docs/status/`.
 
+Since 2026-10-28 my newsletters' predictions are kept: forecasts and promises with a deadline, spotted as each issue arrives, and settled each morning from later newsletters as right, wrong or unclear, with the stories that show it. Library › Predictions lists them and lets me overrule any verdict; a newsletter's page shows how its own calls came out. The archive gave 117, five already settled.
+
 Since 2026-10-19 the thumbs ask one thing: was it useful? Relevant and Irrelevant are gone. Ratings had stalled at 12 in ten days, none for six, and a swipe both rated a card and cleared it. Now a swipe on Today only moves to the next card or back, and a thumb changes nothing but the rating. Work is tracked on the GitHub project Nutgraf (#86). Jev, TypeSafe's decision model, is to sort each story into News or Learning (#81): its scoring script shipped (#87) and the step after ingest waits to merge (#88).
 
 ## Recent entries
 
+- [2026-10-28 10:50: Who called it](entries/2026-10-28-1050-who-called-it.md)
 - [2026-10-28 09:05: The hunt on real links](entries/2026-10-28-0905-the-hunt-on-real-links.md)
 - [2026-10-28 08:40: The hunt for the original](entries/2026-10-28-0840-the-hunt-for-the-original.md)
 - [2026-10-27 23:55: Check the source, and Follow a story](entries/2026-10-27-2355-source-and-follow.md)
@@ -52,6 +55,7 @@ Since 2026-10-19 the thumbs ask one thing: was it useful? Relevant and Irrelevan
 - A thumb that only judges, apart from the swipe that moves on, gets used where Relevant did not (2026-10-19).
 - The story, not the issue, is the right unit for following news across newsletters (#15), and for what to keep: Learning lists stories since 2026-10-27 (#81).
 - My own archive is enough to answer most questions about the last two months, without the web (#21, 2026-10-27).
+- Later newsletters report enough to settle most of my newsletters' predictions without the web (#24, 2026-10-28).
 - Haiku is good enough for sorting, story splitting and the brief at about a cent an issue (`docs/architecture.md`, sections 11 and 12).
 - Brute-force similarity is enough at this volume for years; a vector index waits until a feature needs to search everything at once (`docs/features/story-index.md`).
 - Search can read every story's vector into the API's memory for a while: about 5 MB now, growing about 55 MB a year (`docs/features/search.md`).
@@ -68,6 +72,7 @@ Since 2026-10-19 the thumbs ask one thing: was it useful? Relevant and Irrelevan
 
 ## Things ruled out
 
+- Asking Haiku to skip companies' announced dates when spotting predictions: it kept them; it labels them instead and the code drops them (2026-10-28).
 - Asking Claude to keep the source hunt off a page's own site: it saw only "[n]", so the code withholds those links instead (2026-10-28).
 - Extending `sandip.dev`'s CloudFront distribution: it is Amplify Hosting, so the app has its own distribution behind a rewrite rule (2026-10-09).
 - A keep list of newsletter patterns as the ranking prior: it matched the wrong newsletters; a Must Read star instead (2026-10-09).

@@ -522,3 +522,37 @@ Sandip said "continue", then "You merge them" for milestone 6, and asked for a s
 - Withhold links in code rather than ask Claude to avoid them: it cannot avoid what it cannot see.
 - A short list of sites that are never sources (social networks, help desks, app stores), and no more: Fortune's junk picks would only move to the next site.
 - The probe measured digest stories as well as each newsletter's newest, since a digest item linking to someone else's report is the case the hunt is for.
+
+## 2026-10-28, late morning: Who called it, the archive layer (#138 to #148)
+
+Sandip chose #24 for milestone 7 and said "Build and merge".
+
+**Did:**
+
+- Milestone 7, [Who called it (#24, archive layer)](https://github.com/devsandip/the-library/milestone/7), closed: #138 (PR 142) spotting at ingest, a regex screen for forward-looking sentences with a time, then one Haiku call, quotes checked word for word, the period ended in code; #139 (PR 144) settling in the jobs Lambda every morning at 07:30 IST from the archive, right or wrong only from a story about the same thing, unclear retried after 14 days up to three tries; #143 (PRs 145, 146) each prediction classed forecast, promise or schedule, schedules dropped, and a forced rescreen that keeps settled and Sandip-set ones; #140 (PR 147) `GET /predictions`, `PATCH /predictions/{id}`, and a newsletter's track record; #141 (PR 148) the Predictions page in Library and ⌘K, with overrule and hand back.
+- On prod: the archive screened (172, then 117 after the forecasts rule) and the 5 due settled (4 right, 1 wrong). Probes, read-only, before each prompt shipped: spotting on 20 issues, settling on 16, three spotting wordings on 15 (`docs/features/predictions.md`).
+- `docs/status/2026-10-28-milestone-7.md`.
+
+**State now:**
+
+- Prod runs d741395 (PR 148's Deploy). Every Deploy today passed dev, its integration tests and prod.
+- 117 predictions: 112 open, 5 settled. The 07:30 IST schedule settles the rest as they come due; the next is 2 November.
+- The first forced rescreen failed on 83 issues (duplicate keys in one batch); fixed in PR 146 and rerun. My command then started an accidental third run, which repeated the second with the same result. About $1.25 for the three.
+- The Predictions page was checked in mock mode on the phone and the Mac, light and dark; not yet signed in on a device.
+- The laptop's AWS SSO session was renewed today (`aws sso login --sso-session main`; `--profile main` names no profile).
+
+**Next:**
+
+- Sandip: open Library › Predictions on the phone, look over the 5 settled (the Iran one especially) and some open ones; overrule what is off.
+- After 2 November and the end of December, read what the morning settling decided.
+- The next milestone, my pick: a search provider decision, which would let settling, Backstory (#16) and the web layers of Takes, Ask, Follow and #23 look beyond the newsletters. Without one, Subscription audit (#25) or Weekly tune-up (#26) from the archive.
+
+**Decisions:**
+
+- Spotting is its own call on forward-looking passages, not part of the story split, to leave the story index alone; a regex screen first keeps it to pennies.
+- Claude names the period; the code ends it.
+- No quote, no prediction: a prediction whose words are not in the issue is dropped whole.
+- Classify each as forecast, promise or schedule and drop schedules in code; asked to skip schedules, Haiku kept them.
+- Settled in the jobs Lambda on its own schedule, from the archive only; right or wrong needs a story about the same thing.
+- A newsletter's track record counts only its own calls.
+- Every pull request today was merged by me on Sandip's word for milestone 7.

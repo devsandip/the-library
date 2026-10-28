@@ -61,7 +61,11 @@ Dated, checkable predictions from the newsletters, with who made them and when t
 
 ## The archive (2026-10-28, prod)
 
-`pnpm predictions --days 120`: 566 issues screened, 160 with forward-looking passages, 172 predictions kept, no errors, in 3 minutes, for 37 cents (241,341 tokens in, 26,143 out). 32 are the newsletters' own calls. 16 were already due; 34 more come due in December 2026 and 28 at the end of 2027; the furthest is 2036.
+- **First screening** (`pnpm predictions --days 120`, #138): 566 issues screened, 160 with forward-looking passages, 172 predictions kept, no errors, in 3 minutes, for 37 cents (241,341 tokens in, 26,143 out). 32 were the newsletters' own calls and 16 were already due.
+- **Screened again for forecasts, not schedules** (`--force`, #143): 567 issues, 160 calls, **117 predictions** (91 forecasts, 26 promises; 29 the newsletters' own calls), no errors, in 3 minutes, for 42 cents. Five were due. The first forced run failed on 83 issues (a reused number deleted and written in one batch, fixed in #146); a second run by mistake repeated the good one with the same result. The three forced runs cost about $1.25 in all.
+- **First settling** (`pnpm settle`, #139): the 5 due, 4 right and 1 wrong, in 8 seconds for 1.1 cents. Right and well shown: the Fed's September rise (two predictions), Fed Chair Warsh raising rates that week, and Bumble agreeing to go private with Ithaca. Wrong: Trump expecting talks with Iran that week, from stories about military preparations instead; a call for Sandip to check. One sentence mixes a newsletter's date with the event's ("raised on 19 September, before the 18th"); the verdict stands.
+- **On prod after:** `GET /predictions` lists 112 open, the next due DoorDash buying Instacart, then 28 at the end of December 2026 and 25 at the end of 2027; 5 settled.
+- **Running cost:** spotting about 0.2 cents per issue with forward-looking passages, under 50 cents a month; settling about 0.2 cents a prediction, a few cents a month.
 
 ## Forecasts, not schedules (2026-10-28, prod, read-only: `scratch/predictions-respot-probe.ts`)
 
