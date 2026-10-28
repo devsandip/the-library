@@ -1,7 +1,7 @@
 # Nutgraf: Journal
 
-Last refreshed: 2026-10-28 10:50
-Latest entry: [2026-10-28-1050-who-called-it.md](entries/2026-10-28-1050-who-called-it.md)
+Last refreshed: 2026-10-28 14:50
+Latest entry: [2026-10-28-1450-subscription-audit.md](entries/2026-10-28-1450-subscription-audit.md)
 
 A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Called The Library until 2026-10-12. Live at https://sandip.dev/nutgraf/.
 
@@ -25,10 +25,13 @@ Since 2026-10-28 Check the source follows a news page's links to the original, t
 
 Since 2026-10-28 my newsletters' predictions are kept: forecasts and promises with a deadline, spotted as each issue arrives, and settled each morning from later newsletters as right, wrong or unclear, with the stories that show it. Library › Predictions lists them and lets me overrule any verdict; a newsletter's page shows how its own calls came out. The archive gave 117, five already settled.
 
+Since 2026-10-28 Library has a Subscription audit: a card per newsletter over the last month, from the first open logged, with what it sent, what I opened and rated, and what it repeats or alone covers, ending in worth dropping, keep or too few to tell, with its unsubscribe link and Mute. Rules on counts, no model. On my archive about 7 of 30 come out worth dropping, all for being hardly opened; repeats across newsletters turned out rare.
+
 Since 2026-10-19 the thumbs ask one thing: was it useful? Relevant and Irrelevant are gone. Ratings had stalled at 12 in ten days, none for six, and a swipe both rated a card and cleared it. Now a swipe on Today only moves to the next card or back, and a thumb changes nothing but the rating. Work is tracked on the GitHub project Nutgraf (#86). Jev, TypeSafe's decision model, is to sort each story into News or Learning (#81): its scoring script shipped (#87) and the step after ingest waits to merge (#88).
 
 ## Recent entries
 
+- [2026-10-28 14:50: Subscription audit](entries/2026-10-28-1450-subscription-audit.md)
 - [2026-10-28 10:50: Who called it](entries/2026-10-28-1050-who-called-it.md)
 - [2026-10-28 09:05: The hunt on real links](entries/2026-10-28-0905-the-hunt-on-real-links.md)
 - [2026-10-28 08:40: The hunt for the original](entries/2026-10-28-0840-the-hunt-for-the-original.md)
