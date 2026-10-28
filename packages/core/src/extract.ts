@@ -71,13 +71,28 @@ interface TextNode {
 const textOf = (node: TextNode): string =>
   node.type === "text" ? (node.data ?? "") : (node.children ?? []).map(textOf).join("");
 
+/** A link made whole against the page it is on, when there is one; a fragment alone is none. */
+function absolute(href: string, base: string | undefined): string {
+  if (!base || /^https?:\/\//i.test(href)) return href;
+  if (href.startsWith("#")) return "";
+  try {
+    return new URL(href, base).href;
+  } catch {
+    return href;
+  }
+}
+
 /**
  * Clean text for the story index (#15), with links numbered: a link to an outside page becomes
  * "[n]" after its text, and its URL is `links[n - 1]`. Claude names a story's source by number,
  * so URLs never pass through the model. Housekeeping links (unsubscribe, share, view online) and
- * links without text (images) get no number.
+ * links without text (images) get no number. A web page's relative links count too, made whole
+ * against its address (`base`), for the hunt for a story's original (#128).
  */
-export function storyText(html: string): { text: string; links: string[] } {
+export function storyText(
+  html: string,
+  opts: { base?: string } = {},
+): { text: string; links: string[] } {
   const links: string[] = [];
   const numbers = new Map<string, number>();
   const text = convert(html, {
@@ -85,7 +100,7 @@ export function storyText(html: string): { text: string; links: string[] } {
     formatters: {
       numberedLink(elem, walk, builder) {
         walk(elem.children, builder);
-        const href = String(elem.attribs?.href ?? "").trim();
+        const href = absolute(String(elem.attribs?.href ?? "").trim(), opts.base);
         const label = textOf(elem).replace(/\s+/g, " ").trim();
         if (!/^https?:\/\//i.test(href) || !label || HOUSEKEEPING.test(label)) return;
         let n = numbers.get(href);

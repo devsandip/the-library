@@ -2,6 +2,18 @@ import { describe, expect, it } from "vitest";
 import { storyText } from "../src/extract.js";
 
 describe("storyText", () => {
+  it("makes a web page's relative links whole, and leaves fragments and mail out (#128)", () => {
+    const html =
+      `<p>See <a href="/research/paper">the paper</a>, <a href="../post">the post</a>, ` +
+      `<a href="#notes">the notes</a> and <a href="mailto:x@lab.test">mail us</a>.</p>`;
+    expect(storyText(html, { base: "https://lab.test/news/item" }).links).toEqual([
+      "https://lab.test/research/paper",
+      "https://lab.test/post",
+    ]);
+    // A newsletter has no address to resolve against: its relative links stay unnumbered.
+    expect(storyText(html).links).toEqual([]);
+  });
+
   it("numbers each outside link once, after its text", () => {
     const { text, links } = storyText(
       `<p>OpenAI ships a model. <a href="https://example.com/a">Read more</a></p>` +

@@ -83,6 +83,7 @@ import type {
   Shelf,
   ShelfSetBy,
   SourceCheck,
+  SourceHop,
   StatusResponse,
   StoryPatch,
   StoryShelfSetBy,
@@ -1370,6 +1371,8 @@ export class DynamoRepo
               verdict: c.verdict as SourceCheck["verdict"],
               claims: c.claims as SourceCheck["claims"],
               ...(typeof c.note === "string" ? { note: c.note } : {}),
+              ...(typeof c.original === "boolean" ? { original: c.original } : {}),
+              ...(Array.isArray(c.path) ? { path: c.path as SourceHop[] } : {}),
               at: c.at as string,
               ms: c.ms as number,
               cents: c.cents as number,
@@ -1382,6 +1385,8 @@ export class DynamoRepo
               status: r.status as SourceRunItem["status"],
               since: r.since as string,
               ...(typeof r.none === "string" ? { none: r.none } : {}),
+              ...(Array.isArray(r.pages) ? { pages: r.pages as SourceHop[] } : {}),
+              ...(typeof r.reading === "string" ? { reading: r.reading } : {}),
             },
           }
         : {}),
@@ -1407,14 +1412,33 @@ export class DynamoRepo
     }
   }
 
+  /** A running source check's pages so far (#128), and the one it is reading. */
+  async progressRun(id: string, n: number, pages: SourceHop[], reading?: string): Promise<void> {
+    await this.ddb.send(
+      new UpdateCommand({
+        TableName: this.table,
+        Key: sourceRunKey(id, n),
+        UpdateExpression: reading
+          ? "SET #pages = :pages, #reading = :reading"
+          : "SET #pages = :pages REMOVE #reading",
+        ExpressionAttributeNames: { "#pages": "pages", "#reading": "reading" },
+        ExpressionAttributeValues: reading
+          ? { ":pages": pages, ":reading": reading }
+          : { ":pages": pages },
+      }),
+    );
+  }
+
   /** Ends a story's source check run with no check: why (`none`), or failed. */
   async endRun(id: string, n: number, none?: string): Promise<void> {
     await this.ddb.send(
       new UpdateCommand({
         TableName: this.table,
         Key: sourceRunKey(id, n),
-        UpdateExpression: none ? "SET #st = :st, #none = :none" : "SET #st = :st REMOVE #none",
-        ExpressionAttributeNames: { "#st": "status", "#none": "none" },
+        UpdateExpression: none
+          ? "SET #st = :st, #none = :none REMOVE #reading"
+          : "SET #st = :st REMOVE #none, #reading",
+        ExpressionAttributeNames: { "#st": "status", "#none": "none", "#reading": "reading" },
         ExpressionAttributeValues: none ? { ":st": "none", ":none": none } : { ":st": "failed" },
       }),
     );

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { SourceCheck } from "@library/core/types";
+import type { SourceCheck, SourceHop } from "@library/core/types";
 import type { ClaudePort, ToolRequest } from "../src/claude.js";
 import { HttpError } from "../src/errors.js";
 import { PageError, type Page } from "../src/page.js";
@@ -158,6 +158,15 @@ function memoryStore(story: SourceStory | undefined) {
       runs.set(`${id}#${n}`, { status: "running", since });
       return true;
     }),
+    progressRun: vi.fn(async (id: string, n: number, pages: SourceHop[], reading?: string) => {
+      const run = runs.get(`${id}#${n}`)!;
+      runs.set(`${id}#${n}`, {
+        status: run.status,
+        since: run.since,
+        pages,
+        ...(reading ? { reading } : {}),
+      });
+    }),
     endRun: vi.fn(async (id: string, n: number, none?: string) => {
       const run = runs.get(`${id}#${n}`)!;
       runs.set(`${id}#${n}`, {
@@ -253,7 +262,14 @@ describe("Sources", () => {
 });
 
 describe("SourceChecker", () => {
-  function setup(opts: { story?: SourceStory | undefined; page?: Page | Error; answer?: unknown }) {
+  function setup(opts: {
+    story?: SourceStory | undefined;
+    page?: Page | Error;
+    pages?: Record<string, Page>;
+    /** The hunt's answer for each page by address; the story's own page is the original. */
+    find?: Record<string, unknown>;
+    answer?: unknown;
+  }) {
     const mem = memoryStore("story" in opts ? opts.story : story);
     // The API marked the run started.
     mem.runs.set("tldr#2", { status: "running", since: "2026-10-27T09:59:59.000Z" });
@@ -261,11 +277,21 @@ describe("SourceChecker", () => {
     const claude: ClaudePort = {
       callTool: vi.fn(async (req: ToolRequest) => {
         calls.push(req);
-        return { input: opts.answer, inputTokens: 4000, outputTokens: 400 };
+        const url = /The page \((.+?)\):/.exec(req.user)?.[1] ?? "";
+        const input =
+          req.tool.name === "find_original"
+            ? (opts.find?.[url] ?? { readable: true, original: true, what: "the filing", next: [] })
+            : opts.answer;
+        return { input, inputTokens: 4000, outputTokens: 400 };
       }),
     };
     const read = vi.fn(async (link: string) => {
-      const p = opts.page ?? { url: link, contentType: "text/plain", body: article };
+      const p = opts.pages?.[link] ??
+        opts.page ?? {
+          url: link,
+          contentType: "text/plain",
+          body: article,
+        };
       if (p instanceof Error) throw p;
       return p;
     });
@@ -294,18 +320,21 @@ describe("SourceChecker", () => {
       },
     });
     const r = await checker.check("tldr", 2);
-    expect(calls).toHaveLength(1);
+    expect(calls.map((c) => c.tool.name)).toEqual(["find_original", "check_source"]);
     expect(r.check).toMatchObject({
       url: "https://example.com/filing",
+      original: true,
+      path: [{ url: "https://example.com/filing", what: "the filing" }],
       verdict: "holds",
       claims: [{ quote: "The company plans to list in the spring." }],
-      cents: 0.6,
+      // Both calls: 8,000 tokens in and 800 out.
+      cents: 1.2,
     });
     expect(store.sourceStory).toHaveBeenCalledWith("tldr", 2);
     expect(store.putSource).toHaveBeenCalledWith(
       "tldr",
       2,
-      expect.objectContaining({ inputTokens: 4000 }),
+      expect.objectContaining({ inputTokens: 8000, outputTokens: 800 }),
     );
     expect(runs.size).toBe(0);
     expect((await sources.get("tldr", 2)).check?.verdict).toBe("holds");
@@ -335,6 +364,71 @@ describe("SourceChecker", () => {
     });
     expect(await checker.check("tldr", 2)).toEqual({ none: UNREADABLE });
     expect(store.putSource).not.toHaveBeenCalled();
+  });
+
+  it("follows the story's page to the original, checks that, and shows the pages while running", async () => {
+    const report: Page = {
+      url: "https://example.com/filing",
+      contentType: "text/html",
+      body: `<p>${article}</p><p>Read <a href="https://sec.test/s1">the S-1 filing</a>.</p>`,
+    };
+    const { checker, sources, calls, store } = setup({
+      pages: { "https://example.com/filing": report },
+      find: {
+        "https://example.com/filing": {
+          readable: true,
+          original: false,
+          next: [{ link: 1, what: "the S-1" }],
+        },
+        "https://sec.test/s1": { readable: true, original: true, what: "the filing", next: [] },
+      },
+      answer: {
+        readable: true,
+        verdict: "further",
+        claims: [{ claim: "Revenue tripled.", source: "It grew threefold.", verdict: "further" }],
+      },
+    });
+    vi.mocked(store.progressRun).mockImplementationOnce(async (id, n, pages, reading) => {
+      // GET while the first page is read.
+      expect({ pages, reading }).toEqual({ pages: [], reading: "https://example.com/filing" });
+    });
+    const r = await checker.check("tldr", 2);
+    expect(r.check).toMatchObject({
+      url: "https://sec.test/s1",
+      original: true,
+      path: [
+        { url: "https://example.com/filing" },
+        { url: "https://sec.test/s1", why: "the S-1", what: "the filing" },
+      ],
+    });
+    // The check is told the story linked to a report of the original.
+    expect(calls.at(-1)!.user).toContain(
+      "The story links to https://example.com/filing, which reports it",
+    );
+    expect(store.progressRun).toHaveBeenCalledWith(
+      "tldr",
+      2,
+      [{ url: "https://example.com/filing" }],
+      "https://sec.test/s1",
+    );
+    expect((await sources.get("tldr", 2)).check?.url).toBe("https://sec.test/s1");
+  });
+
+  it("says which pages a running check has read", async () => {
+    const { sources, store } = setup({});
+    await store.progressRun(
+      "tldr",
+      2,
+      [{ url: "https://example.com/filing" }],
+      "https://sec.test/s1",
+    );
+    expect(await sources.get("tldr", 2)).toEqual({
+      running: {
+        since: "2026-10-27T09:59:59.000Z",
+        pages: [{ url: "https://example.com/filing" }],
+        reading: "https://sec.test/s1",
+      },
+    });
   });
 
   it("ends the run as failed and throws when something else goes wrong", async () => {
