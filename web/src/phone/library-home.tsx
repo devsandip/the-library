@@ -3,11 +3,13 @@ import type { StatusResponse } from "@library/core/types";
 import { useApp } from "../context.js";
 import { clock } from "../format.js";
 import { useFollowing } from "../following.js";
+import { usePredictions } from "../predictions.js";
 import { useAsync } from "../hooks.js";
 import { useLibrary } from "../library.js";
 import {
   askHref,
   followingHref,
+  predictionsHref,
   historyHref,
   newslettersHref,
   searchHref,
@@ -32,7 +34,8 @@ export function health(s: StatusResponse | undefined): { word: string; tone: str
 }
 
 /**
- * Library (P6): Search on top, then Ask, Following, History, Newsletters, Status and Settings;
+ * Library (P6): Search on top, then Ask, Following, Predictions, History, Newsletters, Status and
+ * Settings;
  * under them the places still to come. New destinations arrive here, so the tab bar never grows.
  */
 export function LibraryHome() {
@@ -45,6 +48,7 @@ export function LibraryHome() {
     followed.status === "ok"
       ? { unseen: followed.data.unseen, count: followed.data.items.length }
       : { unseen: 0, count: 0 };
+  const predicted = usePredictions("open", false).state;
   const history = useAsync(() => api.history(today), [today], `history:${today}`);
   const all = senders.data?.items ?? [];
   const h = health(status.data);
@@ -75,6 +79,21 @@ export function LibraryHome() {
               : following.count
                 ? `${following.count} ${following.count === 1 ? "story" : "stories"}`
                 : "Stories you track"}
+          </span>
+          <span class="chev" aria-hidden="true">
+            ›
+          </span>
+        </a>
+        <a class="group-row" href={predictionsHref()}>
+          <span class="group-name">Predictions</span>
+          <span
+            class={`label${predicted.status === "ok" && predicted.data.due ? " follow-new" : ""}`}
+          >
+            {predicted.status !== "ok"
+              ? "Who called it"
+              : predicted.data.due
+                ? `${predicted.data.due} due`
+                : `${predicted.data.items.length} open`}
           </span>
           <span class="chev" aria-hidden="true">
             ›
@@ -117,10 +136,6 @@ export function LibraryHome() {
       </nav>
       <p class="group-label label">Coming later</p>
       <ul class="group later" aria-label="Coming later">
-        <li class="group-row">
-          <span class="group-name">Predictions</span>
-          <span class="label">Who called it</span>
-        </li>
         <li class="group-row">
           <span class="group-name">Watch</span>
           <span class="label">The daily video</span>

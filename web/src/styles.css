@@ -1791,6 +1791,99 @@ dialog {
   font-size: 12px;
 }
 
+/* Who called it (#24): open predictions by due date, settled ones with their verdict. */
+.predictions-views {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 14px;
+}
+
+.predictions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.prediction {
+  padding: 14px 0 10px;
+  border-top: 1px solid var(--line);
+}
+
+.prediction-meta {
+  color: var(--ink-3);
+}
+
+.prediction-due {
+  color: var(--box-text);
+}
+
+.prediction-verdict.rel {
+  color: var(--rel);
+}
+
+.prediction-verdict.irr {
+  color: var(--irr);
+}
+
+.prediction-verdict.muted {
+  color: var(--ink-3);
+}
+
+.prediction-text {
+  margin-top: 4px;
+  font: 600 16px/1.35 var(--font-text);
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.prediction-quote {
+  margin: 6px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--line-2);
+  font: italic 400 14px/1.4 var(--font-text);
+  color: var(--ink-body);
+}
+
+.prediction-quote a {
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.prediction-why {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.prediction-evidence {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+
+.prediction-evidence li + li {
+  margin-top: 4px;
+}
+
+.prediction-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.prediction-actions .on {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.sender-record {
+  margin: 4px 0 14px;
+}
+
 /* Takes (#17): groups under a label, each newsletter's sentence opening its story. */
 .takes-group + .takes-group {
   margin-top: 14px;

@@ -38,6 +38,15 @@ Dated, checkable predictions from the newsletters, with who made them and when t
 - **`PATCH /predictions/{id}`** `{ verdict }`: Sandip's verdict (`setBy: sandip`, `settledAt` now), kept with settling's sentence and stories when there were any, and never settled again. `null` hands it back: open, with what settling wrote cleared, so the next morning's settling takes it if it is due.
 - **A newsletter's track record** on its sender page: its own calls (`own`), right, wrong, unclear and open. Predictions it only reported count for no one's record.
 
+## The page (#141)
+
+- **Phone:** Predictions in Library, between Following and History, with how many are due ("2 due") or open; out of Coming later. **Mac:** the same page from ⌘K ("Predictions · 2 due").
+- **Open** (`/library/predictions`): by due date, each with its due day ("Due 31 Dec", in the highlight colour and "settles in the morning" once due), who made it and whether it is the newsletter's own call, the prediction, and the quote with the newsletter and date, opening the issue at its story.
+- **Settled** (`/library/predictions/settled`): latest first, with the verdict in colour (Right green, Wrong red, Unclear grey; "your call" on Sandip's), the sentence, and the stories that show it, each opening its issue at the story.
+- **Overrule:** Right, Wrong and Unclear under every prediction set Sandip's verdict, which moves it to Settled at once; Hand back on one of his returns it to Open for the morning's settling.
+- **Track record:** a newsletter's page says what its own calls came to ("Its own calls: 3 right · 1 wrong · 2 open"), linking to Settled.
+- **Mock mode** has two open predictions (one due), and three settled: right with two stories, wrong with one, and unclear with none.
+
 ## Decisions
 
 - **Rides along with ingest, not with the story split.** Asking the split call for predictions too would change the story index's prompt and need every issue split again. A separate call that only sees forward-looking passages costs pennies a month and leaves the index alone.
