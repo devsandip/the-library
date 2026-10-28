@@ -3,7 +3,8 @@
  * its claims come from (the paper, filing, company post, repository, data or official statement),
  * up to five pages. Each page is read safely (`./page.ts`) with its links numbered, and Claude says
  * whether it is the original or which of its links lead there. Claude picks links by number, so it
- * never writes an address, and no page is read twice.
+ * never writes an address. One page is read per site (#135): an original is almost never on the
+ * site that reports it, so links within a site already read get no number.
  */
 import { READER, storyText } from "@library/core";
 import type { SourceHop } from "@library/core/types";
@@ -26,11 +27,71 @@ export interface NumberedPage {
   links: string[];
 }
 
-export function numberedPage(page: Page): NumberedPage {
+/** Two-part endings under which each name is a site of its own (lab.co.uk, lenny.substack.com). */
+const SHARED_SUFFIXES = new Set([
+  "co.uk",
+  "org.uk",
+  "ac.uk",
+  "gov.uk",
+  "com.au",
+  "co.in",
+  "co.jp",
+  "com.br",
+  "github.io",
+  "substack.com",
+  "blogspot.com",
+  "wordpress.com",
+]);
+
+/**
+ * The site a page is on: its last two names, so `www.` and subdomains are the same site
+ * (newsletter.pragmaticengineer.com is pragmaticengineer.com), or three under a shared suffix.
+ */
+export function siteOf(url: string): string {
+  let host: string;
+  try {
+    host = new URL(url).hostname.toLowerCase().replace(/\.$/, "");
+  } catch {
+    return url;
+  }
+  const names = host.split(".");
+  const two = names.slice(-2).join(".");
+  return SHARED_SUFFIXES.has(two) ? names.slice(-3).join(".") : two;
+}
+
+/**
+ * Sites that are never a story's original and that the reader cannot read anyway: social
+ * networks behind sign-ins, help desks and app stores. Their links get no number.
+ */
+const NEVER_SOURCES = new Set([
+  "instagram.com",
+  "facebook.com",
+  "linkedin.com",
+  "tiktok.com",
+  "pinterest.com",
+  "zendesk.com",
+  "apps.apple.com",
+  "play.google.com",
+]);
+
+/** Whether the hunt may follow a link: not to a site read already, nor one never a source. */
+export function followable(href: string, sites: ReadonlySet<string>): boolean {
+  const site = siteOf(href);
+  let host: string;
+  try {
+    host = new URL(href).hostname.replace(/^www\./, "");
+  } catch {
+    return false;
+  }
+  return !sites.has(site) && !NEVER_SOURCES.has(site) && !NEVER_SOURCES.has(host);
+}
+
+/** The page with its links numbered, each with its host; only those `keep` allows count. */
+export function numberedPage(page: Page, keep?: (href: string) => boolean): NumberedPage {
   if (page.contentType.startsWith("text/plain")) {
     return { url: page.url, text: page.body.trim(), links: [] };
   }
-  const { text, links } = storyText(page.body, { base: page.url });
+  const { text, links } = storyText(page.body, { base: page.url, keep, hosts: true });
   return { url: page.url, text, links };
 }
 
@@ -45,10 +106,12 @@ export function findRequest(
       "",
       "The original is where the story's claims come from: the paper (or its abstract page), " +
         "the company's or organisation's own announcement, the filing, the repository, the " +
-        "dataset, the court document or the official statement. A news report about any of " +
-        "these is not the original.",
-      "The user sends the story as the newsletter told it, then one page the search reached, " +
-        "with each of its links marked [n].",
+        "official documentation or specification, the dataset, the court document or the " +
+        "official statement. A news report, newsletter or blog post about any of these is not " +
+        "the original.",
+      "The user sends the story as the newsletter told it, then one page the search reached. " +
+        "Each of its links to a site not read yet is marked [n host]; links within sites " +
+        "already read are left unmarked and cannot be followed.",
       "Call find_original:",
       "- readable: false if the page is not an article or document: a paywall, a sign-in or " +
         "cookie wall, an error page, a home page or a list of links.",
@@ -58,9 +121,9 @@ export function findRequest(
       `- next: when it is not, up to ${MAX_NEXT} of its links most likely to be the original ` +
         "or to lead there, best first, each with the link's number and in a few words what " +
         "it is. Prefer links the page gives as its source (according to, in a post, the " +
-        "paper, filed with) and links to the organisation the story is about. Never links " +
-        "to other stories on the same site, sharing, sign-in or subscription pages. Empty " +
-        "when the page links to nothing like that.",
+        "paper, filed with) and links to the site of the organisation the story is about. " +
+        "Never other news or newsletters, sharing, sign-in, subscription, help or customer " +
+        "service pages. Empty when the page links to nothing like that.",
       "- Only what the page shows: no outside knowledge, no addresses of your own. No em-dashes.",
     ].join("\n"),
     user: [
@@ -167,6 +230,7 @@ export async function hunt(
   const started = deps.now();
   const path: SourceHop[] = [];
   const seen = new Set<string>();
+  const sites = new Set<string>();
   const calls: Hunt["calls"] = [];
   const stack: { url: string; why?: string }[] = [{ url: story.link }];
   let first: Page | undefined;
@@ -174,7 +238,8 @@ export async function hunt(
 
   while (stack.length && path.length < MAX_PAGES && deps.now() - started < HUNT_BUDGET_MS) {
     const next = stack.shift()!;
-    if (seen.has(pageOf(next.url))) continue;
+    // A site read since this link was found is passed over: one page per site.
+    if (seen.has(pageOf(next.url)) || sites.has(siteOf(next.url))) continue;
     seen.add(pageOf(next.url));
     await deps.progress?.([...path], next.url);
 
@@ -191,10 +256,11 @@ export async function hunt(
     if (path.length && seen.has(pageOf(page.url)) && pageOf(page.url) !== pageOf(next.url))
       continue;
     seen.add(pageOf(page.url));
+    sites.add(siteOf(next.url)).add(siteOf(page.url));
     const hop: SourceHop = { url: page.url, ...(next.why ? { why: next.why } : {}) };
     path.push(hop);
 
-    const numbered = numberedPage(page);
+    const numbered = numberedPage(page, (href) => followable(href, sites));
     if (numbered.text.length < 200) continue;
     const res = await deps.claude.callTool(findRequest(story, passage, numbered));
     calls.push(res);

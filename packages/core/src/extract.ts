@@ -71,6 +71,15 @@ interface TextNode {
 const textOf = (node: TextNode): string =>
   node.type === "text" ? (node.data ?? "") : (node.children ?? []).map(textOf).join("");
 
+/** A link's host, without "www.". */
+function hostOf(href: string): string {
+  try {
+    return new URL(href).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
 /** A link made whole against the page it is on, when there is one; a fragment alone is none. */
 function absolute(href: string, base: string | undefined): string {
   if (!base || /^https?:\/\//i.test(href)) return href;
@@ -87,11 +96,12 @@ function absolute(href: string, base: string | undefined): string {
  * "[n]" after its text, and its URL is `links[n - 1]`. Claude names a story's source by number,
  * so URLs never pass through the model. Housekeeping links (unsubscribe, share, view online) and
  * links without text (images) get no number. A web page's relative links count too, made whole
- * against its address (`base`), for the hunt for a story's original (#128).
+ * against its address (`base`), for the hunt for a story's original (#128), which also numbers
+ * only the links it may follow (`keep`) and shows each one's host ("[3 arxiv.org]", `hosts`).
  */
 export function storyText(
   html: string,
-  opts: { base?: string } = {},
+  opts: { base?: string; keep?: (href: string) => boolean; hosts?: boolean } = {},
 ): { text: string; links: string[] } {
   const links: string[] = [];
   const numbers = new Map<string, number>();
@@ -103,12 +113,13 @@ export function storyText(
         const href = absolute(String(elem.attribs?.href ?? "").trim(), opts.base);
         const label = textOf(elem).replace(/\s+/g, " ").trim();
         if (!/^https?:\/\//i.test(href) || !label || HOUSEKEEPING.test(label)) return;
+        if (opts.keep && !opts.keep(href)) return;
         let n = numbers.get(href);
         if (n === undefined) {
           n = links.push(href);
           numbers.set(href, n);
         }
-        builder.addInline(` [${n}]`);
+        builder.addInline(opts.hosts ? ` [${n} ${hostOf(href)}]` : ` [${n}]`);
       },
     },
     selectors: [

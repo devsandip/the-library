@@ -14,6 +14,19 @@ describe("storyText", () => {
     expect(storyText(html).links).toEqual([]);
   });
 
+  it("numbers only the links it is told to keep, with their hosts when asked (#135)", () => {
+    const html =
+      `<p><a href="https://www.lab.test/post">the post</a>, ` +
+      `<a href="https://news.test/other">another story</a>.</p>`;
+    const { text, links } = storyText(html, {
+      keep: (href) => !href.includes("news.test"),
+      hosts: true,
+    });
+    expect(links).toEqual(["https://www.lab.test/post"]);
+    expect(text).toContain("the post [1 lab.test]");
+    expect(text).not.toContain("another story [");
+  });
+
   it("numbers each outside link once, after its text", () => {
     const { text, links } = storyText(
       `<p>OpenAI ships a model. <a href="https://example.com/a">Read more</a></p>` +

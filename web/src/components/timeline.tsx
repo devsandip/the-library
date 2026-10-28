@@ -367,7 +367,7 @@ export function SourcePanel({
     <DeepPanel
       name="Check the source"
       desc="What this story claims against its original: the page it links to, or the paper, filing or post that page cites, up to five pages on. Each claim with what the original says, its own words, and whether it holds up."
-      scope="The page it links to and what it cites · ~2¢ · under a minute"
+      scope="The page it links to and what it cites · ~2¢ · under half a minute"
       cost="~2¢"
       doing="Checking"
       keptFor="story"
