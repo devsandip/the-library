@@ -148,6 +148,14 @@ function setup(overrides: Partial<RepoPort> = {}) {
         status: (verdict ?? "open") as "open",
       })),
     },
+    audit: {
+      audit: vi.fn(async () => ({
+        from: "2026-10-09T00:00:00.000Z",
+        to: "2026-10-28T00:00:00.000Z",
+        days: 19,
+        cards: [],
+      })),
+    },
     startIngest: vi.fn(async () => undefined),
   };
   const handler = createHandler(svc);
@@ -315,6 +323,15 @@ describe("routing and validation", () => {
     const ran = await call("POST", "/issues/abc123/stories/2/source");
     expect(ran.status).toBe(202);
     expect(ran.body).toEqual({ running: { since } });
+  });
+
+  it("serves the subscription audit (#150)", async () => {
+    const { call, svc } = setup();
+    const r = await call("GET", "/audit");
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ days: 19, cards: [] });
+    expect(svc.audit.audit).toHaveBeenCalledOnce();
+    expect((await call("POST", "/audit")).status).toBe(405);
   });
 
   it("lists predictions by view and takes Sandip's verdict, or null (#140)", async () => {

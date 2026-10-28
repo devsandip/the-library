@@ -332,6 +332,11 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
   },
   {
     method: "GET",
+    pattern: /^\/audit$/,
+    handler: async (svc) => ok(await svc.audit.audit()),
+  },
+  {
+    method: "GET",
     pattern: /^\/topics$/,
     handler: async (svc) => ok({ topics: await svc.repo.listTopics() }),
   },

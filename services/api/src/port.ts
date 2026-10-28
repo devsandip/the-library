@@ -1,5 +1,6 @@
 import type {
   AskResponse,
+  AuditResponse,
   Follow,
   FollowingResponse,
   HistoryResponse,
@@ -132,6 +133,11 @@ export interface PredictionsPort {
   set(id: string, verdict: Exclude<PredictionStatus, "open"> | null): Promise<Prediction>;
 }
 
+/** Subscription audit (#25, #150): a report card per newsletter, worked out when asked. */
+export interface AuditPort {
+  audit(): Promise<AuditResponse>;
+}
+
 /** Followed stories (#22): follow a story's event, list them, unfollow, mark them seen. */
 export interface FollowPort {
   list(): Promise<FollowingResponse>;
@@ -150,6 +156,7 @@ export interface Services {
   ask: AskPort;
   following: FollowPort;
   predictions: PredictionsPort;
+  audit: AuditPort;
   /** Fire-and-forget ingest run ("refresh now"). */
   startIngest(): Promise<void>;
 }

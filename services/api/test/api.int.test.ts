@@ -23,6 +23,8 @@ import {
   sourceKey,
   sourceRunKey,
   predictionKey,
+  senderIndexAttributes,
+  senderItemKey,
   storyRef,
   takesKey,
   timelineKey,
@@ -30,6 +32,7 @@ import {
   vectorBytes,
 } from "@library/core";
 import type {
+  AuditResponse,
   Prediction,
   PredictionsResponse,
   AskResponse,
@@ -1599,6 +1602,160 @@ describe("API on dev", () => {
         ),
         ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: followKey(eventId) })),
       ]);
+    }
+  });
+
+  it("audit: a card per newsletter, repeats by who carried them first, a suggestion (#150)", async () => {
+    const DAY = 86_400_000;
+    const ago = (d: number) => new Date(Date.now() - d * DAY).toISOString();
+    const alpha = senderIdentity("alpha@audit.example.test", "").senderId;
+    const beta = senderIdentity("beta@audit.example.test", "").senderId;
+    const senders = [
+      { id: alpha, publication: "Audit Alpha", unsub: "https://alpha.example.test/unsubscribe" },
+      { id: beta, publication: "Audit Beta" },
+    ];
+    const issues = [
+      ...[2, 4, 6, 8].map((d, k) => ({ id: `int-aud-a${k + 1}`, senderId: alpha, d })),
+      ...[1, 3, 5, 7].map((d, k) => ({ id: `int-aud-b${k + 1}`, senderId: beta, d })),
+    ];
+    const stories = [
+      // Alpha carried e1 first and Beta a day later; e2 is Alpha's alone.
+      { id: "int-aud-a1", senderId: alpha, d: 2, eventId: "int-aud-e1", headline: "Both" },
+      { id: "int-aud-b1", senderId: beta, d: 1, eventId: "int-aud-e1", headline: "Both, later" },
+      { id: "int-aud-a2", senderId: alpha, d: 4, eventId: "int-aud-e2", headline: "Alpha alone" },
+    ];
+    // An open 25 days ago starts the window there; one yesterday opens Alpha's first issue.
+    const opens = [
+      { id: "fx-lenny", at: ago(25) },
+      { id: "int-aud-a1", at: ago(1) },
+    ];
+    const keys = [
+      ...senders.map((x) => senderItemKey(x.id)),
+      ...issues.map((i) => issueKey(i.id)),
+      ...stories.map((x) => storyKey(x.id, 1)),
+      ...opens.map((o, k) => eventKey(o.id, o.at, `audit${k}`)),
+    ];
+    try {
+      for (const x of senders) {
+        await ddb.send(
+          new PutCommand({
+            TableName: stack.tableName,
+            Item: {
+              ...senderItemKey(x.id),
+              senderId: x.id,
+              senderKey: `${x.publication.toLowerCase()}@audit.example.test`,
+              publication: x.publication,
+              muted: false,
+              mustRead: false,
+              up: x.id === alpha ? 1 : 0,
+              down: 0,
+              issueCount: 4,
+              lastSeenAt: ago(1),
+              ...(x.unsub ? { unsubscribeUrl: x.unsub } : {}),
+              ...senderIndexAttributes(x.id, x.publication),
+            },
+          }),
+        );
+      }
+      for (const i of issues) {
+        const receivedAt = ago(i.d);
+        const rated = i.id === "int-aud-a1" ? { rating: 1 as const, ratedAt: ago(1) } : {};
+        await ddb.send(
+          new PutCommand({
+            TableName: stack.tableName,
+            Item: {
+              ...issueKey(i.id),
+              id: i.id,
+              senderId: i.senderId,
+              publication: senders.find((x) => x.id === i.senderId)!.publication,
+              subject: i.id,
+              receivedAt,
+              state: "unread",
+              ...rated,
+              ...issueIndexAttributes({
+                id: i.id,
+                senderId: i.senderId,
+                receivedAt,
+                state: "unread",
+                ...rated,
+              }).set,
+            },
+          }),
+        );
+      }
+      for (const x of stories) {
+        const receivedAt = ago(x.d);
+        await ddb.send(
+          new PutCommand({
+            TableName: stack.tableName,
+            Item: {
+              ...storyKey(x.id, 1),
+              id: x.id,
+              n: 1,
+              senderId: x.senderId,
+              receivedAt,
+              headline: x.headline,
+              summary: "",
+              names: [],
+              eventId: x.eventId,
+              gsi1pk: "STORIES",
+              gsi1sk: `${receivedAt}#${storyRef(x.id, 1)}`,
+            },
+          }),
+        );
+      }
+      for (const [k, o] of opens.entries()) {
+        await ddb.send(
+          new PutCommand({
+            TableName: stack.tableName,
+            Item: {
+              ...eventKey(o.id, o.at, `audit${k}`),
+              type: "open",
+              ...openIndexAttributes(o.id, o.at),
+            },
+          }),
+        );
+      }
+
+      const r = await eventually(
+        () => call<AuditResponse>("GET", "/audit"),
+        (x) =>
+          x.body.cards?.filter((c) => c.senderId === alpha || c.senderId === beta).length === 2 &&
+          x.body.cards.find((c) => c.senderId === beta)!.repeats === 1 &&
+          x.body.days >= 25,
+      );
+      expect(r.status).toBe(200);
+      expect(r.body.days).toBeGreaterThanOrEqual(25);
+      const a = r.body.cards.find((c) => c.senderId === alpha)!;
+      const b = r.body.cards.find((c) => c.senderId === beta)!;
+      expect(a).toMatchObject({
+        publication: "Audit Alpha",
+        unsubscribeUrl: "https://alpha.example.test/unsubscribe",
+        issues: 4,
+        opened: 1,
+        useful: 1,
+        stories: 2,
+        repeats: 0,
+        only: 1,
+        onlyHeadlines: [{ issueId: "int-aud-a2", n: 1, headline: "Alpha alone" }],
+        verdict: "keep",
+        reason: "useful",
+      });
+      expect(b).toMatchObject({
+        issues: 4,
+        opened: 0,
+        stories: 1,
+        repeats: 1,
+        firstBy: { senderId: alpha, publication: "Audit Alpha", stories: 1 },
+        verdict: "drop",
+        reason: "unopened",
+      });
+      // Worth dropping comes first.
+      expect(r.body.cards.indexOf(b)).toBeLessThan(r.body.cards.indexOf(a));
+    } finally {
+      await Promise.all(
+        keys.map((Key) => ddb.send(new DeleteCommand({ TableName: stack.tableName, Key }))),
+      );
     }
   });
 });
