@@ -32,6 +32,8 @@ export const sourceKey = (id: string, n: number) => ({
   pk: `SOURCE#${id}#${String(n).padStart(2, "0")}`,
   sk: "META",
 });
+/** The latest run of a story's source check, beside the check: running, or why it kept none. */
+export const sourceRunKey = (id: string, n: number) => ({ pk: sourceKey(id, n).pk, sk: "RUN" });
 /** How each newsletter covered an event (#17), kept for the event like its timeline. */
 export const takesKey = (eventId: string) => ({ pk: `TAKES#${eventId}`, sk: "META" });
 /** A followed story (#22), by its event; all of them are one partition, read in one query. */

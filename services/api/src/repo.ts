@@ -48,6 +48,7 @@ import {
   storyRef,
   storyShelf,
   sourceKey,
+  sourceRunKey,
   takesKey,
   timelineKey,
   TOPICS_KEY,
@@ -100,7 +101,7 @@ import type { CorpusIssue, CorpusSource, CorpusStory } from "./corpus.js";
 import type { OwnStory, RelatedSource } from "./related.js";
 import type { FollowStore } from "./following.js";
 import type { SearchSource } from "./search.js";
-import type { SourceStore, SourceStory, StoredSource } from "./source.js";
+import type { SourceRunItem, SourceStore, SourceStory, StoredSource } from "./source.js";
 import type { StoredTakes, TakesStore } from "./takes.js";
 import type { StoredTimeline, TimelineStore, TimelineStory } from "./timeline.js";
 
@@ -1308,7 +1309,11 @@ export class DynamoRepo
   }
 
   /** A story as the source check reads it (#23): its link, and its issue's text while kept. */
-  async sourceStory(id: string, n: number): Promise<SourceStory | undefined> {
+  async sourceStory(
+    id: string,
+    n: number,
+    opts: { text?: boolean } = {},
+  ): Promise<SourceStory | undefined> {
     const [issue, story] = await Promise.all([
       this.ddb.send(
         new GetCommand({
@@ -1334,7 +1339,7 @@ export class DynamoRepo
     ]);
     const s = story.Item;
     if (!issue.Item || issue.Item.state === "filtered" || !s) return undefined;
-    const text = await this.readObject(s3Keys(id).text);
+    const text = opts.text === false ? undefined : await this.readObject(s3Keys(id).text);
     return {
       issueId: id,
       n,
@@ -1347,27 +1352,83 @@ export class DynamoRepo
     };
   }
 
-  async getSource(id: string, n: number): Promise<SourceCheck | undefined> {
-    const res = await this.ddb.send(
-      new GetCommand({ TableName: this.table, Key: sourceKey(id, n) }),
-    );
-    const c = res.Item;
-    if (!c) return undefined;
+  /** A story's kept check and its latest run (#23): one consistent read, as GET follows a run. */
+  async getSource(id: string, n: number): Promise<{ check?: SourceCheck; run?: SourceRunItem }> {
+    const res = await this.query({
+      KeyConditionExpression: "pk = :pk",
+      ExpressionAttributeValues: { ":pk": sourceKey(id, n).pk },
+      ConsistentRead: true,
+    });
+    const items = res.Items ?? [];
+    const c = items.find((i) => i.sk === sourceKey(id, n).sk);
+    const r = items.find((i) => i.sk === sourceRunKey(id, n).sk);
     return {
-      url: c.url as string,
-      verdict: c.verdict as SourceCheck["verdict"],
-      claims: c.claims as SourceCheck["claims"],
-      ...(typeof c.note === "string" ? { note: c.note } : {}),
-      at: c.at as string,
-      ms: c.ms as number,
-      cents: c.cents as number,
+      ...(c
+        ? {
+            check: {
+              url: c.url as string,
+              verdict: c.verdict as SourceCheck["verdict"],
+              claims: c.claims as SourceCheck["claims"],
+              ...(typeof c.note === "string" ? { note: c.note } : {}),
+              at: c.at as string,
+              ms: c.ms as number,
+              cents: c.cents as number,
+            },
+          }
+        : {}),
+      ...(r
+        ? {
+            run: {
+              status: r.status as SourceRunItem["status"],
+              since: r.since as string,
+              ...(typeof r.none === "string" ? { none: r.none } : {}),
+            },
+          }
+        : {}),
     };
   }
 
-  /** Keeps a source check for its story (#23), replacing any earlier one. */
+  /** Marks a story's source check running, unless one that started after `staleBefore` is. */
+  async startRun(id: string, n: number, since: string, staleBefore: string): Promise<boolean> {
+    try {
+      await this.ddb.send(
+        new PutCommand({
+          TableName: this.table,
+          Item: { ...sourceRunKey(id, n), status: "running", since },
+          ConditionExpression: "attribute_not_exists(pk) OR #st <> :running OR #since <= :stale",
+          ExpressionAttributeNames: { "#st": "status", "#since": "since" },
+          ExpressionAttributeValues: { ":running": "running", ":stale": staleBefore },
+        }),
+      );
+      return true;
+    } catch (err) {
+      if (isConditionFailure(err)) return false;
+      throw err;
+    }
+  }
+
+  /** Ends a story's source check run with no check: why (`none`), or failed. */
+  async endRun(id: string, n: number, none?: string): Promise<void> {
+    await this.ddb.send(
+      new UpdateCommand({
+        TableName: this.table,
+        Key: sourceRunKey(id, n),
+        UpdateExpression: none ? "SET #st = :st, #none = :none" : "SET #st = :st REMOVE #none",
+        ExpressionAttributeNames: { "#st": "status", "#none": "none" },
+        ExpressionAttributeValues: none ? { ":st": "none", ":none": none } : { ":st": "failed" },
+      }),
+    );
+  }
+
+  /** Keeps a source check for its story (#23), replacing any earlier one, and ends its run. */
   async putSource(id: string, n: number, check: StoredSource): Promise<void> {
     await this.ddb.send(
-      new PutCommand({ TableName: this.table, Item: { ...sourceKey(id, n), ...check } }),
+      new TransactWriteCommand({
+        TransactItems: [
+          { Put: { TableName: this.table, Item: { ...sourceKey(id, n), ...check } } },
+          { Delete: { TableName: this.table, Key: sourceRunKey(id, n) } },
+        ],
+      }),
     );
   }
 

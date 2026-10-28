@@ -238,10 +238,19 @@ export interface SourceCheck {
   cents: number;
 }
 
-/** GET and POST /issues/{id}/stories/{n}/source: the kept check, or why there is none. */
+/** A source check running in the background (#23), since when. */
+export interface SourceRun {
+  since: string;
+}
+
+/**
+ * GET and POST /issues/{id}/stories/{n}/source: the kept check, or why there is none, or the
+ * check running now (GET again until it is kept or says why not).
+ */
 export interface SourceResponse {
   check?: SourceCheck;
   none?: string;
+  running?: SourceRun;
 }
 
 /** One newsletter's take on an event (#17): what it says or stresses, and its story. */

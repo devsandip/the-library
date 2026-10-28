@@ -4,6 +4,9 @@
  * with what the page says, a quote and a verdict: holds up, goes further than the source, or not
  * in the source. Quotes are checked against the page, so a quote shown is the page's own words.
  *
+ * A check runs in the jobs Lambda (`./jobs.ts`), so it is not held to the API's 28 seconds: the
+ * API starts it and answers at once, and GET says it is running until it is kept or says why not.
+ *
  * One page: the hunt for the primary source behind a news report is the next step. Written only
  * when the reader asks, and kept for the story.
  */
@@ -12,17 +15,20 @@ import type { SourceCheck, SourceClaim, SourceResponse, SourceVerdict } from "@l
 import type { ClaudePort, ToolRequest } from "./claude.js";
 import { notFound } from "./errors.js";
 import { fetchPage, PageError, type Page } from "./page.js";
-import type { SourcePort } from "./port.js";
+import type { Job, SourcePort } from "./port.js";
 
 /** The page's text Claude reads at most, and the newsletter's. */
 const PAGE_CHARS = 12_000;
 const PASSAGE_CHARS = 3_000;
 const MAX_CLAIMS = 5;
 const VERDICTS: readonly SourceVerdict[] = ["holds", "further", "missing"];
+/** How long a run may say it is running: the jobs Lambda stops at 2 minutes. */
+export const RUN_LIMIT_MS = 3 * 60_000;
 
 export const NO_LINK = "This story has no source link to check.";
 export const UNREADABLE =
   "The source could not be read as an article: it may be behind a paywall or a sign-in.";
+export const STOPPED = "The check did not finish. Try again.";
 
 /** A story as the check reads it: what it says, where it links, and its newsletter's text. */
 export interface SourceStory {
@@ -39,8 +45,15 @@ export interface SourceStory {
 
 /** Where checks read from and are kept. DynamoRepo implements it; tests use a fake. */
 export interface SourceStore {
-  sourceStory(id: string, n: number): Promise<SourceStory | undefined>;
-  getSource(id: string, n: number): Promise<SourceCheck | undefined>;
+  /** The story, with its issue's text unless `text` is false. */
+  sourceStory(id: string, n: number, opts?: { text?: boolean }): Promise<SourceStory | undefined>;
+  /** The kept check and the latest run, either of which may be missing. */
+  getSource(id: string, n: number): Promise<{ check?: SourceCheck; run?: SourceRunItem }>;
+  /** Marks a run started; false when one started after `staleBefore` is still running. */
+  startRun(id: string, n: number, since: string, staleBefore: string): Promise<boolean>;
+  /** Ends the run with no check: why there is none, or nothing when it failed. */
+  endRun(id: string, n: number, none?: string): Promise<void>;
+  /** Keeps the check, replacing any earlier one, and ends its run. */
   putSource(id: string, n: number, check: StoredSource): Promise<void>;
 }
 
@@ -48,6 +61,13 @@ export interface StoredSource extends SourceCheck {
   model: string;
   inputTokens: number;
   outputTokens: number;
+}
+
+/** The latest run of a story's check, until a check is kept: running, none (why) or failed. */
+export interface SourceRunItem {
+  status: "running" | "none" | "failed";
+  since: string;
+  none?: string;
 }
 
 const words = (s: string) => s.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? [];
@@ -187,7 +207,56 @@ export function parseSource(
   return { verdict, claims, ...(note ? { note } : {}) };
 }
 
+/** The API's side: what is kept or running for a story, and starting a run in the background. */
 export class Sources implements SourcePort {
+  constructor(
+    private readonly store: SourceStore,
+    private readonly startJob: (job: Job) => Promise<void>,
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  /** The run going now, or why the latest run kept nothing, or the kept check. */
+  async get(id: string, n: number): Promise<SourceResponse> {
+    await this.story(id, n);
+    const { check, run } = await this.store.getSource(id, n);
+    if (run?.status === "running") {
+      const fresh = this.now() - Date.parse(run.since) < RUN_LIMIT_MS;
+      return fresh ? { running: { since: run.since } } : { none: STOPPED };
+    }
+    // A kept check ends its run, so a run still here is newer than any check.
+    if (run) return { none: run.none ?? STOPPED };
+    return check ? { check } : {};
+  }
+
+  /** Starts a check in the jobs Lambda, or answers the one already running. */
+  async run(id: string, n: number): Promise<SourceResponse> {
+    const story = await this.story(id, n);
+    if (!story.link) return { none: NO_LINK };
+    const now = this.now();
+    const since = new Date(now).toISOString();
+    const stale = new Date(now - RUN_LIMIT_MS).toISOString();
+    if (!(await this.store.startRun(id, n, since, stale))) return this.get(id, n);
+    try {
+      await this.startJob({ kind: "source", id, n });
+    } catch (err) {
+      await this.store.endRun(id, n);
+      throw err;
+    }
+    return { running: { since } };
+  }
+
+  private async story(id: string, n: number): Promise<SourceStory> {
+    const story = await this.store.sourceStory(id, n, { text: false });
+    if (!story) throw notFound(`issue ${id} has no story ${n}`);
+    return story;
+  }
+}
+
+/**
+ * The jobs Lambda's side: reads the page, asks Claude, and keeps the check, or ends the run with
+ * why there is none. Anything else that goes wrong ends the run as failed, and is thrown.
+ */
+export class SourceChecker {
   constructor(
     private readonly store: SourceStore,
     private readonly claude: ClaudePort,
@@ -195,15 +264,21 @@ export class Sources implements SourcePort {
     private readonly now: () => number = Date.now,
   ) {}
 
-  async get(id: string, n: number): Promise<SourceResponse> {
-    await this.story(id, n);
-    const check = await this.store.getSource(id, n);
-    return check ? { check } : {};
+  async check(id: string, n: number): Promise<SourceResponse> {
+    try {
+      const r = await this.attempt(id, n);
+      if (!r.check) await this.store.endRun(id, n, r.none);
+      return r;
+    } catch (err) {
+      await this.store.endRun(id, n);
+      throw err;
+    }
   }
 
-  async run(id: string, n: number): Promise<SourceResponse> {
+  private async attempt(id: string, n: number): Promise<SourceResponse> {
     const started = this.now();
-    const story = await this.story(id, n);
+    const story = await this.store.sourceStory(id, n);
+    if (!story) throw notFound(`issue ${id} has no story ${n}`);
     if (!story.link) return { none: NO_LINK };
     let page: Page;
     try {
@@ -246,11 +321,5 @@ export class Sources implements SourcePort {
       }),
     );
     return { check };
-  }
-
-  private async story(id: string, n: number): Promise<SourceStory> {
-    const story = await this.store.sourceStory(id, n);
-    if (!story) throw notFound(`issue ${id} has no story ${n}`);
-    return story;
   }
 }

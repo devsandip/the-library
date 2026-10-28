@@ -62,6 +62,7 @@ export class LibraryStack extends Stack {
     new CfnOutput(this, "ContentBucket", { value: data.content.bucketName });
     new CfnOutput(this, "IngestFunction", { value: ingest.fn.functionName });
     new CfnOutput(this, "ApiFunction", { value: api.fn.functionName });
+    new CfnOutput(this, "JobsFunction", { value: api.jobsFn.functionName });
 
     if (!prod) return;
 

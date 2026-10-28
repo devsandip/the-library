@@ -21,6 +21,7 @@ import {
   storyIndexAttributes,
   storyKey,
   sourceKey,
+  sourceRunKey,
   storyRef,
   takesKey,
   timelineKey,
@@ -105,6 +106,16 @@ async function eventually<T>(read: () => Promise<T>, ok: (v: T) => boolean): Pro
     await new Promise((r) => setTimeout(r, 500));
   }
   return last as T;
+}
+
+/** A source check runs in the jobs Lambda (#23): read it until it is no longer running. */
+async function sourceSettled(path: string): Promise<SourceResponse> {
+  for (let i = 0; i < 45; i++) {
+    const res = await call<SourceResponse>("GET", path);
+    if (!res.body.running) return res.body;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  throw new Error(`${path} still running after 90 seconds`);
 }
 
 const ids = (r: { body: IssueListResponse }) => r.body.items.map((i) => i.id);
@@ -1348,7 +1359,7 @@ describe("API on dev", () => {
     ]);
   });
 
-  it("source: a story checked against the page it links to; a private address refused (#23)", async () => {
+  it("source: a story checked in the jobs Lambda against the page it links to; a private address refused (#23)", async () => {
     const tldr = (await getItem("fx-tldr"))!;
     const put = (n: number, headline: string, summary: string, link: string) =>
       ddb.send(
@@ -1381,12 +1392,19 @@ describe("API on dev", () => {
       "http://169.254.169.254/latest/meta-data/",
     );
 
+    // Nothing left from an earlier run that failed before cleaning up.
+    await Promise.all(
+      [sourceKey("fx-tldr", 51), sourceRunKey("fx-tldr", 51), sourceRunKey("fx-tldr", 52)].map(
+        (Key) => ddb.send(new DeleteCommand({ TableName: stack.tableName, Key })),
+      ),
+    );
     expect((await call<SourceResponse>("GET", "/issues/fx-tldr/stories/51/source")).body).toEqual(
       {},
     );
     const ran = await call<SourceResponse>("POST", "/issues/fx-tldr/stories/51/source");
-    expect(ran.status).toBe(200);
-    const check = ran.body.check!;
+    expect(ran.status).toBe(202);
+    expect(ran.body.running?.since).toBeDefined();
+    const check = (await sourceSettled("/issues/fx-tldr/stories/51/source")).check!;
     expect(check.url).toBe("https://www.rfc-editor.org/rfc/rfc2606.txt");
     expect(check.claims.length).toBeGreaterThan(0);
     expect(["holds", "further", "mixed"]).toContain(check.verdict);
@@ -1396,8 +1414,10 @@ describe("API on dev", () => {
       (await call<SourceResponse>("GET", "/issues/fx-tldr/stories/51/source")).body.check?.url,
     ).toBe(check.url);
 
-    const refused = await call<SourceResponse>("POST", "/issues/fx-tldr/stories/52/source");
-    expect(refused.body).toEqual({
+    expect((await call<SourceResponse>("POST", "/issues/fx-tldr/stories/52/source")).status).toBe(
+      202,
+    );
+    expect(await sourceSettled("/issues/fx-tldr/stories/52/source")).toEqual({
       none: "The source could not be read: the address is not a public one.",
     });
 
@@ -1406,6 +1426,11 @@ describe("API on dev", () => {
         ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: storyKey("fx-tldr", n) })),
       ),
       ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: sourceKey("fx-tldr", 51) })),
+      ...[51, 52].map((n) =>
+        ddb.send(
+          new DeleteCommand({ TableName: stack.tableName, Key: sourceRunKey("fx-tldr", n) }),
+        ),
+      ),
     ]);
   });
 

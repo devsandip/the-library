@@ -124,16 +124,33 @@ describe("data and ingest", () => {
     });
   });
 
-  it("ingest and the API may call Haiku 4.5 or 5.5 (any US region) and Titan (#53, #19)", () => {
+  it("the jobs Lambda runs up to 2 minutes, never retries, and the API starts it (#23)", () => {
+    const t = synth("prod");
+    t.hasResourceProperties("AWS::Lambda::Function", {
+      Handler: "index.handler",
+      Timeout: 120,
+      Environment: { Variables: Match.objectLike({ TABLE_NAME: Match.anyValue() }) },
+    });
+    t.hasResourceProperties("AWS::Lambda::Function", {
+      Timeout: 28,
+      Environment: { Variables: Match.objectLike({ JOBS_FUNCTION: Match.anyValue() }) },
+    });
+    const configs = Object.values(t.findResources("AWS::Lambda::EventInvokeConfig"));
+    expect(configs.length).toBeGreaterThanOrEqual(2);
+    expect(configs.every((c) => c.Properties.MaximumRetryAttempts === 0)).toBe(true);
+    expect(Object.keys(t.findOutputs("JobsFunction"))).toHaveLength(1);
+  });
+
+  it("ingest, the API and its jobs may call Haiku 4.5 or 5.5 (any US region) and Titan", () => {
     const policies = Object.values(synth("prod").findResources("AWS::IAM::Policy"));
     const statements = policies.flatMap(
       (p) => p.Properties.PolicyDocument.Statement as { Action: unknown; Resource: unknown }[],
     );
     const bedrock = statements.filter((st) => JSON.stringify(st.Action).includes("bedrock:"));
-    expect(bedrock).toHaveLength(2);
+    expect(bedrock).toHaveLength(3);
     expect(bedrock.every((st) => st.Action === "bedrock:InvokeModel")).toBe(true);
-    const [ingest, api] = bedrock;
-    expect(api!.Resource).toEqual(ingest!.Resource);
+    const [ingest, ...others] = bedrock;
+    for (const st of others) expect(st.Resource).toEqual(ingest!.Resource);
     const resources = JSON.stringify(ingest!.Resource);
     expect(resources).toContain(":inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0");
     expect(resources).toContain(

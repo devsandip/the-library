@@ -285,9 +285,19 @@ describe("routing and validation", () => {
     expect(svc.sources.get).toHaveBeenCalledWith("abc123", 2);
     expect(svc.sources.run).not.toHaveBeenCalled();
     const ran = await call("POST", "/issues/abc123/stories/2/source");
+    expect(ran.status).toBe(200);
     expect(ran.body).toEqual({ none: "This story has no source link to check." });
     expect(svc.sources.run).toHaveBeenCalledWith("abc123", 2);
     expect((await call("DELETE", "/issues/abc123/stories/2/source")).status).toBe(405);
+  });
+
+  it("answers 202 while a source check runs in the background (#23)", async () => {
+    const { call, svc } = setup();
+    const since = "2026-10-28T03:00:00.000Z";
+    vi.mocked(svc.sources.run).mockResolvedValueOnce({ running: { since } });
+    const ran = await call("POST", "/issues/abc123/stories/2/source");
+    expect(ran.status).toBe(202);
+    expect(ran.body).toEqual({ running: { since } });
   });
 
   it("follows and unfollows a story, lists what is followed, marks it seen (#22)", async () => {

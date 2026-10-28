@@ -4,7 +4,8 @@ A story against the page it links to: what the newsletter claimed, what the page
 
 ## What it does
 
-- **`GET` and `POST /nutgraf/api/issues/{id}/stories/{n}/source`** (`services/api/src/source.ts`), like the timeline's: the GET answers the check kept for the story; the POST runs it now and keeps it under `SOURCE#<issueId>#<nn>`, per story, since the link is the story's own.
+- **`GET` and `POST /nutgraf/api/issues/{id}/stories/{n}/source`** (`services/api/src/source.ts`): the POST starts a check and answers 202 `{ running }` at once; the GET answers `{ running }` while it runs, then the check kept for the story under `SOURCE#<issueId>#<nn>` (per story, since the link is the story's own), or `{ none }` with why the latest run kept nothing.
+- **In the background (#127).** The check runs in the jobs Lambda (`services/api/src/jobs.ts`: 2 minutes, started by the API with an async invoke, no retries), so a check is not held to the API's 28 seconds and the hunt for the original (#128) can read several pages. The run is an item beside the check (sort key `RUN`): `running` from the POST, `none` with why or `failed` when the job keeps nothing; keeping a check deletes it in the same transaction. A second POST while a run is going answers that run. A run still `running` after 3 minutes (the job stops at 2) answers "The check did not finish. Try again." and can be started again.
 - **Read the page safely** (`services/api/src/page.ts`). The link comes from a newsletter and the API Lambda can reach the internet, so:
   - http or https only, on ports 80 and 443, with no user name or password in the link;
   - every address the host resolves to must be public: not private, loopback, link-local (which includes the cloud metadata service), shared (CGNAT), multicast, documentation or reserved, in IPv4 or IPv6, including IPv4 written inside IPv6, 6to4 and NAT64. The check runs in the request's own DNS lookup, at connect time, so the answer cannot change after it; an address written as a number is checked before the request;
@@ -17,8 +18,8 @@ A story against the page it links to: what the newsletter claimed, what the page
 
 - **Phone:** the story sheet's Source tab, after Timeline and Takes (`/issue/:id/story/:n/source`). Idle, what it reads and costs (`The page it links to · ~1¢ · under half a minute`) with Run; "Checking · 0:02" while it runs; ✓ once kept. Kept: the overall verdict (Holds up in green, Goes further than the source in yellow, Not in the source in red, or Mixed), the page's host as a link, the note, then each claim with its verdict, what the page says, and the quote in italics. The receipt says it is kept for this story.
 - **Mac:** the story index's key grid has a C row ("Check source", as the design draws it), C runs it, and the check shows compactly under the selected story.
-- Built on the shared deep-dive store and frame (`web/src/timeline.ts`, `DeepPanel`), which now take what the status line says while running and whether a result is kept for the event or the story.
-- **Mock mode** checks against a stand-in page: one claim that holds, one the newsletter took further.
+- Built on the shared deep-dive store and frame (`web/src/timeline.ts`, `DeepPanel`), which now take what the status line says while running and whether a result is kept for the event or the story. The store reads a check that runs in the background again every 2 seconds until it settles (giving up after 4 minutes, with Try again), and a story opened while its check runs, on either device, shows it running.
+- **Mock mode** checks against a stand-in page in a stand-in background run of 4 seconds: one claim that holds, one the newsletter took further.
 
 ## Decisions
 
@@ -26,6 +27,7 @@ A story against the page it links to: what the newsletter claimed, what the page
 - **Haiku, about half a cent.** The design costed Source at about 10¢ for an agent; one call over one page costs far less.
 - **The safety lives in the connection,** not in a check before it: a check-then-fetch can be beaten by a DNS answer that changes between the two, so the address is checked as the socket connects.
 - **Kept per story,** not per event like the timeline and takes: two newsletters on one event link to different pages.
+- **A job, polled** (#127), not a longer request: HTTP API waits at most 30 seconds, and the hunt reads up to five pages of up to 8 seconds each with a Claude call between them. The web polls rather than holding a socket open, so a phone that sleeps mid-check finds the result when it wakes. The run is an item of its own beside the check, so starting or failing a run never rewrites a kept check.
 
 ## Probe (2026-10-27, prod, eight recent stories from eight newsletters, through the API Lambda)
 

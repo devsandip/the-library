@@ -215,8 +215,8 @@ HTTP API, one route `ANY /nutgraf/api/{proxy+}` behind the Cognito JWT authorize
 | POST | `/nutgraf/api/issues/{id}/stories/{n}/timeline` | Writes the story's timeline now, keeps it for the event (replacing any earlier one) and answers like the GET; with nothing close enough to tell, `{ none }` says why and nothing is kept. One Claude call of 4 to 9 seconds, about half a cent; the web calls it only when Sandip asks. |
 | GET | `/nutgraf/api/issues/{id}/stories/{n}/takes` | How each newsletter covered the story's event (#17, section 11): `{ takes? }`, the takes kept for the event (`gist`, `groups` of `label` and `takes`, each a sentence with its `source`, the open story's marked `current`). 404 for a story the issue does not have. |
 | POST | `/nutgraf/api/issues/{id}/stories/{n}/takes` | Writes them now and keeps them for the event, replacing any earlier ones; with fewer than two newsletters, `{ none }` says so and nothing is kept. One Claude call of about a cent. |
-| GET | `/nutgraf/api/issues/{id}/stories/{n}/source` | The story checked against the page it links to (#23, section 11): `{ check? }` (`url`, `verdict`, `claims` each with `claim`, `source`, `quote` when checked against the page, `verdict`; `note`), kept per story. 404 for a story the issue does not have. |
-| POST | `/nutgraf/api/issues/{id}/stories/{n}/source` | Reads the page safely and checks now, keeping the check for the story; `{ none }` says why when there is no link or the page cannot be read as an article, and nothing is kept. |
+| GET | `/nutgraf/api/issues/{id}/stories/{n}/source` | The story checked against the page it links to (#23, section 11): `{ running: { since } }` while a check runs; otherwise `{ check? }` (`url`, `verdict`, `claims` each with `claim`, `source`, `quote` when checked against the page, `verdict`; `note`), kept per story, or `{ none }` with why the latest run kept nothing (a run still going after 3 minutes counts as stopped). 404 for a story the issue does not have. |
+| POST | `/nutgraf/api/issues/{id}/stories/{n}/source` | Starts the check in the jobs Lambda and answers 202 `{ running: { since } }` at once (the running one, if a check is already going); the job reads the page safely, checks it and keeps the check for the story, or records why there is none. `{ none }` straight away when the story has no link. |
 | POST | `/nutgraf/api/issues/{id}/stories/{n}/follow` | Follow the story's event (#22, section 11): answers the follow (`eventId`, the story followed, `followedAt`, `movedAt?`, `points`, `unseen`, `quiet`, `stories`), starting from the event's kept timeline, or the story itself as one point. An event already followed answers its follow. 409 at 20 followed stories; 404 for a story the issue does not have. |
 | DELETE | `/nutgraf/api/issues/{id}/stories/{n}/follow` | Unfollow the story's event (and any follow of the story itself that a relink left on another event), 204. |
 | GET | `/nutgraf/api/following` | `{ items, unseen }`: every followed story, moving ones first and latest movement first, quiet ones (no movement for 30 days) last; `unseen` counts the points added since Sandip last looked. |
@@ -282,6 +282,7 @@ Deploys (`docs/features/pipeline.md`): only GitHub Actions deploys prod, from ma
 | DynamoDB table, content bucket | yes, `RETAIN`, PITR, deletion protection | yes, `DESTROY` |
 | ingest Lambda | yes, with Scheduler and alarms | yes, no schedule (fed by `seed-dev`) |
 | api Lambda | yes, behind HTTP API + authorizer | yes, invoked directly by integration tests |
+| jobs Lambda (#23): deep dives over 28 seconds, started by the API with an async invoke, 2 minutes, no retries | yes | yes |
 | Cognito, HTTP API, CloudFront, web bucket | yes | no |
 
 Lambda details: Node 24, arm64, `NodejsFunction` bundled locally by esbuild (esbuild is a root devDependency; no Docker), ESM output with a `createRequire` banner for CommonJS dependencies, `@aws-sdk/*` external (provided by the runtime), root `pnpm-lock.yaml` as `depsLockFilePath`. Explicit log groups with 14-day retention.
@@ -362,7 +363,8 @@ A story against the page it links to; decisions in `docs/features/source.md`.
 
 - **Read:** http or https on ports 80 and 443, every resolved address public (checked in the request's DNS lookup at connect time, so it cannot change after the check), at most 3 redirects each checked, 2 MB and 8 seconds, HTML or plain text only.
 - **Check:** one forced tool call to Haiku (`check_source`) with the story, the newsletter's passage about it and up to 12,000 characters of the page: up to five claims, each with what the page says, a quote and a verdict (holds, further, missing), an overall verdict and an optional note. Quotes not found on the page word for word are dropped.
-- **Keep:** per story (`SOURCE#<issueId>#<nn>`), written only on `POST`.
+- **Run:** in the jobs Lambda (`services/api/src/jobs.ts`, 2 minutes, no retries), so it is not held to the API's 28 seconds. `POST` marks a run (`SOURCE#<issueId>#<nn>`, sort key `RUN`, unless a fresh one is running) and starts the job; `GET` reads the run and the check in one consistent query. Keeping a check ends its run in the same transaction; a run that keeps nothing stays as `none` (why) or `failed`, and the latest run answers for the story. The web reads it again every 2 seconds until it settles.
+- **Keep:** per story (`SOURCE#<issueId>#<nn>`, sort key `META`), written only by a run the reader started.
 
 ### Takes (`services/api/src/takes.ts`, issue #17, the first layer)
 

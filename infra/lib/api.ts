@@ -26,10 +26,32 @@ export interface ApiProps {
  */
 export class Api extends Construct {
   readonly fn: NodejsFunction;
+  /** Deep dives that may take longer than the API's 28 seconds (#23), started by the API. */
+  readonly jobsFn: NodejsFunction;
   readonly httpApi?: HttpApi;
 
   constructor(scope: Construct, id: string, props: ApiProps) {
     super(scope, id);
+
+    this.jobsFn = nodeFunction(this, "JobsFn", {
+      entry: "services/api/src/jobs.ts",
+      logRemoval: RemovalPolicy.DESTROY,
+      memorySize: 512,
+      // A source check reads pages of at most 8 seconds each and calls Claude; the API calls a
+      // run stopped after 3 minutes.
+      timeout: Duration.minutes(2),
+      // The API starts a job once; a failure is recorded on the run for the reader to retry.
+      retryAttempts: 0,
+      environment: {
+        TABLE_NAME: props.table.tableName,
+        BUCKET_NAME: props.content.bucketName,
+        STAGE: props.stage,
+        NODE_OPTIONS: "--enable-source-maps",
+      },
+    });
+    props.table.grantReadWriteData(this.jobsFn);
+    props.content.grantRead(this.jobsFn);
+    this.jobsFn.addToRolePolicy(bedrockModels(this));
 
     this.fn = nodeFunction(this, "Fn", {
       entry: "services/api/src/handler.ts",
@@ -42,6 +64,7 @@ export class Api extends Construct {
         TABLE_NAME: props.table.tableName,
         BUCKET_NAME: props.content.bucketName,
         INGEST_FUNCTION: props.ingestFn.functionName,
+        JOBS_FUNCTION: this.jobsFn.functionName,
         STAGE: props.stage,
         NODE_OPTIONS: "--enable-source-maps",
       },
@@ -49,6 +72,7 @@ export class Api extends Construct {
     props.table.grantReadWriteData(this.fn);
     props.content.grantRead(this.fn);
     props.ingestFn.grantInvoke(this.fn);
+    this.jobsFn.grantInvoke(this.fn);
     // Search by meaning (#53): Titan embeds the query. How this evolved (#19): Claude writes a
     // story's timeline when the reader asks.
     this.fn.addToRolePolicy(bedrockModels(this));
