@@ -156,6 +156,10 @@ function setup(overrides: Partial<RepoPort> = {}) {
         cards: [],
       })),
     },
+    tuneup: {
+      tuneup: vi.fn(async () => tuneupBody),
+      dismiss: vi.fn(async () => ({ ...tuneupBody, dismissed: 1 })),
+    },
     startIngest: vi.fn(async () => undefined),
   };
   const handler = createHandler(svc);
@@ -184,6 +188,13 @@ function setup(overrides: Partial<RepoPort> = {}) {
   };
   return { repo, svc, call };
 }
+
+const tuneupBody = {
+  proposals: [],
+  dismissed: 0,
+  newsletters: [],
+  totals: { stories: 0, moved: 0, toLearning: 0, toNews: 0, unsure: 0, promos: 0, pulledBack: 0 },
+};
 
 describe("routing and validation", () => {
   it("lists unread by default with a 30-item page", async () => {
@@ -332,6 +343,21 @@ describe("routing and validation", () => {
     expect(r.body).toMatchObject({ days: 19, cards: [] });
     expect(svc.audit.audit).toHaveBeenCalledOnce();
     expect((await call("POST", "/audit")).status).toBe(405);
+  });
+
+  it("serves the tune-up and takes Not now on a proposal (#158)", async () => {
+    const { call, svc } = setup();
+    const r = await call("GET", "/tuneup");
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ proposals: [], dismissed: 0 });
+    const put = await call("POST", "/tuneup/dismissed", { body: { id: "s0123456789ab.learning" } });
+    expect(put.status).toBe(200);
+    expect(put.body).toMatchObject({ dismissed: 1 });
+    expect(svc.tuneup.dismiss).toHaveBeenCalledWith("s0123456789ab.learning");
+    for (const id of [undefined, "s0123456789ab", "s0123456789ab.promo", "x.news"]) {
+      expect((await call("POST", "/tuneup/dismissed", { body: { id } })).status).toBe(400);
+    }
+    expect((await call("POST", "/tuneup")).status).toBe(405);
   });
 
   it("lists predictions by view and takes Sandip's verdict, or null (#140)", async () => {

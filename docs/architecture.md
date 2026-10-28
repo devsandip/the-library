@@ -176,6 +176,7 @@ All four GSIs are defined before the first deploy because CloudFormation adds on
 | Digest (P2) | `DIGEST#<yyyy-mm-dd>` | `META` | `ids`: the Summary's top 5 the first time it is shown on that day (IST), `at`. Written once a day by `GET /summary` (issue #5). |
 | Narrative | `STATE` | `NARRATIVE` | The day in brief (#18), overwritten by each new version: `at`, `threads` (`title`, `text`, `sources` as issue id and publication), `stories`, `newsletters`, `storyKeys` (what the next run compares against), `model`. |
 | Now reading | `STATE` | `NOW_READING` | The issue to come back to (#44), overwritten: `issueId`, `position` (the share of the newsletter above the top of the screen, 0 to 1, where 1 means finished), `since` (when it became Now reading; a rating after that hides it), `at` (last saved). Each open points it at the issue, keeping the place when the same unfinished issue is reopened. |
+| Tune-up | `STATE` | `TUNEUP` | The weekly tune-up's proposals put off with Not now (#158): `dismissed`, a map from a proposal's id (`<senderId>.<shelf>`) to how many of Sandip's moves it had then. It shows again once it has more. |
 
 `senderId` is opaque: `s` + the first 12 hex characters of SHA-256 of the canonical sender key (alias key, or the From address lowercased with any `+tag` removed). It is URL-safe, so `@` and `/` never travel through two proxies.
 
@@ -230,6 +231,8 @@ HTTP API, one route `ANY /nutgraf/api/{proxy+}` behind the Cognito JWT authorize
 | GET | `/nutgraf/api/senders/{senderId}` | Sender + its issues, and `record` (#140): its own predictions right, wrong, unclear and open, once it has made any. |
 | PATCH | `/nutgraf/api/senders/{senderId}` | `{ "muted"?, "mustRead"?, "shelf"?: "news" \| "learning" \| null }`, at least one. Setting `shelf` moves the sender's stories there (except ones Sandip moved) and their issues follow; `null` hands each story back to Jev's call (#81). An issue with no stories takes the setting itself. |
 | GET | `/nutgraf/api/audit` | Subscription audit (#25, #150, section 11): `{ from, to, days, cards }`, a card for every newsletter with issues in the last 30 days (never before the first open logged): `issues`, `promos`, `opened` (opened or peeked at), `useful`, `notUseful`, `stories`, `repeats` (stories another, unmuted newsletter carried first) with `firstBy`, `only` with up to three `onlyHeadlines`, its `unsubscribeUrl`, and a `verdict` (`drop`, `keep`, `new`) with its `reason`. Worth dropping first. Worked out when asked; nothing stored, no model call. |
+| GET | `/nutgraf/api/tuneup` | Weekly tune-up (#26, #158, section 11): `{ proposals, dismissed, newsletters, totals }`. `newsletters`: every newsletter with a story Sandip moved or a promo he pulled back out of Archived, with its shelved `stories`, `learning`, `moved`, the moves against Jev's call (`toLearning`, `toNews`), how many of those Jev was `unsure` about, `promos` the promo rule archived and `pulledBack`. `proposals`: "always" a shelf for a newsletter, each with `fixes`, `moves`, `stories`, `onShelf` and a few headlines of what it fixes and would move; most fixes first. `dismissed` counts the ones put off. Worked out when asked; no model call. Applying one is `PATCH /senders/{id}` `{ shelf }`. |
+| POST | `/nutgraf/api/tuneup/dismissed` | `{ "id": "<senderId>.<shelf>" }`: Not now on a proposal, kept with its moves so more of them bring it back. Returns the tune-up without it; 404 when it is not proposed. |
 | GET | `/nutgraf/api/topics` | The topic list. The web shows the News/Learning tabs once it is non-empty. |
 | GET | `/nutgraf/api/unread-counts` | Unread issues counted by sender, shelf and topic (muted senders included), for the numbers on the tabs, topic chips and sender picker; `saved`, how many issues are saved (#43); and `learning`, unread Learning stories by sender and their issue's topic (#81). The web works out every combination of filters from this one list. |
 | GET | `/nutgraf/api/summary` | The 20 most relevant unread News issues from the last two weeks, best first and at most three from one newsletter, each with a `scoreReason`, plus how many were scored. Scored at read time (section 11). The first call of the day logs the top 5 as the day's digest (`digestAt` says when); every call returns it (`digest`) with the success measure (`digestStats`), and the day in brief (`narrative`, #18) while it is less than a day old. |
@@ -396,6 +399,15 @@ A report card per newsletter and a suggestion with the numbers behind it; decisi
 - **Window:** the last 30 days, starting no earlier than the first open, since reads before Nutgraf are unknown.
 - **Repeats and only:** a story is a repeat when its event (#15) has a story from another, unmuted newsletter received earlier; it is the newsletter's alone when its event has none. Stories from the week before the window count as carried first. A story's newsletter is its issue's.
 - **Suggestion, the first that applies:** Must Read is kept; muted is worth dropping; under 4 issues is too new; rated not useful twice and more than useful, opened under 10% and never useful, or at least 8 stories with 60% repeats and never useful, are worth dropping; otherwise kept.
+
+### Weekly tune-up (`packages/core/src/tuneup.ts`, `services/api/src/tuneup.ts`, issue #26)
+
+Newsletter rules proposed from Sandip's corrections, nothing applied until he does; decisions in `docs/features/tuneup.md`.
+
+- **Read:** every issue (`INBOX`, `ARCHIVE`: its newsletter and `autoArchived`), every story (`STORIES`: Jev's `learning`, `shelf`, `shelfSetBy`), every sender, and `STATE/TUNEUP`. No embeddings.
+- **Corrections:** a story Sandip put on a shelf (`shelfSetBy: sandip`, by moving it or its issue) is against Jev when Jev's probability puts it on the other shelf; unsure is 0.4 to 0.6 (`UNSURE`, shared with ingest). A promo is pulled back when the promo rule archived it and it is no longer archived. A story's newsletter is its issue's.
+- **Proposal:** "always" a shelf for an unmuted newsletter with no setting, when Sandip moved at least 3 of its stories there against Jev, none of them to the other shelf, and at least three quarters of its shelved stories are there already. `moves` is the stories the rule would take from Jev. Not now hides it until `fixes` grows past the number kept.
+- **Apply:** the newsletter's existing setting, which re-shelves its stories except Sandip's moves.
 
 ### Follow a story (`services/api/src/following.ts`, `services/ingest/src/follow.ts`, `packages/core/src/follow.ts`, issue #22)
 

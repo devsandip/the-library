@@ -552,6 +552,64 @@ export interface AuditResponse {
   cards: AuditCard[];
 }
 
+/**
+ * A newsletter rule the weekly tune-up (#26, #158) proposes from Sandip's moves: always this
+ * shelf. Applying it is the newsletter's own "always" setting (`PATCH /senders/{id}`).
+ */
+export interface TuneupProposal {
+  /** `<senderId>.<shelf>`. */
+  id: string;
+  senderId: string;
+  publication: string;
+  shelf: Shelf;
+  /** Its stories Sandip moved to this shelf from Jev's call: the rule would have done it for him. */
+  fixes: number;
+  /** Its stories Jev put on the other shelf that Sandip left there: the rule would move them. */
+  moves: number;
+  /** Its shelved stories, and how many are on this shelf now. */
+  stories: number;
+  onShelf: number;
+  /** A few of each, latest first. */
+  fixed: AuditHeadline[];
+  wouldMove: AuditHeadline[];
+}
+
+/** Sandip's corrections to one newsletter (#158): its stories he moved, its promos he pulled back. */
+export interface TuneupNewsletter {
+  senderId: string;
+  publication: string;
+  /** Its "always" setting, when it has one. */
+  shelf?: Shelf;
+  /** Its shelved stories, and how many are on Learning now. */
+  stories: number;
+  learning: number;
+  /** Stories Sandip put on a shelf himself, moving one or its whole issue. */
+  moved: number;
+  /** Of those, the ones he moved against Jev's call, by where to. */
+  toLearning: number;
+  toNews: number;
+  /** Of the ones against Jev, how many Jev was unsure about (0.4 to 0.6). */
+  unsure: number;
+  /** Issues the promo rule archived, and how many of them he brought back out of Archived. */
+  promos: number;
+  pulledBack: number;
+}
+
+/**
+ * GET /tuneup (#158): newsletter rules proposed from Sandip's corrections, most of his moves first,
+ * and the corrections themselves for every newsletter that has any. Worked out when asked.
+ */
+export interface TuneupResponse {
+  proposals: TuneupProposal[];
+  /** Proposals hidden by Not now until his moves toward them grow. */
+  dismissed: number;
+  newsletters: TuneupNewsletter[];
+  totals: Pick<
+    TuneupNewsletter,
+    "stories" | "moved" | "toLearning" | "toNews" | "unsure" | "promos" | "pulledBack"
+  >;
+}
+
 /** Which predictions to list (#140): open ones by due date, or settled ones latest first. */
 export type PredictionView = "open" | "settled";
 

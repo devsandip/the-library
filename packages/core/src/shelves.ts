@@ -12,6 +12,11 @@ export const LEARNING_FROM = 0.5;
 export const shelfFor = (learning: number): Shelf =>
   learning >= LEARNING_FROM ? "learning" : "news";
 
+/** Unsure answers. They are shelved by 0.5 like the rest; the stored probability finds them later. */
+export const UNSURE = { from: 0.4, to: 0.6 } as const;
+
+export const isUnsure = (p: number) => p >= UNSURE.from && p < UNSURE.to;
+
 /** A story's shelf fields as stored. `learning` is Jev's probability, once Jev has read it. */
 export interface StoryShelfFields {
   shelf?: Shelf;
