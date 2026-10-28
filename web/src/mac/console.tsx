@@ -10,6 +10,7 @@ import { PANES, useMedia } from "../media.js";
 import {
   askHref,
   auditHref,
+  tuneupHref,
   DEFAULT_QUEUE,
   followingHref,
   predictionsHref,
@@ -26,6 +27,7 @@ import {
 import { followingState, toggleFollow, useFollow, useFollowing } from "../following.js";
 import { usePredictions } from "../predictions.js";
 import { dropCount, useAudit } from "../audit.js";
+import { useTuneup, waitingCount } from "../tuneup.js";
 import { useOpenIssue } from "../reader.js";
 import { useStoryActions, useStoryRead, type StoryActions } from "../learning.js";
 import { useTheme } from "../theme.js";
@@ -109,6 +111,7 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
   const predicted = usePredictions("open", false).state;
   const due = predicted.status === "ok" ? predicted.data.due : 0;
   const drop = dropCount(useAudit("never").state);
+  const waiting = waitingCount(useTuneup("never").state);
   const senders = lib.senders.data?.items ?? [];
   const count = (t: QueueTab) =>
     t === "saved"
@@ -418,6 +421,13 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
             label: "Subscription audit",
             hint: drop ? `${drop} worth dropping` : "Keep or drop",
             href: auditHref(),
+          },
+          {
+            label: "Tune-up",
+            hint: waiting
+              ? `${waiting} ${waiting === 1 ? "rule" : "rules"} to look at`
+              : "Rules from your moves",
+            href: tuneupHref(),
           },
           { label: "Status", hint: h.at ? `${h.word} · ${h.at}` : h.word, href: statusHref() },
           { label: "Settings", hint: "Theme", href: settingsHref() },

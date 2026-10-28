@@ -1,6 +1,7 @@
 import type {
   AskResponse,
   AuditResponse,
+  TuneupResponse,
   Follow,
   FollowingResponse,
   Prediction,
@@ -116,6 +117,10 @@ export interface LibraryApi {
   predictions(view: PredictionView): Promise<PredictionsResponse>;
   /** Subscription audit (#25): a report card per newsletter over the last 30 days. */
   audit(): Promise<AuditResponse>;
+  /** Weekly tune-up (#26): newsletter rules proposed from Sandip's corrections. */
+  tuneup(): Promise<TuneupResponse>;
+  /** Not now on a proposed rule, until more of its newsletter's stories are moved that way. */
+  dismissTuneup(id: string): Promise<TuneupResponse>;
   /** Sandip's verdict on a prediction, or null to hand it back to settling. */
   setVerdict(id: string, verdict: Exclude<PredictionStatus, "open"> | null): Promise<Prediction>;
   /** What the newsletters said (#53): by words, then by meaning. */
@@ -296,6 +301,12 @@ export class HttpLibraryApi implements LibraryApi {
   }
   audit() {
     return this.request<AuditResponse>("GET", "/audit");
+  }
+  tuneup() {
+    return this.request<TuneupResponse>("GET", "/tuneup");
+  }
+  dismissTuneup(id: string) {
+    return this.request<TuneupResponse>("POST", "/tuneup/dismissed", { id });
   }
   predictions(view: PredictionView) {
     return this.request<PredictionsResponse>("GET", `/predictions?view=${view}`);

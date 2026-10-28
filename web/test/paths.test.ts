@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   askHref,
   auditHref,
+  tuneupHref,
   followingHref,
   predictionsHref,
   browseHref,
@@ -182,5 +183,8 @@ describe("Following (#22)", () => {
     expect(auditHref()).toBe("/library/audit");
     expect(at(auditHref())).toEqual({ name: "audit" });
     expect(at("/library/audit/x")).toEqual({ name: "not-found" });
+    expect(tuneupHref()).toBe("/library/tuneup");
+    expect(at(tuneupHref())).toEqual({ name: "tuneup" });
+    expect(at("/library/tuneup/x")).toEqual({ name: "not-found" });
   });
 });

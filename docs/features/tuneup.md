@@ -36,6 +36,15 @@ Each proposal is replayed over the newsletter's stored stories: `fixes`, the mov
 - **Apply** is the newsletter's own setting (`PATCH /senders/{id}` `{ shelf }`), which re-shelves its stories except the ones I moved, and their issues follow.
 - **Not now** (`POST /tuneup/dismissed`) keeps the proposal's `fixes`. It stays hidden until I move more of the newsletter's stories that way.
 
+## The page (#159)
+
+`web/src/pages/tuneup.tsx`, in Library after Subscription audit with how many rules are waiting, and from ⌘K on the Mac (whose hint shows the count once the page has been read).
+
+- **Proposed rules first:** the newsletter, the rule ("Always Learning"), why in numbers ("You moved 4 stories to Learning that Jev put on News, and none the other way"), what it would do ("60 of 62 stories on Learning now · would move 2 more from News"), and up to three headlines of each. **Apply** takes the card off at once and sets the newsletter's setting; **Not now** takes it off and says how many are put off.
+- **Then my corrections**, per newsletter: moves, the ones against Jev by where to, how many Jev was unsure of, and promos archived and pulled back. A newsletter with a setting says so.
+- **Empty:** says what counts and that three moves one way make a rule.
+- Mock mode has two proposals (ByteByteGo always Learning, The Juggernaut always News) and four newsletters with corrections, one of them only promos.
+
 ## Decisions
 
 - **Rules, not wording** (2026-10-28): Jev's question stays as I left it on 2026-10-17, and Claude no longer picks the shelf. A rule is visible, mine, and undone by clearing the setting.

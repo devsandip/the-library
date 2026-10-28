@@ -43,6 +43,7 @@ export type Screen =
   | { name: "history"; day?: string }
   | { name: "newsletters" }
   | { name: "audit" }
+  | { name: "tuneup" }
   | { name: "newsletter"; slug: string }
   | { name: "status" }
   | { name: "settings" }
@@ -171,6 +172,8 @@ export const historyHref = (day?: string) =>
 export const newslettersHref = () => `${BASE}/library/newsletters`;
 /** Subscription audit (#25): keep or drop each newsletter. */
 export const auditHref = () => `${BASE}/library/audit`;
+/** Weekly tune-up (#26): newsletter rules from your corrections. */
+export const tuneupHref = () => `${BASE}/library/tuneup`;
 export const newsletterHref = (s: string) => `${BASE}/library/newsletters/${encodeURIComponent(s)}`;
 export const statusHref = () => `${BASE}/library/status`;
 export const settingsHref = () => `${BASE}/library/settings`;
@@ -200,6 +203,7 @@ export function parse(path: string, q: Query): Screen {
       if (a === "history") return { name: "history", day: q.day || undefined };
       if (a === "newsletters") return b ? { name: "newsletter", slug: b } : { name: "newsletters" };
       if (a === "audit") return { name: "audit" };
+      if (a === "tuneup") return { name: "tuneup" };
       if (a === "status") return { name: "status" };
       if (a === "settings") return { name: "settings" };
       break;

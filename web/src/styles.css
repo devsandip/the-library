@@ -1947,6 +1947,14 @@ dialog {
   margin-top: 10px;
 }
 
+/* Weekly tune-up (#26): proposed newsletter rules, in the audit's cards. */
+.tuneup-rule {
+  margin-top: 2px;
+  font: 600 13px/1.4 var(--font-text);
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+
 /* Takes (#17): groups under a label, each newsletter's sentence opening its story. */
 .takes-group + .takes-group {
   margin-top: 14px;
