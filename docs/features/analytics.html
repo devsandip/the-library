@@ -1,0 +1,4598 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Nutgraf Analytics Proposal</title>
+    <meta name="claude:viewport-fit-sides" content="cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <style>
+      /* Layout: a briefing set like Nutgraf's Mac console. A chapter rail on the left, one reading column,
+   diagrams allowed wider. Dark first, Apple system type, greys; yellow only for the Machine's box,
+   which marks what is recommended. Semantic green, orange and red for good, warning and bad. */
+      :root {
+        color-scheme: dark;
+        --bg: #000000;
+        --panel: #1c1c1e;
+        --raised: #2c2c2e;
+        --code-bg: #111113;
+        --line: #38383a;
+        --line-2: #48484a;
+        --ink: #ffffff;
+        --ink-2: #aeaeb2;
+        --ink-3: #8e8e93;
+        --ink-body: #d1d1d6;
+        --box: #ffd60a;
+        --box-text: #ffd60a;
+        --on-box: #000000;
+        --good: #30d158;
+        --good-bg: #0d3317;
+        --warn: #ff9f0a;
+        --warn-bg: #3a2600;
+        --bad: #ff453a;
+        --bad-bg: #3a1412;
+        --top-bg: rgba(0, 0, 0, 0.82);
+        --font-text:
+          -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+        --font-display:
+          -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+        --font-quote: ui-serif, "New York", Georgia, "Times New Roman", serif;
+        --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+        --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+      }
+      @media (prefers-color-scheme: light) {
+        :root:not([data-theme="dark"]) {
+          color-scheme: light;
+          --bg: #f2f2f7;
+          --panel: #ffffff;
+          --raised: #ffffff;
+          --code-bg: #fafafc;
+          --line: #e5e5ea;
+          --line-2: #d1d1d6;
+          --ink: #000000;
+          --ink-2: #3c3c43;
+          --ink-3: #6e6e73;
+          --ink-body: #3c3c43;
+          --box: #ffcc00;
+          --box-text: #946800;
+          --on-box: #000000;
+          --good: #248a3d;
+          --good-bg: #e3f5e7;
+          --warn: #b25000;
+          --warn-bg: #fff1dc;
+          --bad: #d70015;
+          --bad-bg: #fde8ea;
+          --top-bg: rgba(242, 242, 247, 0.86);
+        }
+      }
+      :root[data-theme="light"] {
+        color-scheme: light;
+        --bg: #f2f2f7;
+        --panel: #ffffff;
+        --raised: #ffffff;
+        --code-bg: #fafafc;
+        --line: #e5e5ea;
+        --line-2: #d1d1d6;
+        --ink: #000000;
+        --ink-2: #3c3c43;
+        --ink-3: #6e6e73;
+        --ink-body: #3c3c43;
+        --box: #ffcc00;
+        --box-text: #946800;
+        --on-box: #000000;
+        --good: #248a3d;
+        --good-bg: #e3f5e7;
+        --warn: #b25000;
+        --warn-bg: #fff1dc;
+        --bad: #d70015;
+        --bad-bg: #fde8ea;
+        --top-bg: rgba(242, 242, 247, 0.86);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        html {
+          scroll-behavior: smooth;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink-body);
+        font: 15px/1.6 var(--font-text);
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0 0 auto;
+        height: env(safe-area-inset-top, 0px);
+        background: var(--top-bg);
+        z-index: 10;
+      }
+      a {
+        color: var(--ink);
+        text-decoration-color: var(--line-2);
+        text-underline-offset: 3px;
+      }
+      a:hover {
+        text-decoration-color: var(--ink-2);
+      }
+      :focus-visible {
+        outline: 2px solid var(--box);
+        outline-offset: 2px;
+        border-radius: 3px;
+      }
+      img,
+      svg {
+        max-width: 100%;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      code {
+        font: 0.88em var(--font-mono);
+        background: var(--code-bg);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 0.05em 0.35em;
+        color: var(--ink);
+      }
+      pre {
+        font: 13px/1.55 var(--font-mono);
+        background: var(--code-bg);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px 16px;
+        overflow-x: auto;
+        color: var(--ink);
+        margin: 0;
+      }
+      pre code {
+        background: none;
+        border: 0;
+        padding: 0;
+        font-size: inherit;
+      }
+      pre .c {
+        color: var(--ink-3);
+      }
+
+      /* ---------- top bar ---------- */
+      .top {
+        position: sticky;
+        top: env(safe-area-inset-top, 0px);
+        z-index: 9;
+        background: var(--top-bg);
+        -webkit-backdrop-filter: saturate(1.4) blur(14px);
+        backdrop-filter: saturate(1.4) blur(14px);
+        border-bottom: 1px solid var(--line);
+      }
+      .top-in {
+        max-width: 1240px;
+        margin: 0 auto;
+        height: 52px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding-left: var(--gutter-l);
+        padding-right: var(--gutter-r);
+      }
+      .logo {
+        width: 22px;
+        height: 26px;
+        flex: none;
+      }
+      .brand {
+        font: 600 15px/1 var(--font-display);
+        color: var(--ink);
+        letter-spacing: -0.01em;
+      }
+      .brand span {
+        color: var(--ink-3);
+        font-weight: 400;
+      }
+      .top-in .sp {
+        flex: 1;
+      }
+      .btn {
+        font: 500 13px/1 var(--font-text);
+        color: var(--ink);
+        background: var(--raised);
+        border: 1px solid var(--line-2);
+        border-radius: 6px;
+        height: 32px;
+        padding: 0 12px;
+        cursor: pointer;
+      }
+      .btn {
+        white-space: nowrap;
+      }
+      .keys {
+        font-size: 12px;
+        color: var(--ink-3);
+      }
+      @media (max-width: 760px) {
+        .keys {
+          display: none;
+        }
+      }
+      @media (max-width: 480px) {
+        .brand span {
+          display: none;
+        }
+      }
+      .progress {
+        height: 2px;
+        background: var(--box);
+        transform-origin: 0 50%;
+        transform: scaleX(0);
+      }
+
+      /* ---------- shell ---------- */
+      .shell {
+        max-width: 1240px;
+        margin: 0 auto;
+        padding-left: var(--gutter-l);
+        padding-right: var(--gutter-r);
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 48px;
+      }
+      @media (min-width: 1080px) {
+        .shell {
+          grid-template-columns: 210px minmax(0, 1fr);
+        }
+      }
+      .rail {
+        display: none;
+      }
+      @media (min-width: 1080px) {
+        .rail {
+          display: block;
+          position: sticky;
+          top: calc(env(safe-area-inset-top, 0px) + 72px);
+          align-self: start;
+          max-height: calc(100vh - 96px);
+          overflow-y: auto;
+          padding-block: 8px 24px;
+        }
+      }
+      .rail h4 {
+        font: 600 11px/1 var(--font-text);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin: 18px 0 8px;
+      }
+      .rail ol {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 1px;
+      }
+      .rail a {
+        display: block;
+        padding: 4px 0 4px 12px;
+        font-size: 13px;
+        line-height: 1.35;
+        color: var(--ink-2);
+        text-decoration: none;
+        border-left: 2px solid transparent;
+      }
+      .rail a:hover {
+        color: var(--ink);
+      }
+      .rail a[aria-current="true"] {
+        color: var(--ink);
+        border-left-color: var(--box);
+      }
+
+      main {
+        min-width: 0;
+        padding-bottom: 80px;
+      }
+      section {
+        padding-block: 56px;
+        border-top: 1px solid var(--line);
+        scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 60px);
+      }
+      section:first-child {
+        border-top: 0;
+        padding-top: 40px;
+      }
+      .col {
+        max-width: 720px;
+      }
+
+      /* ---------- type ---------- */
+      .eyebrow {
+        font: 600 11.5px/1 var(--font-text);
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin: 0 0 14px;
+      }
+      h1,
+      h2,
+      h3 {
+        color: var(--ink);
+        text-wrap: balance;
+        margin: 0;
+        font-family: var(--font-display);
+      }
+      h1 {
+        font-size: clamp(34px, 6vw, 52px);
+        line-height: 1.05;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+      }
+      h2 {
+        font-size: clamp(26px, 3.6vw, 34px);
+        line-height: 1.12;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        margin-bottom: 16px;
+      }
+      h3 {
+        font-size: 19px;
+        line-height: 1.3;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        margin: 36px 0 12px;
+      }
+      p {
+        margin: 0 0 14px;
+        max-width: 68ch;
+      }
+      .lead {
+        font-size: 18px;
+        line-height: 1.55;
+        color: var(--ink-2);
+        max-width: 62ch;
+      }
+      .meta {
+        font-size: 13px;
+        color: var(--ink-3);
+        margin-top: 18px;
+      }
+      .question {
+        font: italic 400 clamp(20px, 2.6vw, 24px)/1.4 var(--font-quote);
+        color: var(--ink);
+        margin: 0 0 22px;
+        max-width: 40em;
+      }
+      ul,
+      ol {
+        padding-left: 20px;
+        margin: 0 0 14px;
+        max-width: 68ch;
+      }
+      li {
+        margin-bottom: 6px;
+      }
+      li::marker {
+        color: var(--ink-3);
+      }
+      strong {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .muted {
+        color: var(--ink-3);
+      }
+      .small {
+        font-size: 13px;
+      }
+
+      /* ---------- the Machine's box ---------- */
+      .boxed {
+        position: relative;
+      }
+      .ybox {
+        position: absolute;
+        inset: var(--inset, -7px);
+        pointer-events: none;
+        --c: var(--box);
+        --g: linear-gradient(var(--c), var(--c));
+        background:
+          var(--g) left top / var(--arm, 16px) var(--w, 2px) no-repeat,
+          var(--g) left top / var(--w, 2px) var(--arm, 16px) no-repeat,
+          var(--g) right top / var(--arm, 16px) var(--w, 2px) no-repeat,
+          var(--g) right top / var(--w, 2px) var(--arm, 16px) no-repeat,
+          var(--g) left bottom / var(--arm, 16px) var(--w, 2px) no-repeat,
+          var(--g) left bottom / var(--w, 2px) var(--arm, 16px) no-repeat,
+          var(--g) right bottom / var(--arm, 16px) var(--w, 2px) no-repeat,
+          var(--g) right bottom / var(--w, 2px) var(--arm, 16px) no-repeat;
+      }
+
+      /* ---------- blocks ---------- */
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 18px 20px;
+      }
+      .callout {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 16px 20px;
+        margin: 22px 0;
+        max-width: 720px;
+      }
+      .callout p:last-child,
+      .callout ul:last-child {
+        margin-bottom: 0;
+      }
+      .callout .label {
+        font: 600 11px/1 var(--font-text);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--box-text);
+        margin-bottom: 8px;
+        display: block;
+      }
+      .grid2 {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: minmax(0, 1fr);
+      }
+      @media (min-width: 760px) {
+        .grid2 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      .grid3 {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: minmax(0, 1fr);
+      }
+      @media (min-width: 900px) {
+        .grid3 {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+
+      .minute {
+        display: grid;
+        gap: 10px;
+        margin: 28px 0 0;
+        padding: 0;
+        list-style: none;
+        max-width: 760px;
+      }
+      .minute li {
+        display: grid;
+        grid-template-columns: 112px minmax(0, 1fr);
+        gap: 14px;
+        margin: 0;
+        padding: 12px 0;
+        border-top: 1px solid var(--line);
+      }
+      .minute li b {
+        font: 600 12px/1.5 var(--font-text);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        padding-top: 2px;
+      }
+      @media (max-width: 520px) {
+        .minute li {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 4px;
+        }
+      }
+
+      .tiercards {
+        display: grid;
+        gap: 22px;
+        grid-template-columns: minmax(0, 1fr);
+        margin-top: 36px;
+      }
+      @media (min-width: 860px) {
+        .tiercards {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+      .tiercard {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .tiercard .when {
+        font: 600 11px/1 var(--font-text);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .tiercard.rec .when {
+        color: var(--box-text);
+      }
+      .tiercard h3 {
+        margin: 4px 0 0;
+        font-size: 22px;
+      }
+      .tiercard .cost {
+        font: 600 15px/1.3 var(--font-text);
+        color: var(--ink);
+        font-variant-numeric: tabular-nums;
+      }
+      .tiercard p {
+        margin: 0;
+        font-size: 14px;
+        color: var(--ink-2);
+      }
+
+      /* contents list for narrow screens */
+      .toc-inline {
+        margin-top: 32px;
+      }
+      @media (min-width: 1080px) {
+        .toc-inline {
+          display: none;
+        }
+      }
+      .toc-inline ol {
+        columns: 2;
+        column-gap: 24px;
+        font-size: 14px;
+        padding-left: 20px;
+      }
+      @media (max-width: 480px) {
+        .toc-inline ol {
+          columns: 1;
+        }
+      }
+
+      /* tables */
+      .tbl {
+        overflow-x: auto;
+        margin: 16px 0 8px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+        line-height: 1.45;
+        font-variant-numeric: tabular-nums;
+      }
+      th {
+        text-align: left;
+        font: 600 11px/1.3 var(--font-text);
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        white-space: nowrap;
+        vertical-align: bottom;
+      }
+      td {
+        padding: 10px 14px;
+        border-top: 1px solid var(--line);
+        vertical-align: top;
+      }
+      tr:first-child td {
+        border-top: 0;
+      }
+      td:first-child {
+        color: var(--ink);
+      }
+      td code {
+        white-space: nowrap;
+      }
+      .tbl.wide table {
+        min-width: 720px;
+      }
+      .tbl.mid table {
+        min-width: 560px;
+      }
+
+      /* tier chips */
+      .tier {
+        display: inline-block;
+        font: 600 11px/1 var(--font-text);
+        letter-spacing: 0.02em;
+        padding: 4px 7px;
+        border-radius: 4px;
+        white-space: nowrap;
+      }
+      .tier.n {
+        background: var(--box);
+        color: var(--on-box);
+      }
+      .tier.r {
+        background: var(--raised);
+        color: var(--ink);
+        border: 1px solid var(--line-2);
+      }
+      .tier.w {
+        color: var(--ink-2);
+        border: 1px dashed var(--line-2);
+      }
+
+      /* ideas */
+      .ideas {
+        display: grid;
+        gap: 1px;
+        grid-template-columns: minmax(0, 1fr);
+        background: var(--line);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+        margin: 14px 0 8px;
+      }
+      @media (min-width: 760px) {
+        .ideas {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      .idea {
+        background: var(--panel);
+        padding: 14px 16px;
+        min-width: 0;
+      }
+      .idea dt {
+        font-weight: 600;
+        color: var(--ink);
+        margin-bottom: 4px;
+      }
+      .idea dd {
+        margin: 0;
+        font-size: 14px;
+        color: var(--ink-body);
+      }
+      .idea.span2 {
+        grid-column: 1 / -1;
+      }
+
+      /* tools by tier */
+      .tools {
+        display: grid;
+        gap: 22px;
+        grid-template-columns: minmax(0, 1fr);
+        margin: 16px 0 0;
+      }
+      @media (min-width: 900px) {
+        .tools {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+      .tool {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        font-size: 14px;
+        min-width: 0;
+      }
+      .tool .tier {
+        margin-bottom: 10px;
+      }
+      .tool p {
+        margin: 0 0 8px;
+      }
+      .tool p:last-child {
+        margin: 0;
+      }
+
+      /* figures */
+      figure {
+        margin: 26px 0 10px;
+      }
+      .fig {
+        overflow-x: auto;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 16px;
+      }
+      figcaption {
+        font-size: 13px;
+        color: var(--ink-3);
+        margin-top: 10px;
+        max-width: 72ch;
+      }
+      .dia {
+        display: block;
+        width: 100%;
+        height: auto;
+        min-width: 680px;
+        color: var(--ink-3);
+      }
+      .dia .bx {
+        fill: var(--raised);
+        stroke: var(--line-2);
+        stroke-width: 1;
+      }
+      .dia .bx-hl {
+        fill: var(--raised);
+        stroke: var(--box);
+        stroke-width: 1.6;
+      }
+      .dia .bx-dash {
+        fill: none;
+        stroke: var(--line-2);
+        stroke-width: 1;
+        stroke-dasharray: 5 4;
+      }
+      .dia .t {
+        fill: var(--ink);
+        font: 600 13px var(--font-text);
+      }
+      .dia .t14 {
+        fill: var(--ink);
+        font: 600 14px var(--font-text);
+      }
+      .dia .s {
+        fill: var(--ink-3);
+        font: 400 11.5px var(--font-text);
+      }
+      .dia .l {
+        fill: var(--ink-2);
+        font: 400 11px var(--font-text);
+      }
+      .dia .lb {
+        fill: var(--box-text);
+        font: 600 11px var(--font-text);
+      }
+      .dia .bad-t {
+        fill: var(--bad);
+        font: 500 11px var(--font-text);
+      }
+      .dia .ln {
+        stroke: var(--ink-3);
+        stroke-width: 1.3;
+        fill: none;
+      }
+      .dia .ln-bad {
+        stroke: var(--bad);
+        stroke-width: 2;
+        fill: none;
+      }
+      .dia .grid-ln {
+        stroke: var(--line);
+        stroke-width: 1;
+      }
+      .dia .axis {
+        stroke: var(--line-2);
+        stroke-width: 1;
+      }
+      .dia .corner {
+        stroke: var(--box);
+        stroke-width: 2;
+        fill: none;
+      }
+      .dia .tag-a {
+        fill: var(--ink-2);
+      }
+      .dia .tag-a-t {
+        fill: var(--panel);
+        font: 700 10.5px var(--font-text);
+      }
+      .dia .tag-b {
+        fill: none;
+        stroke: var(--ink-2);
+        stroke-width: 1.2;
+      }
+      .dia .tag-b-t {
+        fill: var(--ink-2);
+        font: 700 10.5px var(--font-text);
+      }
+      .dia .dim {
+        fill: var(--ink-3);
+        font: 400 12px var(--font-text);
+      }
+      .dia .itm {
+        fill: var(--ink);
+        font: 400 12px var(--font-text);
+      }
+      .dia .check {
+        stroke: var(--good);
+        stroke-width: 2.2;
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .dia .good-ln {
+        stroke: var(--good);
+        stroke-width: 2.4;
+        fill: none;
+      }
+      .dia .bad-ln {
+        stroke: var(--bad);
+        stroke-width: 2.4;
+        fill: none;
+      }
+      .dia .good-dot {
+        fill: var(--good);
+      }
+      .dia .bad-dot {
+        fill: var(--bad);
+      }
+      .dia .good-t {
+        fill: var(--good);
+        font: 600 12px var(--font-text);
+      }
+      .dia .bad-t2 {
+        fill: var(--bad);
+        font: 600 12px var(--font-text);
+      }
+      .dia .bar-n {
+        fill: var(--box);
+      }
+      .dia .bar-r {
+        fill: var(--ink-2);
+      }
+      .dia .bar-w {
+        fill: var(--ink-3);
+      }
+      .dia .val {
+        fill: var(--ink);
+        font: 600 12px var(--font-text);
+      }
+
+      /* funnel (illustrative) */
+      .funnel {
+        display: grid;
+        gap: 8px;
+        margin: 14px 0 6px;
+        max-width: 720px;
+      }
+      .frow {
+        display: grid;
+        grid-template-columns: minmax(0, 190px) minmax(0, 1fr);
+        gap: 12px;
+        align-items: center;
+        font-size: 13.5px;
+      }
+      .ftrack {
+        background: var(--raised);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        height: 24px;
+        position: relative;
+        overflow: hidden;
+      }
+      .ffill {
+        position: absolute;
+        inset: 0 auto 0 0;
+        background: var(--ink-3);
+        opacity: 0.55;
+      }
+      .fval {
+        position: absolute;
+        left: 8px;
+        top: 3px;
+        font: 600 12px/18px var(--font-text);
+        color: var(--ink);
+        font-variant-numeric: tabular-nums;
+      }
+      @media (max-width: 520px) {
+        .frow {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 4px;
+        }
+      }
+
+      /* web vitals */
+      .vitals {
+        display: grid;
+        gap: 10px;
+        margin: 14px 0 6px;
+        max-width: 760px;
+      }
+      .vrow {
+        display: grid;
+        grid-template-columns: minmax(0, 170px) minmax(0, 1fr);
+        gap: 12px;
+        align-items: center;
+      }
+      .vrow .name {
+        font-size: 13.5px;
+        color: var(--ink);
+      }
+      .vrow .name span {
+        display: block;
+        font-size: 12px;
+        color: var(--ink-3);
+      }
+      .vbar {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        border-radius: 6px;
+        overflow: hidden;
+        font: 600 12px/1.25 var(--font-text);
+      }
+      .vbar div {
+        padding: 7px 8px;
+      }
+      .vbar .g {
+        background: var(--good-bg);
+        color: var(--good);
+      }
+      .vbar .w {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .vbar .b {
+        background: var(--bad-bg);
+        color: var(--bad);
+      }
+      @media (max-width: 520px) {
+        .vrow {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 4px;
+        }
+      }
+
+      /* rules, missing, steps */
+      .rules {
+        list-style: none;
+        padding: 0;
+        margin: 18px 0 0;
+        display: grid;
+        gap: 1px;
+        background: var(--line);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+        max-width: 820px;
+      }
+      .rules li {
+        background: var(--panel);
+        margin: 0;
+        padding: 14px 18px;
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr);
+        gap: 10px;
+      }
+      .rules .n {
+        font: 700 15px/1.5 var(--font-display);
+        color: var(--ink-3);
+        font-variant-numeric: tabular-nums;
+      }
+      .rules b {
+        color: var(--ink);
+      }
+      .cards {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: minmax(0, 1fr);
+        margin-top: 18px;
+      }
+      @media (min-width: 760px) {
+        .cards {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 16px 18px;
+        min-width: 0;
+      }
+      .card h3 {
+        margin: 0 0 6px;
+        font-size: 17px;
+      }
+      .card p {
+        margin: 0;
+        font-size: 14px;
+      }
+      .steps {
+        list-style: none;
+        counter-reset: s;
+        padding: 0;
+        margin: 18px 0 0;
+        display: grid;
+        gap: 12px;
+        max-width: 820px;
+      }
+      .steps li {
+        counter-increment: s;
+        position: relative;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 18px 14px 58px;
+        margin: 0;
+      }
+      .steps li::before {
+        content: counter(s);
+        position: absolute;
+        left: 18px;
+        top: 13px;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        border: 1px solid var(--line-2);
+        font: 700 13px/24px var(--font-text);
+        text-align: center;
+        color: var(--ink);
+      }
+      .steps b {
+        display: block;
+        color: var(--ink);
+        margin-bottom: 2px;
+      }
+      .decide {
+        list-style: none;
+        padding: 0;
+        margin: 18px 0 0;
+        display: grid;
+        gap: 12px;
+        max-width: 820px;
+        counter-reset: d;
+      }
+      .decide li {
+        counter-increment: d;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 18px;
+        margin: 0;
+      }
+      .decide li b {
+        color: var(--ink);
+      }
+      .decide li .rec {
+        display: inline-block;
+        margin-left: 6px;
+        font: 600 11px/1 var(--font-text);
+        color: var(--on-box);
+        background: var(--box);
+        padding: 3px 6px;
+        border-radius: 4px;
+        vertical-align: 1px;
+      }
+
+      /* glossary */
+      .gfilter {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin: 8px 0 16px;
+        flex-wrap: wrap;
+      }
+      .gfilter input {
+        font: 15px var(--font-text);
+        color: var(--ink);
+        background: var(--panel);
+        border: 1px solid var(--line-2);
+        border-radius: 8px;
+        padding: 9px 12px;
+        width: min(100%, 340px);
+      }
+      .gloss {
+        display: grid;
+        gap: 0;
+        grid-template-columns: minmax(0, 1fr);
+        border-top: 1px solid var(--line);
+        max-width: 900px;
+        margin: 0;
+      }
+      @media (min-width: 760px) {
+        .gloss {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          column-gap: 32px;
+        }
+      }
+      .gloss div {
+        padding: 10px 0;
+        border-bottom: 1px solid var(--line);
+        min-width: 0;
+      }
+      .gloss dt {
+        font-weight: 600;
+        color: var(--ink);
+        font-size: 14px;
+      }
+      .gloss dd {
+        margin: 2px 0 0;
+        font-size: 14px;
+        color: var(--ink-body);
+      }
+      .foot {
+        font-size: 13px;
+        color: var(--ink-3);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="top">
+      <div class="top-in">
+        <svg class="logo" viewBox="0 0 22 26" aria-hidden="true">
+          <path
+            d="M1 1h13l7 7v17H1z"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            style="color: var(--ink)"
+          />
+          <path d="M14 1v7h7z" fill="var(--box)" />
+        </svg>
+        <div class="brand">Nutgraf <span>· analytics proposal</span></div>
+        <div class="sp"></div>
+        <span class="keys">← → to move between chapters</span>
+        <button class="btn" id="theme" type="button">Theme: system</button>
+      </div>
+      <div class="progress" id="progress"></div>
+    </header>
+
+    <div class="shell">
+      <nav class="rail" aria-label="Chapters">
+        <h4>Start</h4>
+        <ol>
+          <li><a href="#minute">In one minute</a></li>
+          <li><a href="#basics">Analytics in plain words</a></li>
+          <li><a href="#today">What Nutgraf already measures</a></li>
+          <li><a href="#rules">Ground rules</a></li>
+          <li><a href="#northstar">The metric that matters most</a></li>
+        </ol>
+        <h4>The seven areas</h4>
+        <ol>
+          <li><a href="#product">1 · Product and behaviour</a></li>
+          <li><a href="#marketing">2 · Marketing and growth</a></li>
+          <li><a href="#qualitative">3 · Qualitative and experience</a></li>
+          <li><a href="#technical">4 · Technical and performance</a></li>
+          <li><a href="#experiments">5 · Experiments and flags</a></li>
+          <li><a href="#messaging">6 · Lifecycle messaging</a></li>
+          <li><a href="#ai">7 · AI and LLM</a></li>
+        </ol>
+        <h4>Beyond the seven</h4>
+        <ol>
+          <li><a href="#missing">What your list was missing</a></li>
+        </ol>
+        <h4>Tiers</h4>
+        <ol>
+          <li><a href="#tiers">Three tiers side by side</a></li>
+          <li><a href="#notebook">Notebook</a></li>
+          <li><a href="#newsroom">Newsroom</a></li>
+          <li><a href="#wire">Wire Service</a></li>
+        </ol>
+        <h4>Next</h4>
+        <ol>
+          <li><a href="#steps">Notebook as pull requests</a></li>
+          <li><a href="#decisions">Decisions for you</a></li>
+          <li><a href="#glossary">Glossary</a></li>
+        </ol>
+      </nav>
+
+      <main>
+        <!-- ================= 1. In one minute ================= -->
+        <section id="minute">
+          <p class="eyebrow">Proposal · 28 October 2026 · nothing built or decided</p>
+          <h1>Analytics for Nutgraf</h1>
+          <p class="lead" style="margin-top: 16px">
+            What a consumer app measures, what Nutgraf should measure in each of seven areas, and
+            three ways to set it up, from nearly free to big-company scale. Written for a PM coming
+            from internal tools: every idea is explained before it is used.
+          </p>
+
+          <ul class="minute">
+            <li>
+              <b>Recommend</b
+              ><span
+                >Start the <strong>Notebook</strong> tier now: about $0 to $5 a month, about six
+                small pull requests, all seven areas at a basic level. Move to
+                <strong>Newsroom</strong> the day you let other people in.
+                <strong>Wire Service</strong> is the map of a large consumer app, here for
+                reference.</span
+              >
+            </li>
+            <li>
+              <b>Today</b
+              ><span
+                >Nutgraf has one user, so "who is viewing" is always you. Three things pay off now:
+                is the product working for you, is anything broken or slow on your phone, and what
+                the AI costs and how good it is. The rest pays off when a second person signs up;
+                the cheapest time to lay its foundation is before that.</span
+              >
+            </li>
+            <li>
+              <b>Three rules</b
+              ><span
+                >No newsletter content in any analytics event. Prompts and answers never leave AWS.
+                Recordings hide all text and never record the newsletter.</span
+              >
+            </li>
+            <li>
+              <b>You missed</b
+              ><span
+                >The data foundation, privacy and consent, ranking quality, cost per reader, trust
+                and safety, money, and the weekly habit of looking.</span
+              >
+            </li>
+          </ul>
+
+          <div class="tiercards">
+            <div class="tiercard rec boxed">
+              <span class="ybox"></span>
+              <span class="when">Start now</span>
+              <h3>Notebook</h3>
+              <span class="cost">$0 to $5 a month</span>
+              <p>One free tool (PostHog) plus what AWS already gives you. You, an hour a week.</p>
+            </div>
+            <div class="tiercard">
+              <span class="when">When Nutgraf opens up</span>
+              <h3>Newsroom</h3>
+              <span class="cost">About $300 to $1,500 a month</span>
+              <p>The best tool for each job and a warehouse in S3. 1,000 to 50,000 readers.</p>
+            </div>
+            <div class="tiercard">
+              <span class="when">For reference</span>
+              <h3>Wire Service</h3>
+              <span class="cost">$25,000 to $250,000+ a month</span>
+              <p>A data platform and a data team. A million readers and more.</p>
+            </div>
+          </div>
+          <p class="small muted" style="margin-top: 20px">
+            The names follow the product. A nut graf is the paragraph in a news story that says why
+            it matters, so the tiers grow the way news operations do: one reporter's notebook, a
+            newsroom with a desk for each beat, a wire service that feeds the world.
+          </p>
+
+          <nav class="toc-inline" aria-label="Contents">
+            <p class="eyebrow">Contents</p>
+            <ol>
+              <li><a href="#basics">Analytics in plain words</a></li>
+              <li><a href="#today">What Nutgraf already measures</a></li>
+              <li><a href="#rules">Ground rules</a></li>
+              <li><a href="#northstar">The metric that matters most</a></li>
+              <li><a href="#product">Product and behaviour</a></li>
+              <li><a href="#marketing">Marketing and growth</a></li>
+              <li><a href="#qualitative">Qualitative and experience</a></li>
+              <li><a href="#technical">Technical and performance</a></li>
+              <li><a href="#experiments">Experiments and flags</a></li>
+              <li><a href="#messaging">Lifecycle messaging</a></li>
+              <li><a href="#ai">AI and LLM</a></li>
+              <li><a href="#missing">What your list was missing</a></li>
+              <li><a href="#tiers">The three tiers</a></li>
+              <li><a href="#steps">Notebook as pull requests</a></li>
+              <li><a href="#decisions">Decisions for you</a></li>
+              <li><a href="#glossary">Glossary</a></li>
+            </ol>
+          </nav>
+        </section>
+
+        <!-- ================= 2. Basics ================= -->
+        <section id="basics">
+          <p class="eyebrow">Chapter 1 · Basics</p>
+          <h2>Analytics in plain words</h2>
+          <p class="lead">
+            With internal tools, users have to use the tool and you can walk over and ask them. With
+            a consumer app, people decide every day whether to come back, nobody owes you a reason,
+            and you will never meet most of them. Analytics is how you hear them.
+          </p>
+
+          <div class="tbl mid">
+            <table>
+              <thead>
+                <tr>
+                  <th>Internal tools</th>
+                  <th>Consumer app</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Did they finish the task? How long did it take?</td>
+                  <td>Did they come back tomorrow? Next week?</td>
+                </tr>
+                <tr>
+                  <td>Adoption is mandated</td>
+                  <td>Adoption is earned every day</td>
+                </tr>
+                <tr>
+                  <td>Feedback: ask the team</td>
+                  <td>Feedback: behaviour data, surveys, recordings</td>
+                </tr>
+                <tr>
+                  <td>Growth: headcount</td>
+                  <td>Growth: channels, word of mouth, habit</td>
+                </tr>
+                <tr>
+                  <td>Cost per user rarely matters</td>
+                  <td>
+                    Cost per user, and AI cost per user, decides whether the product can exist
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>How a tap becomes a chart</h3>
+          <p>Every analytics system, from a free tool to Netflix's, has the same five steps.</p>
+          <figure>
+            <div class="fig">
+              <svg
+                class="dia"
+                viewBox="0 0 884 170"
+                role="img"
+                aria-label="Five steps: the app captures a tap, sends an event, a database stores it, events are joined into people and visits, and the result feeds charts, alerts, tests and messages. Below each step, what it is in Nutgraf's Notebook tier."
+              >
+                <defs>
+                  <marker
+                    id="ah1"
+                    viewBox="0 0 10 10"
+                    refX="9"
+                    refY="5"
+                    markerWidth="7"
+                    markerHeight="7"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M0 0L10 5L0 10z" fill="currentColor" />
+                  </marker>
+                </defs>
+                <g>
+                  <rect class="bx" x="8" y="20" width="132" height="80" rx="8" />
+                  <text class="t" x="74" y="50" text-anchor="middle">Capture</text>
+                  <text class="s" x="74" y="70" text-anchor="middle">the app notices</text>
+                  <text class="s" x="74" y="85" text-anchor="middle">a tap</text>
+                  <rect class="bx" x="192" y="20" width="132" height="80" rx="8" />
+                  <text class="t" x="258" y="50" text-anchor="middle">Collect</text>
+                  <text class="s" x="258" y="70" text-anchor="middle">a small event</text>
+                  <text class="s" x="258" y="85" text-anchor="middle">is sent out</text>
+                  <rect class="bx" x="376" y="20" width="132" height="80" rx="8" />
+                  <text class="t" x="442" y="50" text-anchor="middle">Store</text>
+                  <text class="s" x="442" y="70" text-anchor="middle">a database for</text>
+                  <text class="s" x="442" y="85" text-anchor="middle">billions of rows</text>
+                  <rect class="bx" x="560" y="20" width="132" height="80" rx="8" />
+                  <text class="t" x="626" y="50" text-anchor="middle">Model</text>
+                  <text class="s" x="626" y="70" text-anchor="middle">events joined into</text>
+                  <text class="s" x="626" y="85" text-anchor="middle">people and visits</text>
+                  <rect class="bx" x="744" y="20" width="132" height="80" rx="8" />
+                  <text class="t" x="810" y="50" text-anchor="middle">Analyse, act</text>
+                  <text class="s" x="810" y="70" text-anchor="middle">charts, alerts,</text>
+                  <text class="s" x="810" y="85" text-anchor="middle">tests, messages</text>
+                </g>
+                <g>
+                  <line class="ln" x1="142" y1="60" x2="188" y2="60" marker-end="url(#ah1)" />
+                  <text class="l" x="165" y="52" text-anchor="middle">sends</text>
+                  <line class="ln" x1="326" y1="60" x2="372" y2="60" marker-end="url(#ah1)" />
+                  <text class="l" x="349" y="52" text-anchor="middle">writes</text>
+                  <line class="ln" x1="510" y1="60" x2="556" y2="60" marker-end="url(#ah1)" />
+                  <text class="l" x="533" y="52" text-anchor="middle">joins</text>
+                  <line class="ln" x1="694" y1="60" x2="740" y2="60" marker-end="url(#ah1)" />
+                  <text class="l" x="717" y="52" text-anchor="middle">feeds</text>
+                </g>
+                <g>
+                  <line class="grid-ln" x1="74" y1="104" x2="74" y2="130" stroke-dasharray="3 3" />
+                  <line
+                    class="grid-ln"
+                    x1="258"
+                    y1="104"
+                    x2="258"
+                    y2="130"
+                    stroke-dasharray="3 3"
+                  />
+                  <line
+                    class="grid-ln"
+                    x1="442"
+                    y1="104"
+                    x2="442"
+                    y2="130"
+                    stroke-dasharray="3 3"
+                  />
+                  <line
+                    class="grid-ln"
+                    x1="626"
+                    y1="104"
+                    x2="626"
+                    y2="130"
+                    stroke-dasharray="3 3"
+                  />
+                  <line
+                    class="grid-ln"
+                    x1="810"
+                    y1="104"
+                    x2="810"
+                    y2="130"
+                    stroke-dasharray="3 3"
+                  />
+                  <text class="lb" x="74" y="148" text-anchor="middle">posthog-js in the app</text>
+                  <text class="lb" x="258" y="148" text-anchor="middle">
+                    via sandip.dev/nutgraf
+                  </text>
+                  <text class="lb" x="442" y="148" text-anchor="middle">PostHog Cloud</text>
+                  <text class="lb" x="626" y="148" text-anchor="middle">phone + Mac = you</text>
+                  <text class="lb" x="810" y="148" text-anchor="middle">a Monday email</text>
+                </g>
+              </svg>
+            </div>
+            <figcaption>
+              The five steps every analytics system has. The yellow line is what each step would be
+              in Nutgraf's Notebook tier.
+            </figcaption>
+          </figure>
+
+          <h3>An event, up close</h3>
+          <p>
+            An event is a small record: what happened, who did it, when, and details called
+            properties. Opening an issue from Today's deck would send this:
+          </p>
+          <pre><code>{
+  "event": "issue_opened",
+  "distinct_id": "u_7f3a91c2",          <span class="c">// who: an opaque ID, never an email</span>
+  "timestamp": "2026-10-28T07:42:10+05:30",
+  "properties": {
+    "issue_id": "18f2c4d0a1b2",         <span class="c">// which: an ID, never the subject</span>
+    "source_screen": "today_deck",      <span class="c">// where from</span>
+    "rank": 2,                           <span class="c">// position in the list</span>
+    "is_top5": true,
+    "is_must_read": true,
+    "topic": "AI &amp; LLMs",
+    "device": "phone",
+    "app_version": "d741395"
+  }
+}</code></pre>
+
+          <dl class="ideas">
+            <div class="idea">
+              <dt>Event</dt>
+              <dd>
+                Something that happened, named as a past-tense verb: <code>issue_opened</code>.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Properties</dt>
+              <dd>Details about it: which screen, which rank, which device.</dd>
+            </div>
+            <div class="idea">
+              <dt>User (distinct ID)</dt>
+              <dd>Who did it, as an opaque ID. Never the email address.</dd>
+            </div>
+            <div class="idea">
+              <dt>Session</dt>
+              <dd>One visit, usually ended by 30 minutes without activity.</dd>
+            </div>
+            <div class="idea span2">
+              <dt>Identify</dt>
+              <dd>
+                Joining an anonymous visitor to a known account after sign-in, so your phone and
+                your Mac count as one person, not two.
+              </dd>
+            </div>
+          </dl>
+
+          <h3>Two places to capture, and why the route matters</h3>
+          <div class="grid2">
+            <div class="panel">
+              <strong>In the app (client-side)</strong>
+              <p class="small" style="margin: 6px 0 0">
+                Sees what happens on screen: taps, scrolls, how long a page stayed open. Ad blockers
+                and browser privacy settings block a share of it, and anything in a browser can be
+                faked.
+              </p>
+            </div>
+            <div class="panel">
+              <strong>On the server (in the Lambdas)</strong>
+              <p class="small" style="margin: 6px 0 0">
+                Sees everything that reaches the API: a rating saved, an ingest run, a Claude call.
+                Cannot be blocked; the truth for anything that changes data. Cannot see taps that
+                never reach the server.
+              </p>
+            </div>
+          </div>
+          <p style="margin-top: 16px">
+            Use both: the server for facts (ratings, saves, AI calls, ingest runs), the app for
+            behaviour (screens, scrolling, swipes). For the app's events, the route decides how many
+            arrive:
+          </p>
+          <figure>
+            <div class="fig">
+              <svg
+                class="dia"
+                viewBox="0 0 884 216"
+                role="img"
+                aria-label="Sent straight to the vendor's site, app events are blocked by ad blockers and by Nutgraf's content security policy. Sent to sandip.dev/nutgraf/ingest and forwarded by CloudFront, they stay on Nutgraf's own site and arrive. Server events from the Lambdas go direct and are never blocked."
+              >
+                <defs>
+                  <marker
+                    id="ah2"
+                    viewBox="0 0 10 10"
+                    refX="9"
+                    refY="5"
+                    markerWidth="7"
+                    markerHeight="7"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M0 0L10 5L0 10z" fill="currentColor" />
+                  </marker>
+                </defs>
+                <text class="t" x="8" y="24">Straight to the vendor</text>
+                <rect class="bx" x="8" y="38" width="160" height="50" rx="8" />
+                <text class="t" x="88" y="60" text-anchor="middle">Nutgraf app</text>
+                <text class="s" x="88" y="77" text-anchor="middle">on sandip.dev</text>
+                <rect class="bx" x="500" y="38" width="180" height="50" rx="8" />
+                <text class="t" x="590" y="60" text-anchor="middle">us.i.posthog.com</text>
+                <text class="s" x="590" y="77" text-anchor="middle">another site</text>
+                <line class="ln" x1="170" y1="63" x2="496" y2="63" marker-end="url(#ah2)" />
+                <text class="l" x="250" y="55" text-anchor="middle">events</text>
+                <path class="ln-bad" d="M326 53 L346 73 M346 53 L326 73" />
+                <text class="bad-t" x="336" y="92" text-anchor="middle">
+                  blocked by ad blockers, and by the CSP's connect-src 'self'
+                </text>
+
+                <text class="t" x="8" y="132">First-party, proposed</text>
+                <rect class="bx" x="8" y="146" width="160" height="50" rx="8" />
+                <text class="t" x="88" y="168" text-anchor="middle">Nutgraf app</text>
+                <text class="s" x="88" y="185" text-anchor="middle">on sandip.dev</text>
+                <rect class="bx-hl" x="236" y="146" width="200" height="50" rx="8" />
+                <text class="t" x="336" y="168" text-anchor="middle">
+                  sandip.dev/nutgraf/ingest
+                </text>
+                <text class="s" x="336" y="185" text-anchor="middle">
+                  same site, then CloudFront
+                </text>
+                <rect class="bx" x="500" y="146" width="180" height="50" rx="8" />
+                <text class="t" x="590" y="168" text-anchor="middle">PostHog</text>
+                <text class="s" x="590" y="185" text-anchor="middle">gets the same events</text>
+                <rect class="bx" x="736" y="146" width="140" height="50" rx="8" />
+                <text class="t" x="806" y="168" text-anchor="middle">Lambdas</text>
+                <text class="s" x="806" y="185" text-anchor="middle">server events</text>
+                <line class="ln" x1="170" y1="171" x2="232" y2="171" marker-end="url(#ah2)" />
+                <text class="l" x="201" y="163" text-anchor="middle">events</text>
+                <line class="ln" x1="438" y1="171" x2="496" y2="171" marker-end="url(#ah2)" />
+                <text class="l" x="467" y="163" text-anchor="middle">forwards</text>
+                <line class="ln" x1="734" y1="171" x2="684" y2="171" marker-end="url(#ah2)" />
+                <text class="l" x="709" y="163" text-anchor="middle">direct</text>
+              </svg>
+            </div>
+            <figcaption>
+              Nutgraf's CSP only lets the app talk to its own site, so the first-party route keeps
+              the CSP as it is. PostHog says this route brings in 10 to 30% more data. Server events
+              cannot be blocked at all.
+            </figcaption>
+          </figure>
+
+          <h3>Autocapture or a tracking plan</h3>
+          <div class="grid2">
+            <div class="panel">
+              <strong>Autocapture</strong>
+              <p class="small" style="margin: 6px 0 0">
+                Records every tap and page view with no code. Good for exploring what people click
+                at all. Noisy, and its charts break when a button's text or layout changes.
+              </p>
+            </div>
+            <div class="panel">
+              <strong>A tracking plan</strong>
+              <p class="small" style="margin: 6px 0 0">
+                A short list of events you name on purpose, each with fixed properties. These are
+                the events you trust in a decision. Kept in the repo as typed code, so a misspelt
+                event fails the build.
+              </p>
+            </div>
+          </div>
+          <p style="margin-top: 16px">
+            Use both: autocapture on, plus about 25 planned events (the plan is in Area 1).
+          </p>
+
+          <h3>Where the data ends up</h3>
+          <p>
+            Small teams read the data inside the analytics tool. Bigger teams also copy every event
+            into a <strong>data warehouse</strong>, one large SQL database (BigQuery, Snowflake,
+            Redshift, or files in S3 read with Athena), and treat that copy as the source of truth,
+            because only there can usage be joined with money, support and AI cost. Newsroom starts
+            doing this; Wire Service is built around it.
+          </p>
+        </section>
+
+        <!-- ================= 3. Today ================= -->
+        <section id="today">
+          <p class="eyebrow">Chapter 2 · Starting point</p>
+          <h2>What Nutgraf already measures</h2>
+          <p class="lead">
+            More than you might think. These arrived as features, but they are analytics.
+          </p>
+          <div class="tbl wide">
+            <table>
+              <thead>
+                <tr>
+                  <th>Already built</th>
+                  <th>In analytics terms</th>
+                  <th>Area</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    The event log in DynamoDB (<code>EVT#</code>: rating, state, open, peek, saved),
+                    append-only
+                  </td>
+                  <td>Server-side event tracking</td>
+                  <td>Product</td>
+                </tr>
+                <tr>
+                  <td>Read history (the <code>OPENS</code> index)</td>
+                  <td>A daily activity log</td>
+                  <td>Product</td>
+                </tr>
+                <tr>
+                  <td>Now reading's place, 0 to 1 of the newsletter scrolled past</td>
+                  <td>Read depth and completion</td>
+                  <td>Product</td>
+                </tr>
+                <tr>
+                  <td>
+                    The day's digest and <code>digestStats</code>: share of each day's top 5 found
+                    useful, 14 days, aiming for 3 in 5
+                  </td>
+                  <td>The PRD's success measure; a North Star candidate</td>
+                  <td>Product, AI</td>
+                </tr>
+                <tr>
+                  <td>Subscription audit: opened, useful, repeats per newsletter</td>
+                  <td>Content analytics</td>
+                  <td>Product</td>
+                </tr>
+                <tr>
+                  <td>
+                    Ingest alarms, the <code>IngestSucceeded</code> metric, Library &gt; Status
+                  </td>
+                  <td>Backend monitoring and data freshness</td>
+                  <td>Technical</td>
+                </tr>
+                <tr>
+                  <td>
+                    <code>ms</code>, <code>cents</code>, <code>model</code> and tokens kept with
+                    timelines, takes, source checks; Ask's receipt
+                  </td>
+                  <td>AI cost and speed per call</td>
+                  <td>AI</td>
+                </tr>
+                <tr>
+                  <td><code>pnpm jev:score</code> against labelled stories</td>
+                  <td>An offline AI evaluation</td>
+                  <td>AI</td>
+                </tr>
+                <tr>
+                  <td>
+                    Your prediction verdicts (<code>setBy: sandip</code>) and your moves of Jev's
+                    shelves
+                  </td>
+                  <td>Human corrections: where the AI was wrong</td>
+                  <td>AI</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout">
+            <span class="label">What is missing</span>
+            <ul>
+              <li>
+                Nothing tells you when the app throws an error on your iPhone. A JavaScript crash is
+                silent.
+              </li>
+              <li>
+                Nothing measures speed as you feel it: how long Today takes to appear, how smooth a
+                swipe is.
+              </li>
+              <li>The events power features, but nothing charts them.</li>
+              <li>
+                AI cost is kept for some features only and never added up by feature or day. The AWS
+                Budget alert (<a href="https://github.com/devsandip/the-library/issues/6">issue 6</a
+                >) is not set.
+              </li>
+              <li>No feature flags, no experiments, no messages, no public page.</li>
+              <li>Logs are kept 14 days, so you cannot look back further than two weeks.</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- ================= 4. Rules ================= -->
+        <section id="rules">
+          <p class="eyebrow">Chapter 3 · Every tier</p>
+          <h2>Ground rules</h2>
+          <p class="lead">
+            These keep the PRD's promise that email content never leaves your AWS account except to
+            Bedrock, and they hold in every tier.
+          </p>
+          <ol class="rules">
+            <li>
+              <span class="n">1</span
+              ><span
+                ><b>No newsletter content in analytics events.</b> Opaque IDs, counts, positions and
+                categories only. Never a subject, headline, summary, sender name, search text or Ask
+                question.</span
+              >
+            </li>
+            <li>
+              <span class="n">2</span
+              ><span
+                ><b>Prompts and answers stay in AWS.</b> Every Claude prompt holds newsletter text.
+                Full traces go to Bedrock's logs in your account or a tool you host there; only
+                metadata (feature, model, tokens, cost, time, outcome) may go outside.</span
+              >
+            </li>
+            <li>
+              <span class="n">3</span
+              ><span
+                ><b>Recordings hide everything.</b> Session replay masks all text and inputs and
+                never records the newsletter frame.</span
+              >
+            </li>
+            <li>
+              <span class="n">4</span
+              ><span
+                ><b>First-party collection.</b> The SDK is bundled from npm, so the CSP keeps
+                <code>script-src 'self'</code>; events go through
+                <code>sandip.dev/nutgraf/ingest</code>, so <code>connect-src 'self'</code> stays.
+                The refresh token sits in <code>localStorage</code>, readable by any script on the
+                page, so the SDK version is pinned and every upgrade is a reviewed pull
+                request.</span
+              >
+            </li>
+            <li>
+              <span class="n">5</span
+              ><span
+                ><b>One tracking plan, in code.</b> Names are <code>object_action</code>, past
+                tense, snake case. Properties are typed in <code>packages/core</code>. A new event
+                joins the plan in the pull request that sends it.</span
+              >
+            </li>
+            <li>
+              <span class="n">6</span
+              ><span
+                ><b>Dev is not prod.</b> Dev and integration-test traffic go to a separate
+                project.</span
+              >
+            </li>
+            <li>
+              <span class="n">7</span
+              ><span
+                ><b>Ask before tracking others.</b> For you alone, no consent banner. When others
+                join: a privacy policy naming every tool, consent for anything non-essential, and
+                their analytics deleted when they delete their account.</span
+              >
+            </li>
+          </ol>
+          <div class="callout">
+            <span class="label">Why rule 1 matters twice</span>
+            <p>
+              <code>gmail.readonly</code> is a <em>restricted</em> scope under Google's API user
+              data policy. Data read through it may only provide the app's user-facing features and
+              may not go to third parties for anything else. Opening the app to the public needs
+              Google's verification and, because Nutgraf stores mail on its servers, an independent
+              security assessment renewed every year. Unverified apps are capped at 100 users.
+              Keeping mail-derived data out of analytics tools keeps that review simple.
+            </p>
+          </div>
+        </section>
+
+        <!-- ================= 5. North Star ================= -->
+        <section id="northstar">
+          <p class="eyebrow">Chapter 4 · Focus</p>
+          <h2>The metric that matters most</h2>
+          <p class="lead">
+            Consumer teams pick one <strong>North Star metric</strong>: the number that best
+            captures the value users get. Under it sits a <strong>metric tree</strong> of inputs a
+            team can move directly.
+          </p>
+          <p>
+            Proposed North Star: <strong>useful reads per reader per week</strong>. A useful read is
+            an issue or story you opened and then gave a thumbs up or read to the end. It grows only
+            if you keep coming back, the ranking puts good things first, and the newsletters are
+            worth reading.
+          </p>
+          <figure>
+            <div class="fig">
+              <svg
+                class="dia"
+                viewBox="0 0 884 286"
+                role="img"
+                aria-label="Metric tree. The North Star, useful reads per reader per week, splits into active days per week, reads per active day, useful share of reads, and newsletter supply. Reads per active day breaks into cards seen per Today visit and saved items read within 7 days. Useful share breaks into the top-5 useful rate and thumbs-down share. Supply breaks into issues ingested per day and newsletters worth keeping. Guardrails sit apart: AI cost per reader, error-free visits, and Today's slow-day load time."
+              >
+                <rect class="bx" x="292" y="14" width="300" height="54" rx="8" />
+                <path
+                  class="corner"
+                  d="M286 22V8H300 M584 8H598V22 M286 60V74H300 M584 74H598V60"
+                />
+                <text class="t14" x="442" y="38" text-anchor="middle">
+                  Useful reads per reader per week
+                </text>
+                <text class="s" x="442" y="57" text-anchor="middle">the North Star</text>
+                <path
+                  class="ln"
+                  d="M442 68V88 M122 88H758 M122 88V106 M334 88V106 M546 88V106 M758 88V106"
+                />
+                <rect class="bx" x="24" y="106" width="196" height="56" rx="8" />
+                <text class="t" x="122" y="130" text-anchor="middle">Active days per week</text>
+                <text class="s" x="122" y="148" text-anchor="middle">habit: do you come back?</text>
+                <rect class="bx" x="236" y="106" width="196" height="56" rx="8" />
+                <text class="t" x="334" y="130" text-anchor="middle">Reads per active day</text>
+                <text class="s" x="334" y="148" text-anchor="middle">
+                  depth: do you open things?
+                </text>
+                <rect class="bx" x="448" y="106" width="196" height="56" rx="8" />
+                <text class="t" x="546" y="130" text-anchor="middle">Useful share of reads</text>
+                <text class="s" x="546" y="148" text-anchor="middle">quality: is it worth it?</text>
+                <rect class="bx" x="660" y="106" width="196" height="56" rx="8" />
+                <text class="t" x="758" y="130" text-anchor="middle">Newsletter supply</text>
+                <text class="s" x="758" y="148" text-anchor="middle">inputs</text>
+
+                <path
+                  class="ln"
+                  d="M244 162V254 M244 208H252 M244 254H252 M456 162V254 M456 208H464 M456 254H464 M668 162V254 M668 208H676 M668 254H676"
+                />
+                <rect class="bx" x="252" y="190" width="180" height="36" rx="6" />
+                <text class="itm" x="262" y="212">Cards seen per Today visit</text>
+                <rect class="bx" x="252" y="236" width="180" height="36" rx="6" />
+                <text class="itm" x="262" y="258">Saved read within 7 days</text>
+                <rect class="bx" x="464" y="190" width="180" height="36" rx="6" />
+                <text class="itm" x="474" y="212">Top-5 useful rate, aim 60%</text>
+                <rect class="bx" x="464" y="236" width="180" height="36" rx="6" />
+                <text class="itm" x="474" y="258">Thumbs-down share</text>
+                <rect class="bx" x="676" y="190" width="180" height="36" rx="6" />
+                <text class="itm" x="686" y="212">Issues ingested per day</text>
+                <rect class="bx" x="676" y="236" width="180" height="36" rx="6" />
+                <text class="itm" x="686" y="258">Newsletters worth keeping</text>
+
+                <rect class="bx-dash" x="24" y="190" width="196" height="82" rx="8" />
+                <text class="t" x="38" y="212">Guardrails</text>
+                <text class="s" x="38" y="230">must not get worse:</text>
+                <text class="s" x="38" y="246">AI cost per reader, error-free</text>
+                <text class="s" x="38" y="262">visits, Today's p95 load time</text>
+              </svg>
+            </div>
+            <figcaption>
+              The North Star in the yellow box, the inputs that move it, and the guardrails that
+              stop it being bought with cost or errors. The top-5 useful rate is already built.
+            </figcaption>
+          </figure>
+        </section>
+
+        <!-- ================= Area 1 ================= -->
+        <section id="product">
+          <p class="eyebrow">Area 1 of 7</p>
+          <h2>Product and behavioural analytics</h2>
+          <p class="question">
+            Who uses it, how often, which features, where do people drop off, and do they come back?
+          </p>
+
+          <h3>Ideas to know</h3>
+          <dl class="ideas">
+            <div class="idea">
+              <dt>DAU, WAU, MAU and stickiness</dt>
+              <dd>
+                Distinct people active in a day, a week, 30 days. Stickiness is DAU ÷ MAU: 50% means
+                the average user shows up on half the days. Many consumer apps sit around 10 to 25%;
+                a daily-habit product aims well above.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Activation</dt>
+              <dd>
+                The moment a new user first gets the value, the "aha". For Nutgraf: mail connected,
+                first issues in, three opened and one rated, within 7 days.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Funnel</dt>
+              <dd>
+                The share of people who get through each step of a sequence, in order. It shows
+                exactly where people fall out.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Retention and cohorts</dt>
+              <dd>
+                Of the people who started in one week (a cohort), how many came back in week 2, 3,
+                4. A flattening curve means you have found people who stay.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Feature adoption</dt>
+              <dd>The share of active users who used a feature at least once in the period.</dd>
+            </div>
+            <div class="idea">
+              <dt>Paths</dt>
+              <dd>
+                The order of screens people actually take, which is rarely the one you designed.
+              </dd>
+            </div>
+          </dl>
+
+          <div style="display: grid; gap: 24px; margin-top: 20px">
+            <figure style="margin: 0">
+              <div class="fig" style="padding: 16px 16px 12px">
+                <p class="small" style="margin: 0 0 10px">
+                  <strong>An onboarding funnel</strong>
+                  <span class="muted">· illustrative numbers</span>
+                </p>
+                <div
+                  class="funnel"
+                  aria-label="Illustrative onboarding funnel: sign-up 100%, mail connected 70%, first issue 64%, first read 50%, first rating 34%, back on day 7 22%."
+                >
+                  <div class="frow">
+                    <span>Signed up</span>
+                    <div class="ftrack">
+                      <div class="ffill" style="width: 100%"></div>
+                      <span class="fval">100%</span>
+                    </div>
+                  </div>
+                  <div class="frow">
+                    <span>Mail connected</span>
+                    <div class="ftrack">
+                      <div class="ffill" style="width: 70%"></div>
+                      <span class="fval">70%</span>
+                    </div>
+                  </div>
+                  <div class="frow">
+                    <span>First issue arrived</span>
+                    <div class="ftrack">
+                      <div class="ffill" style="width: 64%"></div>
+                      <span class="fval">64%</span>
+                    </div>
+                  </div>
+                  <div class="frow">
+                    <span>First read</span>
+                    <div class="ftrack">
+                      <div class="ffill" style="width: 50%"></div>
+                      <span class="fval">50%</span>
+                    </div>
+                  </div>
+                  <div class="frow">
+                    <span>First rating</span>
+                    <div class="ftrack">
+                      <div class="ffill" style="width: 34%"></div>
+                      <span class="fval">34%</span>
+                    </div>
+                  </div>
+                  <div class="frow">
+                    <span>Back on day 7</span>
+                    <div class="ftrack">
+                      <div class="ffill" style="width: 22%"></div>
+                      <span class="fval">22%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <figcaption>
+                The biggest drop is the step to fix first: here, connecting mail.
+              </figcaption>
+            </figure>
+            <figure style="margin: 0">
+              <div class="fig">
+                <svg
+                  class="dia"
+                  viewBox="0 0 884 240"
+                  role="img"
+                  aria-label="Illustrative retention curves over eight weeks. One curve falls from 100% to about 24% by week 5 and stays there: these people stay. The other slides to zero by week 8: nobody stays."
+                >
+                  <line class="grid-ln" x1="64" y1="20" x2="860" y2="20" />
+                  <line class="grid-ln" x1="64" y1="65" x2="860" y2="65" />
+                  <line class="grid-ln" x1="64" y1="110" x2="860" y2="110" />
+                  <line class="grid-ln" x1="64" y1="155" x2="860" y2="155" />
+                  <line class="axis" x1="64" y1="200" x2="860" y2="200" />
+                  <text class="s" x="56" y="24" text-anchor="end">100%</text>
+                  <text class="s" x="56" y="69" text-anchor="end">75%</text>
+                  <text class="s" x="56" y="114" text-anchor="end">50%</text>
+                  <text class="s" x="56" y="159" text-anchor="end">25%</text>
+                  <text class="s" x="56" y="204" text-anchor="end">0%</text>
+                  <text class="s" x="64" y="218" text-anchor="middle">0</text>
+                  <text class="s" x="163.5" y="218" text-anchor="middle">1</text>
+                  <text class="s" x="263" y="218" text-anchor="middle">2</text>
+                  <text class="s" x="362.5" y="218" text-anchor="middle">3</text>
+                  <text class="s" x="462" y="218" text-anchor="middle">4</text>
+                  <text class="s" x="561.5" y="218" text-anchor="middle">5</text>
+                  <text class="s" x="661" y="218" text-anchor="middle">6</text>
+                  <text class="s" x="760.5" y="218" text-anchor="middle">7</text>
+                  <text class="s" x="860" y="218" text-anchor="middle">8</text>
+                  <text class="s" x="860" y="236" text-anchor="end">weeks since sign-up</text>
+                  <polyline
+                    class="bad-ln"
+                    points="64,20 163.5,137 263,164 362.5,178.4 462,187.4 561.5,192.8 661,196.4 760.5,198.2 860,200"
+                  />
+                  <polyline
+                    class="good-ln"
+                    points="64,20 163.5,119 263,140.6 362.5,149.6 462,153.2 561.5,155 661,156.8 760.5,156.8 860,156.8"
+                  />
+                  <circle class="good-dot" cx="860" cy="156.8" r="4" />
+                  <circle class="bad-dot" cx="860" cy="200" r="4" />
+                  <text class="good-t" x="852" y="144" text-anchor="end">
+                    Flattens: these people stay
+                  </text>
+                  <text class="bad-t2" x="700" y="182" text-anchor="end">
+                    Slides to zero: nobody stays
+                  </text>
+                </svg>
+              </div>
+              <figcaption>
+                Two retention curves, illustrative. Sign-ups can grow while the red curve quietly
+                empties the product.
+              </figcaption>
+            </figure>
+          </div>
+
+          <h3>Metrics for Nutgraf</h3>
+          <div class="tbl wide">
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Definition</th>
+                  <th>Why it matters</th>
+                  <th>Starts in</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Useful reads per week</td>
+                  <td>The North Star</td>
+                  <td>Value delivered</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Active days per week</td>
+                  <td>Days with at least one open, per reader</td>
+                  <td>Habit; the PRD's "I open it most days"</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Top-5 useful rate</td>
+                  <td>Share of each day's five given a thumbs up (built)</td>
+                  <td>Ranking quality; the PRD's success measure</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Read depth, completion</td>
+                  <td>Median place reached on close; share that reach the end</td>
+                  <td>Did the open turn into a read?</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Peek-to-open rate</td>
+                  <td>Peeks followed by a full open</td>
+                  <td>Are peeks enough, or a step in the way?</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Rating rate</td>
+                  <td>Share of opened issues that get a thumb</td>
+                  <td>Ranking learns from thumbs; too few and it starves</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Deck depth</td>
+                  <td>Cards seen per Today visit; how often the brief card is read</td>
+                  <td>Is the deck really the front door?</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Save-to-read</td>
+                  <td>Saved items read within 7 days</td>
+                  <td>Is Save a promise kept or a graveyard?</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Feature adoption</td>
+                  <td>
+                    Weekly use of Search, Ask, Following, Predictions, Timeline, Takes, Source,
+                    Audit
+                  </td>
+                  <td>What earns its place, what to cut</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Search success</td>
+                  <td>Zero-result rate; searches followed by an open; "Ask instead" taps</td>
+                  <td>Search quality</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Restored auto-archives</td>
+                  <td>Issues moved back after a rule archived them</td>
+                  <td>A rule is wrong</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Device split</td>
+                  <td>Phone or Mac; home-screen app or browser tab</td>
+                  <td>Where to design first</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>DAU, WAU, MAU, stickiness</td>
+                  <td>As above</td>
+                  <td>Health, once there are several readers</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Activation rate, time to value</td>
+                  <td>Share activated in 7 days; sign-up to first issue</td>
+                  <td>Onboarding quality</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>D1, D7, D30 retention; cohort curves</td>
+                  <td>Share of a cohort active again on day 1, 7, 30</td>
+                  <td>The best single sign of product-market fit</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Onboarding funnel</td>
+                  <td>Sign-up → mail → first issue → first read → first rating → day 7</td>
+                  <td>Where onboarding leaks</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Resurrection rate</td>
+                  <td>Readers dormant a month who come back</td>
+                  <td>Is re-engagement working?</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Churn prediction</td>
+                  <td>Chance a reader leaves next month, from behaviour</td>
+                  <td>Act before they go</td>
+                  <td><span class="tier w">Wire Service</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>The tracking plan, first draft</h3>
+          <p>
+            Events and properties only, with no content. Two of them, opens and peeks, are already
+            logged on the server.
+          </p>
+          <div class="tbl wide">
+            <table>
+              <thead>
+                <tr>
+                  <th>Event</th>
+                  <th>Fires when</th>
+                  <th>Key properties</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>app_opened</code></td>
+                  <td>The app comes to the foreground</td>
+                  <td><code>device</code>, <code>standalone</code>, <code>app_version</code></td>
+                </tr>
+                <tr>
+                  <td><code>screen_viewed</code></td>
+                  <td>A screen shows</td>
+                  <td><code>screen</code></td>
+                </tr>
+                <tr>
+                  <td><code>deck_card_viewed</code></td>
+                  <td>A Today card shows</td>
+                  <td><code>position</code>, <code>is_top5</code>, <code>card_type</code></td>
+                </tr>
+                <tr>
+                  <td><code>deck_swiped</code></td>
+                  <td>A swipe moves the deck</td>
+                  <td><code>direction</code>, <code>position</code></td>
+                </tr>
+                <tr>
+                  <td><code>issue_peeked</code></td>
+                  <td>A peek stays open 2 seconds</td>
+                  <td><code>issue_id</code>, <code>source_screen</code>, <code>rank</code></td>
+                </tr>
+                <tr>
+                  <td><code>issue_opened</code></td>
+                  <td>The reader opens</td>
+                  <td>
+                    <code>issue_id</code>, <code>source_screen</code>, <code>rank</code>,
+                    <code>is_top5</code>, <code>is_must_read</code>, <code>topic</code>,
+                    <code>shelf</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td><code>issue_read_progress</code></td>
+                  <td>The place passes 25, 50, 75, 100%</td>
+                  <td><code>issue_id</code>, <code>percent</code></td>
+                </tr>
+                <tr>
+                  <td><code>issue_closed</code></td>
+                  <td>The reader leaves an issue</td>
+                  <td><code>issue_id</code>, <code>place</code>, <code>seconds_visible</code></td>
+                </tr>
+                <tr>
+                  <td><code>issue_rated</code></td>
+                  <td>Thumb up, down or cleared (server)</td>
+                  <td>
+                    <code>issue_id</code>, <code>value</code>, <code>source_screen</code>,
+                    <code>reason</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td><code>issue_saved</code>, <code>issue_archived</code></td>
+                  <td>Save or archive</td>
+                  <td><code>issue_id</code>, <code>source_screen</code>, <code>by</code></td>
+                </tr>
+                <tr>
+                  <td><code>story_opened</code></td>
+                  <td>A story sheet opens</td>
+                  <td><code>issue_id</code>, <code>story_n</code>, <code>shelf</code></td>
+                </tr>
+                <tr>
+                  <td><code>story_moved</code></td>
+                  <td>You move a story to News or Learning</td>
+                  <td><code>from</code>, <code>to</code>, <code>jev_probability</code></td>
+                </tr>
+                <tr>
+                  <td><code>deep_dive_requested</code></td>
+                  <td>Timeline, Takes or Source is run</td>
+                  <td><code>kind</code>, <code>kept_already</code></td>
+                </tr>
+                <tr>
+                  <td><code>story_followed</code>, <code>story_unfollowed</code></td>
+                  <td>Follow or unfollow</td>
+                  <td><code>event_id</code></td>
+                </tr>
+                <tr>
+                  <td><code>search_performed</code></td>
+                  <td>A search returns</td>
+                  <td>
+                    <code>query_length</code>, <code>result_count</code>, <code>by_meaning</code>,
+                    <code>sort</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td><code>search_result_opened</code></td>
+                  <td>A hit is opened</td>
+                  <td><code>rank</code>, <code>match</code></td>
+                </tr>
+                <tr>
+                  <td><code>ask_answered</code></td>
+                  <td>Ask Nutgraf answers</td>
+                  <td>
+                    <code>paragraphs</code>, <code>none_reason</code>, <code>ms</code>,
+                    <code>cents</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td><code>prediction_verdict_set</code></td>
+                  <td>You overrule or hand back</td>
+                  <td><code>verdict</code>, <code>previous_verdict</code></td>
+                </tr>
+                <tr>
+                  <td><code>sender_changed</code></td>
+                  <td>Mute, star, always-shelf</td>
+                  <td><code>change</code></td>
+                </tr>
+                <tr>
+                  <td><code>filter_changed</code></td>
+                  <td>The Browse sentence or a Mac queue filter</td>
+                  <td><code>filter</code>, <code>value_count</code></td>
+                </tr>
+                <tr>
+                  <td><code>refresh_pulled</code></td>
+                  <td>Pull to refresh</td>
+                  <td><code>screen</code></td>
+                </tr>
+                <tr>
+                  <td><code>shortcut_used</code></td>
+                  <td>A Mac key</td>
+                  <td><code>key</code></td>
+                </tr>
+                <tr>
+                  <td><code>ingest_run_completed</code></td>
+                  <td>Server, every run</td>
+                  <td>
+                    <code>issues_new</code>, <code>filtered</code>, <code>errors</code>,
+                    <code>seconds</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td><code>llm_call_completed</code></td>
+                  <td>Server, every Claude or Titan call</td>
+                  <td>
+                    <code>feature</code>, <code>model</code>, <code>tokens_in</code>,
+                    <code>tokens_out</code>, <code>cents</code>, <code>ms</code>,
+                    <code>outcome</code>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Tools by tier</h3>
+          <div class="tools">
+            <div class="tool boxed">
+              <span class="ybox"></span><span class="tier n">Notebook</span>
+              <p>
+                PostHog Cloud on its free allowance (1 million events a month) for charts, funnels,
+                retention and paths, fed by the app's SDK and by server events from the Lambdas.
+              </p>
+              <p class="muted">
+                The DynamoDB event log stays as it is, for the app's own features.
+              </p>
+            </div>
+            <div class="tool">
+              <span class="tier r">Newsroom</span>
+              <p>
+                PostHog on paid usage (5 cents per 1,000 events above the free million), or
+                Amplitude (2 million free) or Mixpanel (1 million free) if you prefer their
+                interface.
+              </p>
+              <p>
+                Every event also exported to S3 as the warehouse, modelled with dbt, charted in
+                Metabase over Athena.
+              </p>
+            </div>
+            <div class="tool">
+              <span class="tier w">Wire Service</span>
+              <p>
+                A customer data platform (Segment, RudderStack, mParticle) into a warehouse
+                (Snowflake, Databricks, BigQuery, Redshift).
+              </p>
+              <p>
+                Amplitude or Mixpanel on the warehouse; Avo to enforce the plan; Monte Carlo to
+                catch broken data; Looker or Hex.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= Area 2 ================= -->
+        <section id="marketing">
+          <p class="eyebrow">Area 2 of 7</p>
+          <h2>Marketing, attribution and growth</h2>
+          <p class="question">
+            Where do new users come from, which channels bring people who stay, what does a user
+            cost to win, and is word of mouth working?
+          </p>
+          <div class="callout">
+            <span class="label">For Nutgraf</span>
+            <p>
+              None of this applies yet: Nutgraf is private and hidden from search engines. It starts
+              with a public page (the <code>about.html</code> Google already requires is a seed) and
+              a waitlist or invitations.
+            </p>
+          </div>
+
+          <h3>Ideas to know</h3>
+          <dl class="ideas">
+            <div class="idea">
+              <dt>UTM parameters</dt>
+              <dd>
+                Tags on a link that say where a visit came from:
+                <code>?utm_source=linkedin&amp;utm_medium=social&amp;utm_campaign=launch</code>.
+                Every link you share gets them.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Referrer</dt>
+              <dd>The site the browser came from. Free, but often stripped.</dd>
+            </div>
+            <div class="idea">
+              <dt>Attribution</dt>
+              <dd>
+                Giving a channel credit for a sign-up. First touch credits the first visit, last
+                touch the last, multi-touch splits it. None is the truth; they are lenses.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Conversion rate</dt>
+              <dd>The share of visitors who sign up, and of sign-ups who activate.</dd>
+            </div>
+            <div class="idea">
+              <dt>CAC and LTV</dt>
+              <dd>
+                Cost to win a customer, and what a customer is worth over their whole time with you.
+                A common rule of thumb wants LTV at least 3 × CAC.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>K-factor</dt>
+              <dd>
+                Invites per user × the share of invites that become users. Above 1, each user brings
+                in more than one more. Rare.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Incrementality</dt>
+              <dd>
+                Would they have come anyway? Tested with holdouts: show the campaign to some regions
+                or people and not others.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>The privacy shift</dt>
+              <dd>
+                Safari and Firefox block third-party cookies; iPhone apps must ask before tracking
+                people across other companies' apps. Following individuals is less exact everywhere,
+                so big apps lean on measurement partners and statistical models.
+              </dd>
+            </div>
+          </dl>
+
+          <h3>Metrics for Nutgraf</h3>
+          <div class="tbl wide">
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Definition</th>
+                  <th>Starts in</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Visitors by source, medium, campaign</td>
+                  <td>Visits to the public page by UTM and referrer</td>
+                  <td>
+                    <span class="tier r">Newsroom</span>
+                    <span class="muted small">Notebook once a public page exists</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Visitor → sign-up → activated</td>
+                  <td>Conversion at each step, by channel</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Activated readers by channel</td>
+                  <td>Quality of each channel, not just volume</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Waitlist → invited → activated</td>
+                  <td>If you open by invitation</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Referral share and k-factor</td>
+                  <td>Sign-ups from invites; invites × acceptance</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Organic search clicks, searches for "Nutgraf"</td>
+                  <td>From Google Search Console</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>CAC by channel, blended CAC, payback months</td>
+                  <td>Only once you pay for growth</td>
+                  <td><span class="tier w">Wire Service</span></td>
+                </tr>
+                <tr>
+                  <td>LTV and LTV ÷ CAC</td>
+                  <td>Only once Nutgraf earns money</td>
+                  <td><span class="tier w">Wire Service</span></td>
+                </tr>
+                <tr>
+                  <td>Incremental lift per channel</td>
+                  <td>Holdout or geo tests, or a marketing mix model</td>
+                  <td><span class="tier w">Wire Service</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Tools by tier</h3>
+          <div class="tools">
+            <div class="tool boxed">
+              <span class="ybox"></span><span class="tier n">Notebook</span>
+              <p>
+                UTM-tagged links, PostHog web analytics on the public page, Google Search Console
+                (free).
+              </p>
+              <p class="muted">
+                No Google Analytics: PostHog covers it, and GA adds a Google script and a cookie
+                banner.
+              </p>
+            </div>
+            <div class="tool">
+              <span class="tier r">Newsroom</span>
+              <p>
+                PostHog web analytics with first- and last-touch channel on each person; Dub for
+                tracked short links; Search Console; invitations and referral codes in sign-up.
+              </p>
+              <p>
+                Google Analytics 4 only with Google Ads; ad platforms' server-side conversion APIs
+                only if you buy ads.
+              </p>
+            </div>
+            <div class="tool">
+              <span class="tier w">Wire Service</span>
+              <p>
+                A mobile measurement partner (AppsFlyer, Adjust, Branch) once there are native apps;
+                marketing mix modelling with Google's Meridian or Meta's Robyn (open source).
+              </p>
+              <p>Holdout and geo tests; attribution modelled in the warehouse; a growth team.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= Area 3 ================= -->
+        <section id="qualitative">
+          <p class="eyebrow">Area 3 of 7</p>
+          <h2>Qualitative and experience analytics</h2>
+          <p class="question">Why do people do what the numbers show, and what frustrates them?</p>
+
+          <h3>Ideas to know</h3>
+          <dl class="ideas">
+            <div class="idea">
+              <dt>Session replay</dt>
+              <dd>
+                A reconstruction of a visit (not a video): taps, scrolls, screens. Shows where
+                someone hesitated or got stuck.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Heatmaps</dt>
+              <dd>Where people tap and how far they scroll, summed over many visits.</dd>
+            </div>
+            <div class="idea">
+              <dt>Rage taps, dead taps</dt>
+              <dd>
+                Repeated taps on one spot, or taps on things that do nothing. Automatic frustration
+                signals.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Product-market fit survey</dt>
+              <dd>
+                "How would you feel if you could no longer use Nutgraf?" When 40% or more say "very
+                disappointed", the product has found its fit (the Sean Ellis test).
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>NPS</dt>
+              <dd>
+                "How likely are you to recommend Nutgraf?" from 0 to 10. Promoters (9, 10) minus
+                detractors (0 to 6), from −100 to 100.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>CSAT</dt>
+              <dd>"Was this helpful?" asked about one feature.</dd>
+            </div>
+            <div class="idea">
+              <dt>Interviews and usability tests</dt>
+              <dd>Watching five people try a task finds most of the big problems.</dd>
+            </div>
+            <div class="idea">
+              <dt>Voice of the customer</dt>
+              <dd>Support messages, feedback boards and reviews, tagged by theme and counted.</dd>
+            </div>
+          </dl>
+
+          <h3>Metrics for Nutgraf</h3>
+          <div class="tbl wide">
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Definition</th>
+                  <th>Starts in</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Thumbs-down reasons</td>
+                  <td>
+                    An optional chip after a thumbs down: not my topic, knew it already, too long, a
+                    promo, poorly written. Also teaches the ranking.
+                  </td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Helpful? on AI answers</td>
+                  <td>A thumb on Ask answers, timelines, takes and source checks</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Rage and dead taps per 100 visits</td>
+                  <td>Frustration hot spots</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Replays watched per week</td>
+                  <td>The habit of looking</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Product-market fit score</td>
+                  <td>Share answering "very disappointed" (needs 40+ answers)</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>NPS, CSAT by feature</td>
+                  <td>As above</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Survey response rate</td>
+                  <td>Answers ÷ times shown</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Feedback themes per month</td>
+                  <td>Tagged themes from support and the feedback board</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Support load and speed</td>
+                  <td>Contacts per 100 active readers; first response time</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Tools by tier</h3>
+          <div class="tools">
+            <div class="tool boxed">
+              <span class="ybox"></span><span class="tier n">Notebook</span>
+              <p>
+                PostHog replay (5,000 recordings a month free; text masked, newsletter frame
+                blocked) and surveys (1,500 answers free). Thumbs-down reasons and AI-answer thumbs
+                built into the app.
+              </p>
+              <p class="muted">
+                For you alone, the best tool is a "this felt wrong" button that saves the screen and
+                a sentence.
+              </p>
+            </div>
+            <div class="tool">
+              <span class="tier r">Newsroom</span>
+              <p>
+                PostHog replay, heatmaps and surveys at scale; Canny or Featurebase for feedback;
+                Plain, Crisp or Intercom for support, with tags; interviews in Notion or Dovetail;
+                Maze or Lyssna for usability tests.
+              </p>
+              <p>Microsoft Clarity (free) on the public page only, never inside the app.</p>
+            </div>
+            <div class="tool">
+              <span class="tier w">Wire Service</span>
+              <p>
+                FullStory, Contentsquare (now owns Hotjar) or Quantum Metric; Qualtrics or Medallia;
+                Sprig; UserTesting panels; Dovetail as the research library.
+              </p>
+              <p>AI theme-mining of tickets and reviews; a UX research team.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= Area 4 ================= -->
+        <section id="technical">
+          <p class="eyebrow">Area 4 of 7</p>
+          <h2>Technical, performance and crash analytics</h2>
+          <p class="question">Is it up, is it fast, and is it broken for someone right now?</p>
+
+          <h3>Ideas to know</h3>
+          <dl class="ideas">
+            <div class="idea">
+              <dt>Logs, metrics, traces</dt>
+              <dd>
+                Lines saying what happened; numbers over time; one request followed through every
+                part it touches. Together: observability.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Real user monitoring</dt>
+              <dd>Speed and errors measured on real devices, not in a lab.</dd>
+            </div>
+            <div class="idea">
+              <dt>Percentiles</dt>
+              <dd>
+                p50 is the typical visit, p95 the slow visit one in twenty sees, p99 the worst 1%.
+                Averages hide pain.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Error-free sessions</dt>
+              <dd>
+                The share of visits with no error. Mobile teams usually hold crash-free well above
+                99%.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Source maps</dt>
+              <dd>Turn the minified code in an error report back into your real file and line.</dd>
+            </div>
+            <div class="idea">
+              <dt>SLO and error budget</dt>
+              <dd>
+                A target you set yourself (99.5% of API calls succeed over 30 days). The 0.5%
+                allowed to fail is a budget for risky changes; when it runs out, slow down.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Synthetic monitoring</dt>
+              <dd>
+                A robot that loads the site every few minutes, so you hear about an outage before a
+                user does.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Cold start</dt>
+              <dd>The extra time a Lambda takes when it has not run for a while.</dd>
+            </div>
+          </dl>
+
+          <h3>Core Web Vitals: how a page feels</h3>
+          <p>Google's three measures, judged on the 75th percentile of visits.</p>
+          <div class="vitals">
+            <div class="vrow">
+              <div class="name">LCP <span>main content appears</span></div>
+              <div class="vbar">
+                <div class="g">Good ≤ 2.5 s</div>
+                <div class="w">Needs work ≤ 4 s</div>
+                <div class="b">Poor &gt; 4 s</div>
+              </div>
+            </div>
+            <div class="vrow">
+              <div class="name">INP <span>the page answers a tap</span></div>
+              <div class="vbar">
+                <div class="g">Good ≤ 200 ms</div>
+                <div class="w">Needs work ≤ 500 ms</div>
+                <div class="b">Poor &gt; 500 ms</div>
+              </div>
+            </div>
+            <div class="vrow">
+              <div class="name">CLS <span>the layout jumps</span></div>
+              <div class="vbar">
+                <div class="g">Good ≤ 0.1</div>
+                <div class="w">Needs work ≤ 0.25</div>
+                <div class="b">Poor &gt; 0.25</div>
+              </div>
+            </div>
+          </div>
+
+          <h3>Metrics for Nutgraf</h3>
+          <div class="tbl wide">
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Definition</th>
+                  <th>Starts in</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Errors, error-free sessions</td>
+                  <td>Uncaught errors and failed promises in the app, by screen and release</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Web vitals by screen</td>
+                  <td>LCP, INP, CLS at p75 for Today, Browse, the reader</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Time to first list</td>
+                  <td>Opening the app to the first rows shown</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Sign-in failures</td>
+                  <td>Token refresh failures and sign-in loops</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>API errors and latency by route</td>
+                  <td>4xx and 5xx; p50, p95, p99</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Lambda cold starts, timeouts, throttles</td>
+                  <td>By function; timeouts against the API's 28 seconds</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Ingest freshness</td>
+                  <td>
+                    Minutes since the last clean run (alarmed today); issues waiting to be enriched
+                    or split
+                  </td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Jobs outcomes</td>
+                  <td>Source checks and settling: done, none, failed, stopped</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Uptime</td>
+                  <td>A robot loads the app shell every 5 minutes</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>DynamoDB throttles, S3 growth</td>
+                  <td>Capacity and storage</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>SLOs and error-budget burn</td>
+                  <td>
+                    For example 99.5% API success over 30 days; Today p95 under 2.5 s; ingest never
+                    over 3 hours stale between 06:00 and 22:00 IST
+                  </td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Release health</td>
+                  <td>Errors per release; regressions after a deploy</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>The four DORA measures</td>
+                  <td>
+                    Deploy frequency, lead time, change failure rate, time to restore, from GitHub
+                    Actions
+                  </td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Crash-free users, app-not-responding</td>
+                  <td>Only with native apps</td>
+                  <td><span class="tier w">Wire Service</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Tools by tier</h3>
+          <div class="tools">
+            <div class="tool boxed">
+              <span class="ybox"></span><span class="tier n">Notebook</span>
+              <p>
+                PostHog error tracking (100,000 errors a month free) and web vitals for the app.
+                Powertools for AWS Lambda (free library): structured logs, metrics, traces.
+              </p>
+              <p>
+                A CloudWatch dashboard beside today's alarms; a free uptime check (UptimeRobot or
+                Better Stack); logs kept 90 days, not 14.
+              </p>
+            </div>
+            <div class="tool">
+              <span class="tier r">Newsroom</span>
+              <p>
+                Sentry Team ($26 a month on yearly billing, 50,000 errors): source maps, tracing
+                from a tap to the Lambda, release health, replay of the moments before an error.
+              </p>
+              <p>
+                CloudWatch Application Signals for the backend; Better Stack for uptime, a status
+                page and on-call.
+              </p>
+            </div>
+            <div class="tool">
+              <span class="tier w">Wire Service</span>
+              <p>
+                One observability platform (Datadog, or Grafana Cloud, New Relic, Honeycomb,
+                Dynatrace) on OpenTelemetry.
+              </p>
+              <p>
+                Crashlytics, Embrace or Sentry for native apps; PagerDuty or incident.io; SLOs owned
+                by a reliability team.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= Area 5 ================= -->
+        <section id="experiments">
+          <p class="eyebrow">Area 5 of 7</p>
+          <h2>Experimentation and feature flags</h2>
+          <p class="question">Did this change make things better, and can I release it safely?</p>
+
+          <h3>Ideas to know</h3>
+          <dl class="ideas">
+            <div class="idea">
+              <dt>Feature flag</dt>
+              <dd>
+                A switch read while the app runs: ship code turned off, then turn it on for you, for
+                10%, for everyone, without a deploy. Doubles as a kill switch.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>A/B test</dt>
+              <dd>
+                Half get A (control), half get B (variant). Compare a primary metric chosen in
+                advance; guardrail metrics must not get worse.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Statistical significance</dt>
+              <dd>
+                How unlikely the difference would be if B were no better. Peeking daily and stopping
+                when it looks good makes false wins; sequential testing corrects for it.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Sample ratio mismatch</dt>
+              <dd>
+                A 50/50 split that comes out 53/47 means a broken experiment. Do not trust its
+                result.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Novelty effect</dt>
+              <dd>
+                A new thing gets clicks because it is new. Let tests run long enough for that to
+                wear off.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Holdout</dt>
+              <dd>
+                A group kept on the old experience for months, to measure the long-run effect of
+                many changes together.
+              </dd>
+            </div>
+          </dl>
+
+          <div class="grid2" style="margin-top: 20px; align-items: start">
+            <div>
+              <h3 style="margin-top: 0">Why small products rarely A/B test</h3>
+              <p>
+                Users needed in each group to notice a lift on a 20% conversion rate, at 95%
+                confidence and 80% power:
+              </p>
+              <div class="tbl">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Lift to detect</th>
+                      <th>Users per group</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>5% (20% → 21%)</td>
+                      <td>about 25,600</td>
+                    </tr>
+                    <tr>
+                      <td>10% (20% → 22%)</td>
+                      <td>about 6,500</td>
+                    </tr>
+                    <tr>
+                      <td>20% (20% → 24%)</td>
+                      <td>about 1,700</td>
+                    </tr>
+                    <tr>
+                      <td>50% (20% → 30%)</td>
+                      <td>about 300</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="callout" style="margin: 0">
+              <span class="label">What works for Nutgraf now</span>
+              <p>
+                You cannot A/B test with one user. Two things do work. <strong>Flags</strong> let
+                you ship dark and turn a feature on for yourself, which you already do by hand.
+                <strong>Interleaving</strong> can settle the open ranking questions, the LLM
+                reranker (<a href="https://github.com/devsandip/the-library/issues/69">issue 69</a>)
+                and the model bake-off (<a href="https://github.com/devsandip/the-library/issues/27"
+                  >issue 27</a
+                >), from your own opens and thumbs within a few weeks.
+              </p>
+            </div>
+          </div>
+
+          <h3>Interleaving: an experiment for one reader</h3>
+          <figure>
+            <div class="fig">
+              <svg
+                class="dia"
+                viewBox="0 0 884 262"
+                role="img"
+                aria-label="Interleaving. Ranker A and ranker B each produce a list. They take turns picking their best item not yet taken, giving one mixed list of six: Platformer from A, The Ken from B, ByteByteGo from A, Pragmatic Engineer from B, Lenny's from A, Product Talk from B. You open or thumb up The Ken, Pragmatic Engineer and Lenny's, so B wins 2 to 1 today. Over two to three weeks, B's share of your picks is tested against 50%."
+              >
+                <defs>
+                  <marker
+                    id="ah4"
+                    viewBox="0 0 10 10"
+                    refX="9"
+                    refY="5"
+                    markerWidth="7"
+                    markerHeight="7"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M0 0L10 5L0 10z" fill="currentColor" />
+                  </marker>
+                </defs>
+                <text class="t" x="8" y="22">Ranker A, today's</text>
+                <text class="t" x="176" y="22">Ranker B, the reranker</text>
+                <text class="t" x="380" y="22">What you see</text>
+                <text class="t" x="680" y="22">Score</text>
+                <g>
+                  <rect class="bx" x="8" y="36" width="150" height="28" rx="5" />
+                  <text class="itm" x="18" y="54">Platformer</text>
+                  <rect class="bx" x="8" y="72" width="150" height="28" rx="5" />
+                  <text class="dim" x="18" y="90">The Ken</text>
+                  <rect class="bx" x="8" y="108" width="150" height="28" rx="5" />
+                  <text class="itm" x="18" y="126">ByteByteGo</text>
+                  <rect class="bx" x="8" y="144" width="150" height="28" rx="5" />
+                  <text class="itm" x="18" y="162">Lenny's</text>
+                  <rect class="bx" x="8" y="180" width="150" height="28" rx="5" />
+                  <text class="dim" x="18" y="198">TLDR AI</text>
+                </g>
+                <g>
+                  <rect class="bx" x="176" y="36" width="150" height="28" rx="5" />
+                  <text class="itm" x="186" y="54">The Ken</text>
+                  <rect class="bx" x="176" y="72" width="150" height="28" rx="5" />
+                  <text class="itm" x="186" y="90">Pragmatic Eng.</text>
+                  <rect class="bx" x="176" y="108" width="150" height="28" rx="5" />
+                  <text class="dim" x="186" y="126">Platformer</text>
+                  <rect class="bx" x="176" y="144" width="150" height="28" rx="5" />
+                  <text class="itm" x="186" y="162">Product Talk</text>
+                  <rect class="bx" x="176" y="180" width="150" height="28" rx="5" />
+                  <text class="dim" x="186" y="198">AlgoMaster</text>
+                </g>
+                <line class="ln" x1="330" y1="122" x2="374" y2="122" marker-end="url(#ah4)" />
+                <text class="l" x="352" y="114" text-anchor="middle">take turns</text>
+                <g>
+                  <rect class="bx" x="380" y="36" width="200" height="28" rx="5" />
+                  <text class="s" x="390" y="54">1</text>
+                  <text class="itm" x="406" y="54">Platformer</text>
+                  <rect class="tag-a" x="548" y="41" width="22" height="18" rx="3" />
+                  <text class="tag-a-t" x="559" y="54" text-anchor="middle">A</text>
+                  <rect class="bx" x="380" y="72" width="200" height="28" rx="5" />
+                  <text class="s" x="390" y="90">2</text>
+                  <text class="itm" x="406" y="90">The Ken</text>
+                  <rect class="tag-b" x="548" y="77" width="22" height="18" rx="3" />
+                  <text class="tag-b-t" x="559" y="90" text-anchor="middle">B</text>
+                  <rect class="bx" x="380" y="108" width="200" height="28" rx="5" />
+                  <text class="s" x="390" y="126">3</text>
+                  <text class="itm" x="406" y="126">ByteByteGo</text>
+                  <rect class="tag-a" x="548" y="113" width="22" height="18" rx="3" />
+                  <text class="tag-a-t" x="559" y="126" text-anchor="middle">A</text>
+                  <rect class="bx" x="380" y="144" width="200" height="28" rx="5" />
+                  <text class="s" x="390" y="162">4</text>
+                  <text class="itm" x="406" y="162">Pragmatic Eng.</text>
+                  <rect class="tag-b" x="548" y="149" width="22" height="18" rx="3" />
+                  <text class="tag-b-t" x="559" y="162" text-anchor="middle">B</text>
+                  <rect class="bx" x="380" y="180" width="200" height="28" rx="5" />
+                  <text class="s" x="390" y="198">5</text>
+                  <text class="itm" x="406" y="198">Lenny's</text>
+                  <rect class="tag-a" x="548" y="185" width="22" height="18" rx="3" />
+                  <text class="tag-a-t" x="559" y="198" text-anchor="middle">A</text>
+                  <rect class="bx" x="380" y="216" width="200" height="28" rx="5" />
+                  <text class="s" x="390" y="234">6</text>
+                  <text class="itm" x="406" y="234">Product Talk</text>
+                  <rect class="tag-b" x="548" y="221" width="22" height="18" rx="3" />
+                  <text class="tag-b-t" x="559" y="234" text-anchor="middle">B</text>
+                </g>
+                <path class="check" d="M594 86l5 5 9-10" />
+                <path class="check" d="M594 158l5 5 9-10" />
+                <path class="check" d="M594 194l5 5 9-10" />
+                <text class="s" x="590" y="254">you open or thumb up</text>
+                <line class="ln" x1="616" y1="86" x2="676" y2="86" marker-end="url(#ah4)" />
+                <text class="l" x="646" y="78" text-anchor="middle">count</text>
+                <rect class="bx" x="680" y="40" width="196" height="96" rx="8" />
+                <text class="t" x="694" y="64">Today</text>
+                <text class="itm" x="694" y="88">B: 2 of your 3 picks</text>
+                <text class="itm" x="694" y="108">A: 1</text>
+                <rect class="bx-hl" x="680" y="152" width="196" height="76" rx="8" />
+                <text class="t" x="694" y="176">After 2 to 3 weeks</text>
+                <text class="itm" x="694" y="198">Is B's share of picks above</text>
+                <text class="itm" x="694" y="216">50% by more than chance?</text>
+              </svg>
+            </div>
+            <figcaption>
+              The two rankers take turns picking their best item not yet taken; each item remembers
+              who picked it. Whoever's items you choose more often wins. Netflix reported
+              interleaving needs about 100 times fewer people than an A/B test, and here every day's
+              list is a small contest of its own.
+            </figcaption>
+          </figure>
+
+          <h3>Metrics for Nutgraf</h3>
+          <div class="tbl wide">
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Definition</th>
+                  <th>Starts in</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Interleaving preference</td>
+                  <td>
+                    Share of your opens and thumbs up that land on ranker B's items, with a binomial
+                    test
+                  </td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Flag exposure</td>
+                  <td>Which flag value each person saw, attached to their events</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Experiment result</td>
+                  <td>
+                    Primary metric's lift with a confidence interval; guardrails: errors, latency,
+                    AI cost per reader, unsubscribes
+                  </td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Sample ratio check</td>
+                  <td>Observed split against the planned one</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Stale flags</td>
+                  <td>Fully on or off for 90 days and still in the code</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Velocity, win rate, launches tested</td>
+                  <td>How fast the team learns</td>
+                  <td><span class="tier w">Wire Service</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Tools by tier</h3>
+          <div class="tools">
+            <div class="tool boxed">
+              <span class="ybox"></span><span class="tier n">Notebook</span>
+              <p>
+                PostHog feature flags (1 million requests a month free), or one config item in
+                DynamoDB.
+              </p>
+              <p>
+                Interleaving written into the Summary endpoint, which logs which ranker picked each
+                item.
+              </p>
+            </div>
+            <div class="tool">
+              <span class="tier r">Newsroom</span>
+              <p>
+                PostHog experiments, or GrowthBook (open source; free to host yourself, $40 a seat a
+                month on its cloud; variance reduction and sequential tests built in).
+              </p>
+              <p class="muted">
+                AWS's CloudWatch Evidently was shut down in October 2025; AppConfig remains, for
+                flags only.
+              </p>
+            </div>
+            <div class="tool">
+              <span class="tier w">Wire Service</span>
+              <p>
+                Statsig (OpenAI announced its purchase in September 2025; still sold), Eppo (now
+                part of Datadog), Optimizely or LaunchDarkly, or in-house.
+              </p>
+              <p>A global holdout; CUPED; bandits for content; review of experiment designs.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= Area 6 ================= -->
+        <section id="messaging">
+          <p class="eyebrow">Area 6 of 7</p>
+          <h2>Engagement and lifecycle messaging</h2>
+          <p class="question">
+            Which messages bring people back, and which annoy them into leaving?
+          </p>
+
+          <h3>Ideas to know</h3>
+          <dl class="ideas">
+            <div class="idea">
+              <dt>Lifecycle stages</dt>
+              <dd>
+                New → activated → engaged → at risk → dormant → resurrected, or gone. Each stage
+                gets different messages.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Triggered or scheduled</dt>
+              <dd>
+                Caused by behaviour ("a story you follow moved") or sent at a fixed time ("your week
+                in Nutgraf").
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Channels</dt>
+              <dd>
+                Email; web push (on an iPhone only for a home-screen app, iOS 16.4 and later);
+                messages inside the app.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Open rates are unreliable</dt>
+              <dd>
+                Apple Mail loads every email's images by itself (Mail Privacy Protection), so opens
+                look higher than they are. Count clicks and the visits that follow.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Holdout</dt>
+              <dd>
+                The honest measure. Keep 10% of eligible people from getting a message; the
+                difference in return visits is what the message caused.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Deliverability</dt>
+              <dd>
+                SPF, DKIM and DMARC prove the mail is yours. Google requires bulk senders to keep
+                spam complaints under 0.3%, recommends under 0.1%, and wants one-click unsubscribe.
+              </dd>
+            </div>
+            <div class="idea span2">
+              <dt>Fatigue</dt>
+              <dd>
+                Every message spends attention. Nutgraf exists because newsletters overwhelm you, so
+                its own messages should be few and worth it.
+              </dd>
+            </div>
+          </dl>
+
+          <h3>Metrics for Nutgraf</h3>
+          <div class="tbl wide">
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Definition</th>
+                  <th>Starts in</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Message → visit</td>
+                  <td>
+                    Visits within 24 hours of a message, counted with a <code>ref</code> tag on
+                    every link
+                  </td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Push opt-in rate</td>
+                  <td>Granted ÷ asked (if you add a morning push)</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Click rate, click-to-open</td>
+                  <td>Clicks ÷ delivered; clicks ÷ opens</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Delivery, bounce, complaint, unsubscribe</td>
+                  <td>Per kind of message</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Incremental lift</td>
+                  <td>Return rate of those messaged against the holdout</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Push disable rate</td>
+                  <td>Permission withdrawn after a message</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Messages per reader per week</td>
+                  <td>Fatigue</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Reactivation rate</td>
+                  <td>Dormant readers who return after a message</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Tools by tier</h3>
+          <div class="tools">
+            <div class="tool boxed">
+              <span class="ybox"></span><span class="tier n">Notebook</span>
+              <p>
+                Amazon SES (10 cents per 1,000 emails) for a weekly "your week in Nutgraf" email to
+                yourself.
+              </p>
+              <p>
+                Web push from a Lambda through the browser's Push API (free) for "the day in brief
+                is ready" or "a followed story moved"; a <code>ref</code> tag on every link.
+              </p>
+            </div>
+            <div class="tool">
+              <span class="tier r">Newsroom</span>
+              <p>
+                Customer.io (from $100 a month for 5,000 people; journeys triggered by events) or
+                Loops (free to 1,000 contacts, then from $49).
+              </p>
+              <p>
+                OneSignal for push; Knock for in-app and email together. Audiences flow from PostHog
+                or the warehouse.
+              </p>
+            </div>
+            <div class="tool">
+              <span class="tier w">Wire Service</span>
+              <p>
+                Braze, Iterable or Airship; send-time optimisation; frequency caps across channels.
+              </p>
+              <p>A global message holdout; a deliverability specialist watching inbox placement.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= Area 7 ================= -->
+        <section id="ai">
+          <p class="eyebrow">Area 7 of 7</p>
+          <h2>AI and LLM analytics</h2>
+          <p class="question">
+            What does each AI feature cost, how fast is it, how often does it fail, and are its
+            answers right?
+          </p>
+          <p>
+            This is where Nutgraf has the most to gain today. Claude does about ten jobs: summaries
+            and topics, the story split, Jev's shelves, the day in brief, spotting predictions,
+            settling them, following stories, timelines, takes, the source check with its hunt, and
+            Ask. Titan embeds every issue, story and search.
+          </p>
+
+          <h3>Ideas to know</h3>
+          <dl class="ideas">
+            <div class="idea">
+              <dt>Tokens</dt>
+              <dd>
+                The units models are billed in, separately for input and output. Cost is tokens ×
+                price.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Trace and span</dt>
+              <dd>
+                One job from start to finish (an Ask: plan, three searches, answer), and each step
+                in it. Shows where time and money go.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Evals</dt>
+              <dd>
+                Testing a prompt or model against examples with known good answers. Offline evals
+                run before a change ships, like unit tests; online evals score a sample of real
+                traffic.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Golden set</dt>
+              <dd>
+                A few dozen real examples with the right answers, in the repo.
+                <code>jev:score</code>'s labelled stories are one already.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>LLM-as-judge</dt>
+              <dd>
+                A second model grades answers ("is every sentence supported by its sources?").
+                Cheap; check it against your own judgement now and then.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Groundedness</dt>
+              <dd>
+                Whether an answer is supported by the sources it cites. Its opposite is
+                hallucination.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Human override rate</dt>
+              <dd>
+                How often a person corrects the AI. Your prediction verdicts and shelf moves are
+                exactly this.
+              </dd>
+            </div>
+            <div class="idea">
+              <dt>Prompt injection</dt>
+              <dd>
+                Text inside an input (a newsletter, a page the source check reads) that tries to
+                give the model orders. Nutgraf reads untrusted text all day.
+              </dd>
+            </div>
+          </dl>
+
+          <h3>Metrics for Nutgraf</h3>
+          <div class="tbl wide">
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Definition</th>
+                  <th>Starts in</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Cost by feature, per day and month</td>
+                  <td>Sum of every call's cost, by feature and model</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Cost per issue ingested</td>
+                  <td>Summaries + story split + shelves + predictions, ÷ issues</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Cost against budget</td>
+                  <td>Month to date against the $8 AWS Budget</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Calls, tokens in and out</td>
+                  <td>Per feature</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Latency p50 and p95 by feature</td>
+                  <td>Ask takes 3 to 17 s today; watch the API's 28 s ceiling</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Failures</td>
+                  <td>
+                    Bedrock errors, throttles, retries, tool calls that did not validate, items
+                    given up after three tries
+                  </td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Built-in check failures</td>
+                  <td>
+                    Quotes not found word for word; unknown story ids; answers of <code>none</code>
+                  </td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Human override rate</td>
+                  <td>
+                    Predictions overruled ÷ settled; your shelf moves ÷ Jev's calls; summaries
+                    thumbed down
+                  </td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Helpful rate</td>
+                  <td>Thumbs up on Ask answers and deep dives</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Offline eval scores</td>
+                  <td>
+                    <code>jev:score</code>; a golden set per feature, rerun on every prompt or model
+                    change
+                  </td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Reuse rate</td>
+                  <td>Timelines and takes opened free (kept for their event) ÷ written</td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Ranking quality</td>
+                  <td>
+                    Top-5 useful rate; precision at 5; how many newsletters the five come from
+                  </td>
+                  <td><span class="tier n">Notebook</span></td>
+                </tr>
+                <tr>
+                  <td>Groundedness score</td>
+                  <td>LLM-as-judge on a weekly sample</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Suspected injections, guardrail blocks</td>
+                  <td>By source</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>AI cost per active reader per month</td>
+                  <td>The number that decides whether Nutgraf can be free</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Spend caps reached</td>
+                  <td>Readers who hit the daily limit on Ask or deep dives</td>
+                  <td><span class="tier r">Newsroom</span></td>
+                </tr>
+                <tr>
+                  <td>Drift</td>
+                  <td>Week-on-week change in eval scores, refusals, answer length</td>
+                  <td><span class="tier w">Wire Service</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Tools by tier</h3>
+          <div class="tools">
+            <div class="tool boxed">
+              <span class="ybox"></span><span class="tier n">Notebook</span>
+              <p>
+                One wrapper around every Bedrock call: feature, model, tokens, cents, ms, outcome,
+                as a CloudWatch metric and a server event with no text.
+              </p>
+              <p>
+                Bedrock's own CloudWatch metrics; invocation logs to S3 in your account (30 days);
+                an inference profile per feature, so the bill splits by feature; Budgets and Cost
+                Anomaly Detection (free); Promptfoo in CI.
+              </p>
+            </div>
+            <div class="tool">
+              <span class="tier r">Newsroom</span>
+              <p>
+                Langfuse, self-hosted in your AWS account (MIT licence; ClickHouse bought the
+                company in January 2026 and kept it open): traces, prompt versions, scores,
+                datasets. Prompts never leave AWS.
+              </p>
+              <p>
+                Weekly LLM-as-judge; Bedrock Guardrails on fetched pages; per-reader rate limits and
+                spend caps.
+              </p>
+            </div>
+            <div class="tool">
+              <span class="tier w">Wire Service</span>
+              <p>Datadog LLM Observability, Arize, Braintrust or LangSmith.</p>
+              <p>
+                An AI gateway (LiteLLM, Portkey) for routing, caching, per-customer budgets and
+                fallbacks; continuous evals and red-teaming; labelling queues; an AI quality team.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= Missing ================= -->
+        <section id="missing">
+          <p class="eyebrow">Chapter 5 · Beyond the seven</p>
+          <h2>What your list was missing</h2>
+          <p class="lead">
+            Your seven cover the classic map. Seven more things decide whether the analytics are
+            trustworthy, legal and affordable.
+          </p>
+          <div class="cards">
+            <div class="card">
+              <h3>The data foundation</h3>
+              <p>
+                A tracking plan, naming rules, identity (one person across phone and Mac, anonymous
+                before sign-in and known after), versioned events, tests that catch a broken event,
+                and from Newsroom on, a warehouse as the single source of truth. Every other area
+                stands on this.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Privacy, consent and compliance</h3>
+              <p>
+                India's DPDP Act first: its Rules were notified in November 2025; consent-manager
+                duties start 13 November 2026, the core duties 13 May 2027. GDPR and CCPA follow if
+                readers come from Europe or California. A privacy policy naming every tool, consent,
+                minimum collection, retention limits, deletion on request, a data processing
+                agreement per vendor. Plus Google's Gmail rules.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Ranking and recommendation quality</h3>
+              <p>
+                Nutgraf's core is a ranker. Precision at 5, coverage (how many newsletters ever
+                reach the top), diversity, novelty, exploration share, and replays of past days with
+                a new ranker before it ships. It deserves its own page once the stored score (<a
+                  href="https://github.com/devsandip/the-library/issues/5"
+                  >issue 5</a
+                >) lands.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Cost and unit economics</h3>
+              <p>
+                AWS plus Bedrock cost per reader per month, per issue, per feature. If Nutgraf opens
+                up, this number decides free, freemium or paid. Today the budget alert is not set.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Trust, safety and abuse</h3>
+              <p>
+                Fake sign-ups, password guessing, scraping, and above all AI cost abuse: one person
+                scripting Ask a thousand times a day is a real bill. Measure sign-ups per hour,
+                failed sign-ins, requests and AI spend per reader; enforce limits.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Money</h3>
+              <p>
+                If Nutgraf ever charges: trial-to-paid conversion, monthly recurring revenue, churn,
+                revenue per reader, refunds, lifetime value. Stripe's dashboard first, then the
+                warehouse.
+              </p>
+            </div>
+            <div class="card boxed" style="grid-column: 1 / -1">
+              <span class="ybox"></span>
+              <h3>The weekly review</h3>
+              <p>
+                A metric is only useful if someone looks at it. One page every week: the North Star
+                and its inputs, the guardrails, AI cost, open alarms, three replays watched, one
+                decision. Without this habit, every tier is decoration.
+              </p>
+            </div>
+          </div>
+          <p class="small muted" style="margin-top: 16px">
+            Smaller, for later: app-store analytics (only with native apps), accessibility signals
+            (text size, reduced motion), search-engine visibility for a public site.
+          </p>
+        </section>
+
+        <!-- ================= Tiers ================= -->
+        <section id="tiers">
+          <p class="eyebrow">Chapter 6 · The proposals</p>
+          <h2>Three tiers side by side</h2>
+          <div class="tbl wide">
+            <table>
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>Notebook</th>
+                  <th>Newsroom</th>
+                  <th>Wire Service</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>In one line</td>
+                  <td>One free tool plus what AWS already gives you</td>
+                  <td>The best tool for each job, plus a warehouse</td>
+                  <td>A data platform and a data team</td>
+                </tr>
+                <tr>
+                  <td>For</td>
+                  <td>You alone, or a few friends</td>
+                  <td>Nutgraf opened up: 1,000 to 50,000 readers a month</td>
+                  <td>A million readers and more</td>
+                </tr>
+                <tr>
+                  <td>Tools a month</td>
+                  <td>$0 to $5</td>
+                  <td>about $300 to $1,500</td>
+                  <td>$25,000 to $250,000 and up</td>
+                </tr>
+                <tr>
+                  <td>People</td>
+                  <td>You, an hour a week</td>
+                  <td>You, plus part of an engineer's time</td>
+                  <td>5 to 20+ across data, growth, research, reliability</td>
+                </tr>
+                <tr>
+                  <td>Set-up</td>
+                  <td>About 6 small pull requests</td>
+                  <td>One to two months</td>
+                  <td>Quarters, never finished</td>
+                </tr>
+                <tr>
+                  <td>Source of truth</td>
+                  <td>PostHog and CloudWatch</td>
+                  <td>A warehouse in S3</td>
+                  <td>A governed lakehouse</td>
+                </tr>
+                <tr>
+                  <td>Outside vendors</td>
+                  <td>1 (PostHog)</td>
+                  <td>5 to 8</td>
+                  <td>15 or more</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <figure>
+            <div class="fig">
+              <svg
+                class="dia"
+                viewBox="0 0 884 220"
+                role="img"
+                aria-label="Monthly tool cost of each tier on a log scale from one dollar to one million dollars. Notebook: zero to five dollars. Newsroom: about three hundred to fifteen hundred dollars. Wire Service: twenty-five thousand to two hundred and fifty thousand dollars and up."
+              >
+                <defs>
+                  <marker
+                    id="ah5"
+                    viewBox="0 0 10 10"
+                    refX="9"
+                    refY="5"
+                    markerWidth="7"
+                    markerHeight="7"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M0 0L10 5L0 10z" fill="currentColor" />
+                  </marker>
+                </defs>
+                <line class="grid-ln" x1="170" y1="20" x2="170" y2="190" />
+                <line class="grid-ln" x1="285" y1="20" x2="285" y2="190" />
+                <line class="grid-ln" x1="400" y1="20" x2="400" y2="190" />
+                <line class="grid-ln" x1="515" y1="20" x2="515" y2="190" />
+                <line class="grid-ln" x1="630" y1="20" x2="630" y2="190" />
+                <line class="grid-ln" x1="745" y1="20" x2="745" y2="190" />
+                <line class="grid-ln" x1="860" y1="20" x2="860" y2="190" />
+                <line class="axis" x1="170" y1="190" x2="860" y2="190" />
+                <text class="s" x="170" y="208" text-anchor="middle">$1</text>
+                <text class="s" x="285" y="208" text-anchor="middle">$10</text>
+                <text class="s" x="400" y="208" text-anchor="middle">$100</text>
+                <text class="s" x="515" y="208" text-anchor="middle">$1k</text>
+                <text class="s" x="630" y="208" text-anchor="middle">$10k</text>
+                <text class="s" x="745" y="208" text-anchor="middle">$100k</text>
+                <text class="s" x="860" y="208" text-anchor="middle">$1M</text>
+
+                <text class="t" x="158" y="55" text-anchor="end">Notebook</text>
+                <rect class="bar-n" x="170" y="40" width="80.4" height="22" rx="3" />
+                <text class="val" x="210" y="34" text-anchor="middle">$0 to $5</text>
+
+                <text class="t" x="158" y="111" text-anchor="end">Newsroom</text>
+                <rect class="bar-r" x="454.9" y="96" width="80.4" height="22" rx="3" />
+                <text class="val" x="495" y="90" text-anchor="middle">$300 to $1,500</text>
+
+                <text class="t" x="158" y="167" text-anchor="end">Wire Service</text>
+                <rect class="bar-w" x="675.8" y="152" width="115" height="22" rx="3" />
+                <line
+                  class="ln"
+                  x1="792"
+                  y1="163"
+                  x2="842"
+                  y2="163"
+                  stroke-dasharray="4 3"
+                  marker-end="url(#ah5)"
+                />
+                <text class="val" x="733" y="146" text-anchor="middle">
+                  $25,000 to $250,000 and up
+                </text>
+              </svg>
+            </div>
+            <figcaption>
+              Monthly tool cost on a log scale: each gridline is ten times the one before. A log
+              scale cannot show $0, so Notebook's bar starts at $1. Wire Service's people cost more
+              than its tools.
+            </figcaption>
+          </figure>
+
+          <h3>Each area, in each tier</h3>
+          <div class="tbl wide">
+            <table>
+              <thead>
+                <tr>
+                  <th>Area</th>
+                  <th>Notebook</th>
+                  <th>Newsroom</th>
+                  <th>Wire Service</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Product</td>
+                  <td>PostHog (app + server events)</td>
+                  <td>PostHog paid; S3 warehouse, dbt, Athena, Metabase</td>
+                  <td>
+                    CDP, Snowflake or Databricks, Amplitude or Mixpanel, Looker or Hex, Avo, Monte
+                    Carlo
+                  </td>
+                </tr>
+                <tr>
+                  <td>Marketing</td>
+                  <td>UTM links, PostHog web analytics, Search Console</td>
+                  <td>Attribution in PostHog, Dub, Search Console, GA4 only with Google Ads</td>
+                  <td>AppsFlyer, Adjust or Branch; Meridian or Robyn; incrementality tests</td>
+                </tr>
+                <tr>
+                  <td>Qualitative</td>
+                  <td>PostHog replay (masked) and surveys; thumbs-down reasons</td>
+                  <td>
+                    PostHog replay, heatmaps, surveys; Canny; Plain; Clarity on the public page
+                  </td>
+                  <td>FullStory or Contentsquare; Qualtrics; Sprig; UserTesting; Dovetail</td>
+                </tr>
+                <tr>
+                  <td>Technical</td>
+                  <td>PostHog errors and web vitals; Powertools; CloudWatch; free uptime check</td>
+                  <td>Sentry, Application Signals, Better Stack</td>
+                  <td>Datadog on OpenTelemetry; Crashlytics; PagerDuty</td>
+                </tr>
+                <tr>
+                  <td>Experiments</td>
+                  <td>PostHog flags; interleaving</td>
+                  <td>PostHog experiments or GrowthBook</td>
+                  <td>Statsig, Eppo, Optimizely or in-house</td>
+                </tr>
+                <tr>
+                  <td>Messaging</td>
+                  <td>SES email, web push, <code>ref</code> tags</td>
+                  <td>Customer.io or Loops, OneSignal</td>
+                  <td>Braze or Iterable, fed by reverse ETL</td>
+                </tr>
+                <tr>
+                  <td>AI</td>
+                  <td>
+                    Bedrock wrapper metrics, invocation logs in S3, tagged profiles, Budgets,
+                    Promptfoo
+                  </td>
+                  <td>Langfuse in AWS, Guardrails, spend caps</td>
+                  <td>Datadog LLM Observability or Arize; an AI gateway</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ================= Notebook ================= -->
+        <section id="notebook">
+          <p class="eyebrow">Tier 1 · Start now</p>
+          <h2>Notebook: nearly free</h2>
+          <p class="lead">
+            One outside tool, PostHog, plus what your AWS account already offers. It touches all
+            seven areas at a basic level.
+          </p>
+          <figure>
+            <div class="fig">
+              <svg
+                class="dia"
+                viewBox="0 0 900 340"
+                role="img"
+                aria-label="Notebook architecture. The phone and Mac app sends events to CloudFront at sandip.dev/nutgraf/ingest inside your AWS account, which forwards them to PostHog Cloud. Server events from the Lambdas join the same line. That line, events with no text, is the only thing that leaves AWS. Lambdas send logs and metrics to CloudWatch; Bedrock's prompts are logged to S3, and its costs split by feature in Budgets."
+              >
+                <defs>
+                  <marker
+                    id="ah6"
+                    viewBox="0 0 10 10"
+                    refX="9"
+                    refY="5"
+                    markerWidth="7"
+                    markerHeight="7"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M0 0L10 5L0 10z" fill="currentColor" />
+                  </marker>
+                </defs>
+                <rect class="bx-dash" x="192" y="14" width="478" height="312" rx="10" />
+                <text class="l" x="208" y="34">Your AWS account</text>
+
+                <rect class="bx" x="16" y="46" width="150" height="56" rx="8" />
+                <text class="t" x="91" y="70" text-anchor="middle">Phone and Mac app</text>
+                <text class="s" x="91" y="88" text-anchor="middle">posthog-js, bundled</text>
+
+                <rect class="bx" x="212" y="46" width="180" height="56" rx="8" />
+                <text class="t" x="302" y="70" text-anchor="middle">CloudFront</text>
+                <text class="s" x="302" y="88" text-anchor="middle">/nutgraf/ingest/*</text>
+
+                <rect class="bx" x="212" y="148" width="180" height="56" rx="8" />
+                <text class="t" x="302" y="172" text-anchor="middle">Lambdas</text>
+                <text class="s" x="302" y="190" text-anchor="middle">API · ingest · jobs</text>
+
+                <rect class="bx" x="212" y="250" width="180" height="56" rx="8" />
+                <text class="t" x="302" y="274" text-anchor="middle">Bedrock</text>
+                <text class="s" x="302" y="292" text-anchor="middle">Claude · Titan</text>
+
+                <rect class="bx" x="470" y="148" width="180" height="56" rx="8" />
+                <text class="t" x="560" y="172" text-anchor="middle">CloudWatch</text>
+                <text class="s" x="560" y="190" text-anchor="middle">
+                  dashboards · alarms · logs
+                </text>
+
+                <rect class="bx" x="470" y="250" width="180" height="56" rx="8" />
+                <text class="t" x="560" y="274" text-anchor="middle">S3 and Budgets</text>
+                <text class="s" x="560" y="292" text-anchor="middle">
+                  prompt logs · cost by feature
+                </text>
+
+                <rect class="bx-hl" x="716" y="30" width="168" height="176" rx="10" />
+                <text class="t" x="800" y="56" text-anchor="middle">PostHog Cloud</text>
+                <text class="s" x="800" y="82" text-anchor="middle">charts · funnels</text>
+                <text class="s" x="800" y="100" text-anchor="middle">retention · paths</text>
+                <text class="s" x="800" y="118" text-anchor="middle">replay · surveys</text>
+                <text class="s" x="800" y="136" text-anchor="middle">flags · experiments</text>
+                <text class="s" x="800" y="154" text-anchor="middle">errors · web vitals</text>
+                <text class="lb" x="800" y="188" text-anchor="middle">the one outside tool</text>
+
+                <line class="ln" x1="166" y1="74" x2="208" y2="74" marker-end="url(#ah6)" />
+                <text class="l" x="187" y="66" text-anchor="middle">events</text>
+                <line class="ln" x1="392" y1="74" x2="712" y2="74" marker-end="url(#ah6)" />
+                <text class="lb" x="560" y="66" text-anchor="middle">events, never any text</text>
+                <path class="ln" d="M392 166H430V74" />
+                <circle cx="430" cy="74" r="3" fill="currentColor" />
+                <text class="l" x="438" y="124">server events</text>
+                <line class="ln" x1="392" y1="186" x2="466" y2="186" marker-end="url(#ah6)" />
+                <text class="l" x="430" y="202" text-anchor="middle">logs, metrics</text>
+                <line class="ln" x1="392" y1="278" x2="466" y2="278" marker-end="url(#ah6)" />
+                <text class="l" x="430" y="270" text-anchor="middle">prompts</text>
+              </svg>
+            </div>
+            <figcaption>
+              Only one line crosses out of your AWS account: events with IDs and counts, never text.
+              Prompts, logs and costs stay inside. Bedrock publishes its own token and latency
+              metrics to CloudWatch; a Monday Lambda reads the week and emails it through SES.
+            </figcaption>
+          </figure>
+
+          <div class="grid3">
+            <div class="panel">
+              <strong>Cost</strong>
+              <p class="small" style="margin: 6px 0 0">
+                You will produce perhaps 10,000 to 30,000 events a month, about 2% of PostHog's free
+                million. A few CloudWatch metrics, a dashboard and some S3: a few dollars at most.
+              </p>
+            </div>
+            <div class="panel">
+              <strong>Good</strong>
+              <p class="small" style="margin: 6px 0 0">
+                One tool to learn, and its ideas (events, funnels, retention, flags) are the
+                industry's. Nearly free. Touches every area.
+              </p>
+            </div>
+            <div class="panel">
+              <strong>Watch</strong>
+              <p class="small" style="margin: 6px 0 0">
+                PostHog is outside AWS, a change to the PRD (decision 2). Replays are capped at
+                5,000 a month free. One person's data is anecdote, not statistics.
+              </p>
+            </div>
+          </div>
+          <div class="callout">
+            <span class="label">If you want nothing outside AWS</span>
+            <p>
+              The app sends events to a new <code>POST /api/events</code> route; Firehose writes
+              them to S3 (about 3 cents per GB); Athena queries them ($5 per TB scanned, fractions
+              of a cent here); CloudWatch RUM gives errors and web vitals ($1 per 100,000 events);
+              AppConfig gives flags. The same facts and no new vendor, but no replay, no surveys and
+              no ready-made funnels or retention charts: each is SQL you write.
+            </p>
+          </div>
+          <p>
+            <strong>Move up when</strong> a second person signs up, or events pass the free million.
+          </p>
+        </section>
+
+        <!-- ================= Newsroom ================= -->
+        <section id="newsroom">
+          <p class="eyebrow">Tier 2 · When Nutgraf opens up</p>
+          <h2>Newsroom: a tool per desk, one warehouse</h2>
+          <p class="lead">
+            The change from Notebook: a warehouse in S3 becomes the source of truth, joining usage,
+            AI cost and messages. Each job gets a specialist tool.
+          </p>
+          <figure>
+            <div class="fig">
+              <svg
+                class="dia"
+                viewBox="0 0 884 352"
+                role="img"
+                aria-label="Newsroom architecture. The app and the Lambdas send events to PostHog and errors and traces to Sentry. Bedrock calls are traced in Langfuse, hosted in AWS. PostHog exports hourly, and Langfuse sends cost and scores, to a warehouse in S3. Metabase queries the warehouse for dashboards, and audiences flow from it to Customer.io or Loops for email and push. Better Stack watches uptime separately."
+              >
+                <defs>
+                  <marker
+                    id="ah7"
+                    viewBox="0 0 10 10"
+                    refX="9"
+                    refY="5"
+                    markerWidth="7"
+                    markerHeight="7"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M0 0L10 5L0 10z" fill="currentColor" />
+                  </marker>
+                </defs>
+                <rect class="bx" x="8" y="28" width="150" height="178" rx="8" />
+                <text class="t" x="83" y="110" text-anchor="middle">App and Lambdas</text>
+                <text class="s" x="83" y="128" text-anchor="middle">client and server</text>
+                <rect class="bx" x="8" y="272" width="150" height="56" rx="8" />
+                <text class="t" x="83" y="296" text-anchor="middle">Bedrock calls</text>
+                <text class="s" x="83" y="314" text-anchor="middle">Claude · Titan</text>
+
+                <rect class="bx" x="236" y="28" width="180" height="56" rx="8" />
+                <text class="t" x="326" y="52" text-anchor="middle">PostHog</text>
+                <text class="s" x="326" y="70" text-anchor="middle">product · replay · flags</text>
+                <rect class="bx" x="236" y="150" width="180" height="56" rx="8" />
+                <text class="t" x="326" y="174" text-anchor="middle">Sentry</text>
+                <text class="s" x="326" y="192" text-anchor="middle">
+                  errors · tracing · releases
+                </text>
+                <rect class="bx" x="236" y="272" width="180" height="56" rx="8" />
+                <text class="t" x="326" y="296" text-anchor="middle">Langfuse, in AWS</text>
+                <text class="s" x="326" y="314" text-anchor="middle">traces with prompts</text>
+
+                <rect class="bx-hl" x="480" y="130" width="170" height="96" rx="10" />
+                <text class="t" x="565" y="162" text-anchor="middle">Warehouse in S3</text>
+                <text class="s" x="565" y="182" text-anchor="middle">Parquet · dbt · Athena</text>
+                <text class="lb" x="565" y="204" text-anchor="middle">the source of truth</text>
+
+                <rect class="bx" x="726" y="40" width="150" height="56" rx="8" />
+                <text class="t" x="801" y="64" text-anchor="middle">Metabase</text>
+                <text class="s" x="801" y="82" text-anchor="middle">dashboards · review</text>
+                <rect class="bx" x="726" y="226" width="150" height="56" rx="8" />
+                <text class="t" x="801" y="250" text-anchor="middle">Customer.io or Loops</text>
+                <text class="s" x="801" y="268" text-anchor="middle">email · push</text>
+                <rect class="bx-dash" x="726" y="300" width="150" height="44" rx="8" />
+                <text class="t" x="801" y="320" text-anchor="middle">Better Stack</text>
+                <text class="s" x="801" y="336" text-anchor="middle">uptime · status page</text>
+
+                <line class="ln" x1="158" y1="56" x2="232" y2="56" marker-end="url(#ah7)" />
+                <text class="l" x="195" y="48" text-anchor="middle">events</text>
+                <line class="ln" x1="158" y1="178" x2="232" y2="178" marker-end="url(#ah7)" />
+                <text class="l" x="195" y="170" text-anchor="middle">errors, traces</text>
+                <line class="ln" x1="158" y1="300" x2="232" y2="300" marker-end="url(#ah7)" />
+                <text class="l" x="195" y="292" text-anchor="middle">every call</text>
+                <path class="ln" d="M416 56H448V158H476" marker-end="url(#ah7)" />
+                <text class="l" x="454" y="104">hourly export</text>
+                <path class="ln" d="M416 300H448V198H476" marker-end="url(#ah7)" />
+                <text class="l" x="454" y="262">cost, scores</text>
+                <path class="ln" d="M650 160H690V68H722" marker-end="url(#ah7)" />
+                <text class="l" x="696" y="126">queries</text>
+                <path class="ln" d="M650 196H690V254H722" marker-end="url(#ah7)" />
+                <text class="l" x="696" y="214">audiences</text>
+              </svg>
+            </div>
+            <figcaption>
+              Everything lands in one warehouse, so one query can ask "which channel brings readers
+              who stay, and what does their AI cost?". Langfuse runs inside your AWS account so
+              prompts still never leave it.
+            </figcaption>
+          </figure>
+          <div class="grid3">
+            <div class="panel">
+              <strong>Cost at 10,000 readers</strong>
+              <p class="small" style="margin: 6px 0 0">
+                PostHog a few hundred dollars (5 cents per 1,000 events and half a cent per
+                recording above the free allowances); Sentry from $26; Langfuse's servers roughly
+                $100 to $250; Customer.io about $145, or Loops for less; the rest tens of dollars.
+                About $300 to $1,500 a month. Bedrock is separate and probably bigger.
+              </p>
+            </div>
+            <div class="panel">
+              <strong>Good</strong>
+              <p class="small" style="margin: 6px 0 0">
+                The right tool for each job. The warehouse joins everything. Prompts still never
+                leave AWS.
+              </p>
+            </div>
+            <div class="panel">
+              <strong>Watch</strong>
+              <p class="small" style="margin: 6px 0 0">
+                Five to eight vendors, each a bill, a contract and a data processing agreement.
+                Someone has to own the tracking plan. The privacy work becomes real.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= Wire ================= -->
+        <section id="wire">
+          <p class="eyebrow">Tier 3 · For reference</p>
+          <h2>Wire Service: big consumer scale</h2>
+          <p class="lead">
+            A data platform: every event collected once, streamed into a lakehouse, modelled under
+            contracts, and fanned out to specialist tools and back into messaging.
+          </p>
+          <figure>
+            <div class="fig">
+              <svg
+                class="dia"
+                viewBox="0 0 884 404"
+                role="img"
+                aria-label="Wire Service architecture. Web, iOS, Android and servers send events to a customer data platform, which streams every event through Kinesis or Kafka into a lakehouse of S3 with Iceberg tables and Snowflake or Databricks, governed by dbt, a semantic layer, data contracts and Monte Carlo. From the lakehouse, data flows to Amplitude or Mixpanel, Looker or Hex, Statsig or Eppo, Braze by reverse ETL, and machine learning and marketing mix models. Datadog and LLM observability sit beside the pipeline."
+              >
+                <defs>
+                  <marker
+                    id="ah8"
+                    viewBox="0 0 10 10"
+                    refX="9"
+                    refY="5"
+                    markerWidth="7"
+                    markerHeight="7"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M0 0L10 5L0 10z" fill="currentColor" />
+                  </marker>
+                </defs>
+                <rect class="bx" x="120" y="16" width="140" height="40" rx="8" />
+                <text class="t" x="190" y="41" text-anchor="middle">Web</text>
+                <rect class="bx" x="300" y="16" width="140" height="40" rx="8" />
+                <text class="t" x="370" y="41" text-anchor="middle">iOS</text>
+                <rect class="bx" x="480" y="16" width="140" height="40" rx="8" />
+                <text class="t" x="550" y="41" text-anchor="middle">Android</text>
+                <rect class="bx" x="660" y="16" width="140" height="40" rx="8" />
+                <text class="t" x="730" y="41" text-anchor="middle">Servers</text>
+                <line class="ln" x1="190" y1="56" x2="190" y2="92" marker-end="url(#ah8)" />
+                <line class="ln" x1="370" y1="56" x2="370" y2="92" marker-end="url(#ah8)" />
+                <line class="ln" x1="550" y1="56" x2="550" y2="92" marker-end="url(#ah8)" />
+                <line class="ln" x1="730" y1="56" x2="730" y2="92" marker-end="url(#ah8)" />
+                <text class="l" x="198" y="79">events</text>
+
+                <rect class="bx" x="120" y="96" width="680" height="46" rx="8" />
+                <text class="t" x="460" y="116" text-anchor="middle">Customer data platform</text>
+                <text class="s" x="460" y="133" text-anchor="middle">
+                  Segment, RudderStack or mParticle: collect once, send anywhere
+                </text>
+
+                <line class="ln" x1="460" y1="142" x2="460" y2="172" marker-end="url(#ah8)" />
+                <text class="l" x="468" y="162">every event</text>
+                <rect class="bx" x="340" y="176" width="240" height="40" rx="8" />
+                <text class="t" x="460" y="201" text-anchor="middle">Stream: Kinesis or Kafka</text>
+                <rect class="bx-dash" x="20" y="176" width="280" height="40" rx="8" />
+                <text class="s" x="160" y="200" text-anchor="middle">
+                  beside it: Datadog for APM, RUM, logs
+                </text>
+                <rect class="bx-dash" x="620" y="176" width="244" height="40" rx="8" />
+                <text class="s" x="742" y="200" text-anchor="middle">
+                  beside it: LLM observability, AI gateway
+                </text>
+
+                <line class="ln" x1="460" y1="216" x2="460" y2="246" marker-end="url(#ah8)" />
+                <text class="l" x="468" y="236">seconds later</text>
+                <rect class="bx-hl" x="120" y="250" width="680" height="58" rx="10" />
+                <text class="t" x="460" y="274" text-anchor="middle">
+                  Lakehouse: S3 with Iceberg tables, Snowflake or Databricks
+                </text>
+                <text class="s" x="460" y="294" text-anchor="middle">
+                  dbt models · semantic layer · data contracts · Monte Carlo checks
+                </text>
+
+                <line class="ln" x1="182" y1="308" x2="182" y2="346" marker-end="url(#ah8)" />
+                <line class="ln" x1="321" y1="308" x2="321" y2="346" marker-end="url(#ah8)" />
+                <line class="ln" x1="460" y1="308" x2="460" y2="346" marker-end="url(#ah8)" />
+                <line class="ln" x1="599" y1="308" x2="599" y2="346" marker-end="url(#ah8)" />
+                <line class="ln" x1="738" y1="308" x2="738" y2="346" marker-end="url(#ah8)" />
+                <text class="l" x="606" y="331">reverse ETL</text>
+                <rect class="bx" x="120" y="350" width="124" height="46" rx="8" />
+                <text class="t" x="182" y="370" text-anchor="middle">Amplitude</text>
+                <text class="s" x="182" y="386" text-anchor="middle">product</text>
+                <rect class="bx" x="259" y="350" width="124" height="46" rx="8" />
+                <text class="t" x="321" y="370" text-anchor="middle">Looker, Hex</text>
+                <text class="s" x="321" y="386" text-anchor="middle">analysts</text>
+                <rect class="bx" x="398" y="350" width="124" height="46" rx="8" />
+                <text class="t" x="460" y="370" text-anchor="middle">Statsig, Eppo</text>
+                <text class="s" x="460" y="386" text-anchor="middle">experiments</text>
+                <rect class="bx" x="537" y="350" width="124" height="46" rx="8" />
+                <text class="t" x="599" y="370" text-anchor="middle">Braze</text>
+                <text class="s" x="599" y="386" text-anchor="middle">messages</text>
+                <rect class="bx" x="676" y="350" width="124" height="46" rx="8" />
+                <text class="t" x="738" y="370" text-anchor="middle">ML, MMM</text>
+                <text class="s" x="738" y="386" text-anchor="middle">models</text>
+              </svg>
+            </div>
+            <figcaption>
+              Collect once, store once, use everywhere. The lakehouse in the yellow box is the hub;
+              every tool reads from it, and reverse ETL sends warehouse audiences back into Braze.
+            </figcaption>
+          </figure>
+          <div class="grid2">
+            <div class="panel">
+              <strong>Cost</strong>
+              <p class="small" style="margin: 6px 0 0">
+                Tool contracts from about $25,000 to well over $250,000 a month, negotiated yearly.
+                People cost more: analytics engineers, data scientists, data engineers, growth
+                marketers, UX researchers, reliability engineers, AI evaluators.
+              </p>
+            </div>
+            <div class="panel">
+              <strong>Why anyone pays this</strong>
+              <p class="small" style="margin: 6px 0 0">
+                At a million readers, a 1% gain in retention is worth more than the whole stack, and
+                only this machinery can measure 1%.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= Steps ================= -->
+        <section id="steps">
+          <p class="eyebrow">Chapter 7 · If you approve Notebook</p>
+          <h2>Notebook as pull requests</h2>
+          <p class="lead">A milestone of about six pull requests, each useful on its own.</p>
+          <ol class="steps">
+            <li>
+              <b>Tracking plan in code</b><code>packages/core/src/analytics.ts</code>: the typed
+              events and properties, and a test that no property holds free text. Nothing is sent
+              yet.
+            </li>
+            <li>
+              <b>PostHog in the app</b><code>posthog-js</code> bundled; a CloudFront behaviour
+              sending <code>/nutgraf/ingest/*</code> to PostHog; the CSP unchanged; identify by a
+              hash of the Cognito user ID; replay masked with the newsletter frame blocked; separate
+              dev and prod projects; screen, deck and reader events.
+            </li>
+            <li>
+              <b>Server events and Powertools</b>Ratings, saves, opens and ingest runs; a shared
+              Bedrock wrapper sending <code>llm_call_completed</code>; Powertools logs and metrics;
+              dashboards "Nutgraf health" and "AI cost by feature"; logs kept 90 days.
+            </li>
+            <li>
+              <b>Cost guardrails</b>The AWS Budget on the project tag (closes
+              <a href="https://github.com/devsandip/the-library/issues/6">issue 6</a>); Cost Anomaly
+              Detection; Bedrock invocation logs to S3 with a 30-day lifecycle; an inference profile
+              per feature.
+            </li>
+            <li>
+              <b>Your feedback, captured</b>Thumbs-down reasons; thumbs on Ask answers, timelines,
+              takes and source checks.
+            </li>
+            <li>
+              <b>The weekly review</b>A Monday email through SES, or a Metrics page under Library
+              &gt; Status: the North Star and its inputs, the guardrails, AI cost by feature, the
+              top-5 useful rate.
+            </li>
+          </ol>
+          <p style="margin-top: 16px" class="muted">
+            After those: interleaving in the Summary, once the reranker (<a
+              href="https://github.com/devsandip/the-library/issues/69"
+              >issue 69</a
+            >) or the bake-off (<a href="https://github.com/devsandip/the-library/issues/27"
+              >issue 27</a
+            >) has a second ranker to compare.
+          </p>
+        </section>
+
+        <!-- ================= Decisions ================= -->
+        <section id="decisions">
+          <p class="eyebrow">Chapter 8 · Your call</p>
+          <h2>Decisions for you</h2>
+          <ol class="decide">
+            <li><b>Start Notebook now?</b><span class="rec">Recommended: yes</span></li>
+            <li>
+              <b>A vendor outside AWS?</b> The PRD says AWS only, and that email content never
+              leaves the account except to Bedrock. Notebook keeps all content in AWS but sends
+              usage metadata to PostHog, which changes the PRD's "AWS only" line. Choose PostHog
+              under the ground rules, or the all-AWS alternative.<span class="rec"
+                >Recommended: PostHog</span
+              >
+            </li>
+            <li>
+              <b>PostHog's US or EU cloud?</b> Either works for you alone. EU (Frankfurt) is simpler
+              for European readers later; US is closer to your stack in us-east-1.
+            </li>
+            <li><b>The North Star:</b> useful reads per reader per week, or another?</li>
+            <li>
+              <b>Messages to yourself:</b> the Monday email, a morning push when the day in brief is
+              ready, both, or neither?
+            </li>
+          </ol>
+        </section>
+
+        <!-- ================= Glossary ================= -->
+        <section id="glossary">
+          <p class="eyebrow">Reference</p>
+          <h2>Glossary</h2>
+          <div class="gfilter">
+            <label for="gq" class="small muted">Find a term</label>
+            <input
+              id="gq"
+              type="search"
+              placeholder="Try retention, flag, token"
+              autocomplete="off"
+            />
+            <span id="gcount" class="small muted"></span>
+          </div>
+          <dl class="gloss" id="gloss">
+            <div>
+              <dt>A/B test</dt>
+              <dd>Two versions shown to two random groups; compare a chosen metric.</dd>
+            </div>
+            <div>
+              <dt>Activation</dt>
+              <dd>The moment a new user first gets the product's value.</dd>
+            </div>
+            <div>
+              <dt>Attribution</dt>
+              <dd>Giving a marketing channel credit for a sign-up.</dd>
+            </div>
+            <div>
+              <dt>Autocapture</dt>
+              <dd>Recording every tap and page view without writing code for each.</dd>
+            </div>
+            <div>
+              <dt>CAC</dt>
+              <dd>Customer acquisition cost: spend ÷ customers won.</dd>
+            </div>
+            <div>
+              <dt>CDP</dt>
+              <dd>Customer data platform: collects events once and sends them to every tool.</dd>
+            </div>
+            <div>
+              <dt>Cohort</dt>
+              <dd>A group of users who started in the same period.</dd>
+            </div>
+            <div>
+              <dt>Conversion rate</dt>
+              <dd>The share of people who complete a step.</dd>
+            </div>
+            <div>
+              <dt>Core Web Vitals</dt>
+              <dd>Google's speed measures: LCP, INP, CLS.</dd>
+            </div>
+            <div>
+              <dt>CSAT</dt>
+              <dd>Customer satisfaction: "was this helpful?".</dd>
+            </div>
+            <div>
+              <dt>CUPED</dt>
+              <dd>A statistical method that lets experiments reach an answer with fewer users.</dd>
+            </div>
+            <div>
+              <dt>DAU, WAU, MAU</dt>
+              <dd>People active in a day, week, month.</dd>
+            </div>
+            <div>
+              <dt>dbt</dt>
+              <dd>A tool that turns raw warehouse tables into clean, tested ones with SQL.</dd>
+            </div>
+            <div>
+              <dt>Distinct ID</dt>
+              <dd>The opaque ID that says who did an event.</dd>
+            </div>
+            <div>
+              <dt>Error budget</dt>
+              <dd>The failures an SLO allows, spent on risky changes.</dd>
+            </div>
+            <div>
+              <dt>Eval</dt>
+              <dd>A test of an AI prompt or model against known good answers.</dd>
+            </div>
+            <div>
+              <dt>Event</dt>
+              <dd>One thing that happened, with its properties.</dd>
+            </div>
+            <div>
+              <dt>Feature flag</dt>
+              <dd>A switch that turns code on or off without a deploy.</dd>
+            </div>
+            <div>
+              <dt>Funnel</dt>
+              <dd>The share of people completing each step of a sequence.</dd>
+            </div>
+            <div>
+              <dt>Golden set</dt>
+              <dd>A small set of examples with correct answers, for evals.</dd>
+            </div>
+            <div>
+              <dt>Groundedness</dt>
+              <dd>Whether an AI answer is supported by its sources.</dd>
+            </div>
+            <div>
+              <dt>Guardrail metric</dt>
+              <dd>A metric that must not get worse while you improve another.</dd>
+            </div>
+            <div>
+              <dt>Holdout</dt>
+              <dd>A group kept from a change or message, to measure its true effect.</dd>
+            </div>
+            <div>
+              <dt>Identify</dt>
+              <dd>Joining an anonymous visitor to a known account.</dd>
+            </div>
+            <div>
+              <dt>Incrementality</dt>
+              <dd>What a campaign or message caused that would not have happened anyway.</dd>
+            </div>
+            <div>
+              <dt>Interleaving</dt>
+              <dd>Mixing two rankers' results in one list to see which wins.</dd>
+            </div>
+            <div>
+              <dt>K-factor</dt>
+              <dd>Invites per user × acceptance rate.</dd>
+            </div>
+            <div>
+              <dt>LLM-as-judge</dt>
+              <dd>One model grading another's answers.</dd>
+            </div>
+            <div>
+              <dt>LTV</dt>
+              <dd>Lifetime value: what a customer is worth over their time with you.</dd>
+            </div>
+            <div>
+              <dt>MMM</dt>
+              <dd>
+                Marketing mix modelling: statistics that estimate each channel's effect from totals.
+              </dd>
+            </div>
+            <div>
+              <dt>MMP</dt>
+              <dd>Mobile measurement partner: attributes app installs to ads.</dd>
+            </div>
+            <div>
+              <dt>North Star metric</dt>
+              <dd>The one number that best captures the value users get.</dd>
+            </div>
+            <div>
+              <dt>NPS</dt>
+              <dd>Net Promoter Score, from −100 to 100.</dd>
+            </div>
+            <div>
+              <dt>Observability</dt>
+              <dd>Logs, metrics and traces together.</dd>
+            </div>
+            <div>
+              <dt>p50, p95, p99</dt>
+              <dd>The typical case, the slow one-in-twenty, and the worst 1%.</dd>
+            </div>
+            <div>
+              <dt>PMF survey</dt>
+              <dd>
+                "How would you feel if you could no longer use it?"; 40% "very disappointed" is the
+                bar.
+              </dd>
+            </div>
+            <div>
+              <dt>Property</dt>
+              <dd>A detail attached to an event.</dd>
+            </div>
+            <div>
+              <dt>Retention</dt>
+              <dd>The share of a cohort that comes back after a given time.</dd>
+            </div>
+            <div>
+              <dt>Reverse ETL</dt>
+              <dd>Sending warehouse data back into tools such as email platforms.</dd>
+            </div>
+            <div>
+              <dt>RUM</dt>
+              <dd>Real user monitoring: speed and errors from real devices.</dd>
+            </div>
+            <div>
+              <dt>Sample ratio mismatch</dt>
+              <dd>A split that came out uneven: a sign of a broken experiment.</dd>
+            </div>
+            <div>
+              <dt>SDK</dt>
+              <dd>A vendor's library inside your app that captures and sends events.</dd>
+            </div>
+            <div>
+              <dt>Session</dt>
+              <dd>One visit, usually ended by 30 minutes of inactivity.</dd>
+            </div>
+            <div>
+              <dt>Session replay</dt>
+              <dd>A reconstruction of a visit's taps, scrolls and screens.</dd>
+            </div>
+            <div>
+              <dt>SLO</dt>
+              <dd>Service level objective: a reliability target you set.</dd>
+            </div>
+            <div>
+              <dt>Source map</dt>
+              <dd>A file that maps minified code back to the original source.</dd>
+            </div>
+            <div>
+              <dt>Stickiness</dt>
+              <dd>DAU ÷ MAU.</dd>
+            </div>
+            <div>
+              <dt>Token</dt>
+              <dd>The unit AI models are billed in.</dd>
+            </div>
+            <div>
+              <dt>Trace, span</dt>
+              <dd>One job end to end, and each step in it.</dd>
+            </div>
+            <div>
+              <dt>Tracking plan</dt>
+              <dd>The designed list of events and their properties.</dd>
+            </div>
+            <div>
+              <dt>UTM</dt>
+              <dd>Tags on a link that record where a visit came from.</dd>
+            </div>
+            <div>
+              <dt>Warehouse</dt>
+              <dd>One large SQL database holding every event, as the source of truth.</dd>
+            </div>
+          </dl>
+          <p class="foot" style="margin-top: 28px">
+            Prices and limits were read on vendor pages on 28 October 2026 and change often; the
+            Markdown version, <code>docs/features/analytics.md</code>, lists every source. Sample
+            sizes use the standard two-proportion formula at 95% confidence and 80% power.
+          </p>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      (() => {
+        const root = document.documentElement;
+        const KEY = "nutgraf-analytics-theme";
+        const order = ["system", "light", "dark"];
+        const btn = document.getElementById("theme");
+        let mode = "system";
+        try {
+          mode = localStorage.getItem(KEY) || "system";
+        } catch (e) {
+          mode = "system";
+        }
+        if (!order.includes(mode)) mode = "system";
+        const apply = (m) => {
+          if (m === "system") root.removeAttribute("data-theme");
+          else root.setAttribute("data-theme", m);
+          btn.textContent = "Theme: " + m;
+        };
+        apply(mode);
+        btn.addEventListener("click", () => {
+          mode = order[(order.indexOf(mode) + 1) % order.length];
+          apply(mode);
+          try {
+            localStorage.setItem(KEY, mode);
+          } catch (e) {
+            /* storage unavailable */
+          }
+        });
+
+        const sections = Array.from(document.querySelectorAll("main > section[id]"));
+        const links = new Map(
+          Array.from(document.querySelectorAll(".rail a")).map((a) => [
+            a.getAttribute("href").slice(1),
+            a,
+          ]),
+        );
+        const bar = document.getElementById("progress");
+        const currentIndex = () => {
+          let idx = 0;
+          sections.forEach((s, i) => {
+            if (s.getBoundingClientRect().top < 140) idx = i;
+          });
+          return idx;
+        };
+        const onScroll = () => {
+          const max = document.documentElement.scrollHeight - window.innerHeight;
+          bar.style.transform = "scaleX(" + (max > 0 ? Math.min(1, window.scrollY / max) : 0) + ")";
+          const cur = sections[currentIndex()];
+          links.forEach((a, id) => {
+            if (id === cur.id) a.setAttribute("aria-current", "true");
+            else a.removeAttribute("aria-current");
+          });
+        };
+        window.addEventListener("scroll", onScroll, { passive: true });
+        window.addEventListener("resize", onScroll);
+        onScroll();
+
+        const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        window.addEventListener("keydown", (e) => {
+          if (e.target.closest && e.target.closest("input, textarea, select")) return;
+          if (e.metaKey || e.ctrlKey || e.altKey) return;
+          let dir = 0;
+          if (e.key === "ArrowRight") dir = 1;
+          else if (e.key === "ArrowLeft") dir = -1;
+          else return;
+          const next = sections[Math.max(0, Math.min(sections.length - 1, currentIndex() + dir))];
+          e.preventDefault();
+          next.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+        });
+
+        const q = document.getElementById("gq");
+        const items = Array.from(document.querySelectorAll("#gloss > div"));
+        const count = document.getElementById("gcount");
+        const filter = () => {
+          const term = q.value.trim().toLowerCase();
+          let shown = 0;
+          items.forEach((d) => {
+            const hit = !term || d.textContent.toLowerCase().includes(term);
+            d.hidden = !hit;
+            if (hit) shown += 1;
+          });
+          count.textContent = term
+            ? shown + " of " + items.length + " terms"
+            : items.length + " terms";
+        };
+        q.addEventListener("input", filter);
+        filter();
+      })();
+    </script>
+  </body>
+</html>
