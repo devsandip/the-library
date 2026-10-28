@@ -35,6 +35,7 @@ const model: ModelPort = {
             text: "Acme will ship its first robot by March 2027.",
             who: "Acme's founder",
             own: false,
+            kind: "promise",
             quote: "Acme will ship its first robot by March 2027",
             by: "2027-03",
             story: 0,
@@ -86,6 +87,7 @@ describe("predictions on dev", () => {
       own: false,
       quote: "Acme will ship its first robot by March 2027",
       due: "2027-03-31",
+      kind: "promise",
       status: "open",
     });
     const issue = await ddb.send(

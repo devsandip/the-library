@@ -92,8 +92,11 @@ export interface IngestEvent {
    * `derive` asks Jev nothing and brings shelves, states and issues in line (#81).
    */
   shelves?: { days?: number; force?: boolean; derive?: boolean };
-  /** Screen stored issues for predictions (`pnpm predictions`), those not screened yet (#24). */
-  predictions?: { days?: number };
+  /**
+   * Screen stored issues for predictions (`pnpm predictions`), those not screened yet (#24);
+   * `force` screens them all again, keeping settled predictions and Sandip's (#143).
+   */
+  predictions?: { days?: number; force?: boolean };
   /** Write today's narrative now (`pnpm narrative`); `force` even if the last one is recent. */
   narrative?: { force?: boolean };
   /** Index opens logged before read history existed (`pnpm history-backfill`). */
@@ -144,6 +147,7 @@ export async function handler(event: IngestEvent = {}) {
   if (event.predictions) {
     const stats = await spotPredictions(store, bedrock, {
       sinceIso: daysAgo(event.predictions.days ?? 30),
+      force: event.predictions.force === true,
       deadline: started + 8.5 * 60_000,
     });
     console.log(JSON.stringify({ level: "info", msg: "predictions done", ...stats }));
