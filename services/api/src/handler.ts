@@ -1,6 +1,7 @@
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { Asks } from "./ask.js";
+import { Audits } from "./audit.js";
 import { HttpError } from "./errors.js";
 import { Following } from "./following.js";
 import { Predictions } from "./predictions.js";
@@ -122,5 +123,6 @@ export const handler = createHandler({
   ask: new Asks(repo, corpus, new TitanEmbedder(), claude),
   following: new Following(repo),
   predictions: new Predictions(repo),
+  audit: new Audits(repo),
   startIngest: () => invokeAsync(INGEST_FUNCTION!, {}),
 });

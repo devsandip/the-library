@@ -495,6 +495,63 @@ export interface TrackRecord {
   open: number;
 }
 
+/** What the subscription audit (#25) suggests for a newsletter: drop it, keep it, or wait. */
+export type AuditVerdict = "drop" | "keep" | "new";
+
+/**
+ * Why, in a word. Worth dropping: muted, rated not useful, hardly opened, or mostly stories another
+ * newsletter carried first. Kept: Must Read, rated useful, or opened. Too new: too few issues.
+ */
+export type AuditReason =
+  "muted" | "notUseful" | "unopened" | "repeats" | "mustRead" | "useful" | "opened" | "few";
+
+/** A story only this newsletter carried, for what only it covers. */
+export interface AuditHeadline {
+  issueId: string;
+  n: number;
+  headline: string;
+}
+
+/** A newsletter's report card over the audit's window (#25, #150). */
+export interface AuditCard {
+  senderId: string;
+  publication: string;
+  muted: boolean;
+  mustRead: boolean;
+  /** Its own unsubscribe link, opened only when Sandip taps it. */
+  unsubscribeUrl?: string;
+  /** Issues received in the window, and how many of them were promos. */
+  issues: number;
+  promos: number;
+  /** Issues opened or peeked at (#56). */
+  opened: number;
+  /** Issues rated useful and not useful. */
+  useful: number;
+  notUseful: number;
+  /** Its stories linked in the story index (#15). */
+  stories: number;
+  /** Stories another newsletter (not a muted one) carried first, and the one that most often did. */
+  repeats: number;
+  firstBy?: { senderId: string; publication: string; stories: number };
+  /** Stories no other newsletter carried, and the latest few of them. */
+  only: number;
+  onlyHeadlines: AuditHeadline[];
+  verdict: AuditVerdict;
+  reason: AuditReason;
+}
+
+/**
+ * GET /audit (#150): the window (the last 30 days, never before the first open logged) and a card
+ * for every newsletter with issues in it: worth dropping first, then kept, then too new to tell.
+ */
+export interface AuditResponse {
+  from: string;
+  to: string;
+  /** The window in whole days, at least 1. */
+  days: number;
+  cards: AuditCard[];
+}
+
 /** Which predictions to list (#140): open ones by due date, or settled ones latest first. */
 export type PredictionView = "open" | "settled";
 

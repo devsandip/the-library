@@ -51,6 +51,7 @@ import {
   sourceRunKey,
   PREDICTIONS_PK,
   predictionKeyFromId,
+  type AuditData,
   trackRecord,
   takesKey,
   timelineKey,
@@ -101,6 +102,7 @@ import type {
 } from "@library/core/types";
 import { badRequest, conflict, notFound } from "./errors.js";
 import type { ListOptions, RepoPort } from "./port.js";
+import type { AuditStore } from "./audit.js";
 import type { CorpusIssue, CorpusSource, CorpusStory } from "./corpus.js";
 import type { OwnStory, RelatedSource } from "./related.js";
 import type { FollowStore } from "./following.js";
@@ -348,7 +350,8 @@ export class DynamoRepo
     SourceStore,
     FollowStore,
     SettleStore,
-    PredictionStore
+    PredictionStore,
+    AuditStore
 {
   private readonly ddb: DynamoDBDocumentClient;
   private readonly s3: S3Client;
@@ -1808,6 +1811,62 @@ export class DynamoRepo
       addresses: [...((res.Item.addresses as Set<string> | undefined) ?? [])].sort(),
       issues: (issues.Items ?? []).map(toListItem),
       ...(record ? { record } : {}),
+    };
+  }
+
+  // ---------- subscription audit (#25, #150) ----------
+
+  /** What the audit is worked out from: a month of issues, stories and opens, and every sender. */
+  async readAudit(since: { issues: string; stories: string; opened: string }): Promise<AuditData> {
+    const after = (p: string, from: string, attrs: string[]) =>
+      this.queryAll({
+        IndexName: INDEX.list,
+        KeyConditionExpression: "gsi1pk = :p AND gsi1sk >= :from",
+        ExpressionAttributeValues: { ":p": p, ":from": from },
+        ProjectionExpression: attrs.map((_, k) => `#a${k}`).join(", "),
+        ExpressionAttributeNames: Object.fromEntries(attrs.map((a, k) => [`#a${k}`, a])),
+      });
+    const issueAttrs = ["id", "senderId", "receivedAt", "rating", "promo"];
+    const [inbox, archive, stories, opens, first, senders] = await Promise.all([
+      after(PARTITION.inbox, since.issues, issueAttrs),
+      after(PARTITION.archive, since.issues, issueAttrs),
+      after(PARTITION.stories, since.stories, [
+        "id",
+        "n",
+        "senderId",
+        "receivedAt",
+        "headline",
+        "eventId",
+      ]),
+      after(PARTITION.opens, since.opened, ["gsi1sk"]),
+      this.query({
+        ...this.partition(PARTITION.opens),
+        ProjectionExpression: "gsi1sk",
+        Limit: 1,
+      }),
+      this.listSenders(),
+    ]);
+    const firstOpen = (first.Items?.[0]?.gsi1sk as string | undefined)?.split("#")[0];
+    return {
+      ...(firstOpen ? { firstOpen } : {}),
+      senders,
+      issues: [...inbox, ...archive].map((i) => ({
+        id: i.id as string,
+        senderId: i.senderId as string,
+        receivedAt: i.receivedAt as string,
+        ...(i.rating === 1 || i.rating === -1 ? { rating: i.rating as Rating } : {}),
+        ...(i.promo === true ? { promo: true } : {}),
+      })),
+      stories: stories.map((s) => ({
+        id: s.id as string,
+        n: s.n as number,
+        senderId: s.senderId as string,
+        receivedAt: s.receivedAt as string,
+        headline: s.headline as string,
+        ...(typeof s.eventId === "string" ? { eventId: s.eventId } : {}),
+      })),
+      // Sort keys are "<openedAt>#<issueId>".
+      opened: opens.map((o) => (o.gsi1sk as string).split("#")[1]!),
     };
   }
 
