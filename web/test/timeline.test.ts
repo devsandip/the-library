@@ -40,6 +40,27 @@ describe("the source check (#23)", () => {
     expect(source).toHaveBeenCalledTimes(2);
   });
 
+  it("carries the pages a running check has read into its state (#129)", async () => {
+    const since = "2026-10-28T03:00:00.000Z";
+    const pages = [{ url: "https://news.test/story" }];
+    const { api: a } = api({ running: { since } }, [
+      { running: { since, pages, reading: "https://lab.test/post" } },
+      { check },
+    ]);
+    checkSource(a, "run-pages", 1);
+    await settle();
+    const started = sourceState("run-pages", 1);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(sourceState("run-pages", 1)).toEqual({
+      status: "writing",
+      // The clock keeps counting from when Run was tapped.
+      since: (started as { since: number }).since,
+      run: { pages, reading: "https://lab.test/post" },
+    });
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(sourceState("run-pages", 1).status).toBe("kept");
+  });
+
   it("says why when the run keeps nothing, and answers at once when there is no link", async () => {
     const none = "The source could not be read: the page answered 403.";
     const ran = api({ running: { since: "2026-10-28T03:00:00.000Z" } }, [{ none }]);

@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import type { SourceCheck, TimelineSource } from "@library/core/types";
+import type { SourceCheck, SourceHop, SourceRun, TimelineSource } from "@library/core/types";
 import { clock, shortDate } from "../format.js";
 import { clickInPlace } from "../nav.js";
 import {
@@ -79,6 +79,7 @@ function DeepPanel<T extends { at: string; ms: number; cents: number }>({
   keptFor = "event",
   deep,
   compact,
+  progress,
   children,
 }: {
   name: string;
@@ -91,6 +92,8 @@ function DeepPanel<T extends { at: string; ms: number; cents: number }>({
   keptFor?: "event" | "story";
   deep: { state: DeepState<T>; write: () => void; retry: () => void };
   compact: boolean;
+  /** For a run in the background (#129): what shows under the status line, from its pages. */
+  progress?: (run: Omit<SourceRun, "since">) => ComponentChildren;
   children: (value: T) => ComponentChildren;
 }) {
   const { state, write, retry } = deep;
@@ -147,6 +150,7 @@ function DeepPanel<T extends { at: string; ms: number; cents: number }>({
             </span>
           </div>
           {!compact && <p class="label deep-scope">{scope}</p>}
+          {state.run && progress?.(state.run)}
           <ol class="deep-skeleton" aria-hidden="true">
             <li />
             <li />
@@ -279,9 +283,76 @@ export const VERDICT: Record<SourceCheck["verdict"], string> = {
   mixed: "Mixed",
 };
 
+/** A page's host, without "www.". */
+const host = (url: string) => new URL(url).hostname.replace(/^www\./, "");
+
 /**
- * Check the source (#23), the Source tab: the overall verdict and the page read, then each claim
- * with its verdict, what the page says and the page's own words. Compact on the Mac, run with C.
+ * The pages a check tried on its way to the original (#128), in order from the story's link:
+ * each host linked, what the page before called it, the original marked, and why a page could
+ * not be read. On the Mac, one line of hosts.
+ */
+function SourcePath({
+  path,
+  reading,
+  compact,
+}: {
+  path: SourceHop[];
+  /** The page being read now, while the check runs. */
+  reading?: string;
+  compact: boolean;
+}) {
+  if (compact) {
+    return (
+      <p class="label source-path-line">
+        {path.map((p, k) => (
+          <span key={k} class={p.failed ? "source-failed" : undefined}>
+            {k > 0 && " → "}
+            {host(p.url)}
+          </span>
+        ))}
+        {reading && `${path.length ? " → " : ""}${host(reading)}…`}
+      </p>
+    );
+  }
+  return (
+    <ol class="source-path">
+      {path.map((p, k) => (
+        <li key={k} class={p.failed ? "source-failed" : p.what ? "source-original" : undefined}>
+          <a href={p.url} target="_blank" rel="noopener noreferrer">
+            {host(p.url)} ↗
+          </a>
+          <span class="source-why">
+            {p.failed
+              ? ` · could not be read: ${p.failed}`
+              : p.what
+                ? ` · the original: ${p.what}`
+                : k === 0
+                  ? " · the story's link"
+                  : p.why
+                    ? ` · ${p.why}`
+                    : ""}
+          </span>
+        </li>
+      ))}
+      {reading && <li class="source-reading">Reading {host(reading)}…</li>}
+    </ol>
+  );
+}
+
+/** What a check was made against: the original, or the story's own page when none was found. */
+function against(c: SourceCheck): string {
+  const pages = c.path?.length ?? 1;
+  if (c.original)
+    return pages > 1 ? "Checked against the original" : "The story links to the original";
+  if (pages > 1) return `No original in ${pages} pages: checked against the story's link`;
+  return "Checked against the page the story links to";
+}
+
+/**
+ * Check the source (#23), the Source tab: the overall verdict and the page checked, the way there
+ * when the check followed links to the original (#128), then each claim with its verdict, what
+ * the page says and the page's own words. While it runs, the page being read and those read so
+ * far. Compact on the Mac, run with C.
  */
 export function SourcePanel({
   id,
@@ -295,22 +366,27 @@ export function SourcePanel({
   return (
     <DeepPanel
       name="Check the source"
-      desc="What this story claims against the page it links to: each claim with what the page says, its own words, and whether it holds up."
-      scope="The page it links to · ~1¢ · under half a minute"
-      cost="~1¢"
+      desc="What this story claims against its original: the page it links to, or the paper, filing or post that page cites, up to five pages on. Each claim with what the original says, its own words, and whether it holds up."
+      scope="The page it links to and what it cites · ~2¢ · under a minute"
+      cost="~2¢"
       doing="Checking"
       keptFor="story"
       deep={useSource(id, n)}
       compact={compact}
+      progress={(run) => (
+        <SourcePath path={run.pages ?? []} reading={run.reading} compact={compact} />
+      )}
     >
       {(c) => (
         <>
           <p class={`source-verdict ${c.verdict}`}>{VERDICT[c.verdict]}</p>
           <p class="label source-page">
+            {c.original !== undefined && `${against(c)} · `}
             <a href={c.url} target="_blank" rel="noopener noreferrer">
-              {new URL(c.url).hostname} ↗
+              {host(c.url)} ↗
             </a>
           </p>
+          {c.path && c.path.length > 1 && <SourcePath path={c.path} compact={compact} />}
           {c.note && <p class="deep-gist">{c.note}</p>}
           <ul class={`source-claims${compact ? " compact" : ""}`}>
             {c.claims.map((claim, k) => (
