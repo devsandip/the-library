@@ -1,4 +1,5 @@
 import { useState } from "preact/hooks";
+import { suggest } from "@library/core/audit";
 import type { AuditCard, AuditVerdict } from "@library/core/types";
 import { useApp } from "../context.js";
 import { shortDate } from "../format.js";
@@ -13,17 +14,25 @@ import { Page } from "./page.js";
 export const GROUPS: { verdict: AuditVerdict; title: string }[] = [
   { verdict: "drop", title: "Worth dropping" },
   { verdict: "keep", title: "Keep" },
-  { verdict: "new", title: "Too new to tell" },
+  // Mostly weeklies with a few issues in the window (#152), so not "new".
+  { verdict: "new", title: "Too few to tell" },
 ];
 
 const times = (n: number) => (n === 1 ? "once" : n === 2 ? "twice" : `${n} times`);
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-/** Why, in numbers: the sentence under a newsletter's name. */
+/**
+ * Why, in numbers: the sentence under a newsletter's name. A Must Read one that would otherwise
+ * be worth dropping says so and why, since the star keeps it whatever its numbers (#152).
+ */
 export function why(c: AuditCard, days: number): string {
   switch (c.reason) {
-    case "mustRead":
-      return "Must Read: starred to keep.";
+    case "mustRead": {
+      const without = suggest({ ...c, mustRead: false });
+      return without.verdict === "drop"
+        ? `Must Read: starred to keep, though otherwise worth dropping. ${why({ ...c, ...without }, days)}`
+        : "Must Read: starred to keep.";
+    }
     case "muted":
       return "Muted, so you never see it.";
     case "few":
@@ -68,7 +77,7 @@ export function storiesLine(c: AuditCard): string | undefined {
 /**
  * Subscription audit (#25, #151): a report card per newsletter over the last 30 days, worth
  * dropping first with why in numbers, its own Unsubscribe link and Mute; then the ones to keep,
- * then the ones too new to tell. Each opens its newsletter's page.
+ * then the ones with too few issues to tell. Each opens its newsletter's page.
  */
 export function Audit({ wide }: { wide: boolean }) {
   const { api } = useApp();

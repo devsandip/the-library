@@ -734,6 +734,7 @@ const AUDIT: [string, number, number, number, number, number, number, number, st
     ["TLDR Dev", 20, 0, 6, 0, 0, 40, 30, "TLDR", 3],
     ["Pirate Wires Daily", 8, 0, 4, 0, 3, 10, 2, "The Verge", 4],
     ["The Ken", 9, 0, 7, 2, 0, 15, 1, "Inc42", 11],
+    ["System Design Newsletter", 11, 3, 0, 0, 0, 17, 0, undefined, 17],
     ["Stratechery", 6, 0, 5, 3, 0, 12, 2, "Platformer", 7],
     ["The Verge", 18, 1, 5, 0, 0, 30, 6, "Platformer", 9],
     ["Exponential View", 2, 0, 1, 0, 0, 4, 0, undefined, 4],

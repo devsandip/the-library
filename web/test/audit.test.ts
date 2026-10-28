@@ -40,6 +40,17 @@ describe("why a card says what it says (#151)", () => {
     );
   });
 
+  it("says when the star alone keeps a newsletter, and why it would otherwise go (#152)", () => {
+    const starred = { mustRead: true, verdict: "keep", reason: "mustRead" } as const;
+    expect(why(card("a", { ...starred, opened: 0, issues: 11 }), 19)).toBe(
+      "Must Read: starred to keep, though otherwise worth dropping. Opened 0 of 11 issues, and never rated useful.",
+    );
+    expect(why(card("a", { ...starred, opened: 4 }), 19)).toBe("Must Read: starred to keep.");
+    expect(why(card("a", { ...starred, opened: 0, issues: 3 }), 19)).toBe(
+      "Must Read: starred to keep.",
+    );
+  });
+
   it("counts what it sent and what was done with it, leaving out what is none", () => {
     expect(countsLine(card("a", { promos: 2, opened: 6, useful: 2, notUseful: 1 }))).toBe(
       "10 issues · 2 promos · 6 opened · 2 ✓ · 1 ✕",
