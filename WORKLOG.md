@@ -588,3 +588,33 @@ Sandip said "continue building", then "Build and merge" for milestone 8.
 - Thresholds unchanged after prod: 10% opened, 4 issues, 2 thumbs down, 8 stories at 60% repeats.
 - Per-newsletter reading numbers stay out of the public repo; the page shows them.
 - Every pull request today was merged by me on Sandip's word for milestone 8.
+
+## 2026-10-28, evening: Weekly tune-up, the rules layer (#158 to #164)
+
+Sandip said "continue", then "try again" once auto mode was off for the prod read.
+
+**Did:**
+
+- Milestone 9, [Weekly tune-up (#26, rules layer)](https://github.com/devsandip/the-library/milestone/9), closed: #158 (PR 161) `GET /tuneup`, my moves against Jev and promos pulled back per newsletter, an "always" rule proposed at 3 moves one way, none the other, 75% on the shelf, and `POST /tuneup/dismissed`; #159 (PR 162) the page in Library after Subscription audit and from ⌘K; #160 (PR 164) the thresholds checked against prod and kept.
+- Read-only probes of prod from the laptop: `scratch/tuneup-probe.ts` (the deployed code's read and rules), `scratch/tuneup-moves-probe.ts` (issues, shelf events, sender settings), `scratch/tuneup-read-timing.ts` and `scratch/stories-by-week.ts`, all in the design-handoff worktree.
+- Filed #163 in the backlog: the tune-up reads every story stored.
+- `docs/status/2026-10-28-milestone-9.md`.
+
+**State now:**
+
+- Prod runs 3bdb65f (PR 162's Deploy); PR 164 was docs only and skipped Deploy.
+- Prod has no corrections: 3,536 stories all on Jev's shelf, no shelf event in 5,929 items, no "always" setting, none muted; 65 promos archived, none pulled back. The page shows its empty state.
+- The tune-up's read is 11 pages, about 10 MB, roughly 3 to 6 s in the API (estimated; neither the Tune-up nor the audit page has been opened on prod, so no `/tuneup` or `/audit` request is in the API's logs).
+- The page was checked in mock mode on the phone and the Mac, light and dark; not yet signed in on a device.
+
+**Next:**
+
+- Sandip: open Predictions, Subscription audit and Tune-up on the phone; move a story when Jev's shelf is wrong, so the tune-up has something to count. Then read the `/tuneup` and `/audit` `ms` in the API's logs and note them on #163.
+- The next milestone, my pick: a search provider decision. Without one, Highlights to Obsidian (#71), which needs neither web search nor corrections.
+
+**Decisions:**
+
+- Rules, not wording: Jev's question stays as frozen on 2026-10-17, and the tune-up proposes a newsletter's "always" setting.
+- Worked out when asked, no schedule, no model call.
+- Thresholds unchanged after prod: no corrections to test them on, and 75% is where Jev's split divides 25 near-uniform newsletters from 4 mixed ones.
+- No "never a promo" setting: prod has no pullbacks.
