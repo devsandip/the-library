@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./audit": "./src/audit.ts",
     "./days": "./src/days.ts",
     "./follow": "./src/follow.ts",
     "./predictions": "./src/predictions.ts",

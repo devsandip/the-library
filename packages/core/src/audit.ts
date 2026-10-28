@@ -108,6 +108,12 @@ export function suggest(c: AuditNumbers): { verdict: AuditVerdict; reason: Audit
 
 const ORDER: Record<AuditVerdict, number> = { drop: 0, keep: 1, new: 2 };
 
+/** Worth dropping first, then kept, then too new; each with the most issues first. */
+export const byVerdict = (a: AuditCard, b: AuditCard) =>
+  ORDER[a.verdict] - ORDER[b.verdict] ||
+  b.issues - a.issues ||
+  a.publication.localeCompare(b.publication);
+
 /** A card per newsletter with issues in the window: worth dropping first, most issues first. */
 export function audit(now: number, data: AuditData): AuditResponse {
   const { from, to } = auditWindow(now, data.firstOpen);
@@ -181,12 +187,7 @@ export function audit(now: number, data: AuditData): AuditResponse {
     from,
     to,
     days: Math.max(1, Math.round((Date.parse(to) - Date.parse(from)) / DAY_MS)),
-    cards: [...cards.values()].sort(
-      (a, b) =>
-        ORDER[a.verdict] - ORDER[b.verdict] ||
-        b.issues - a.issues ||
-        a.publication.localeCompare(b.publication),
-    ),
+    cards: [...cards.values()].sort(byVerdict),
   };
 }
 

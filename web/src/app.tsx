@@ -20,6 +20,7 @@ import { Console } from "./mac/console.js";
 import { History } from "./pages/history.js";
 import { Newsletter, Newsletters } from "./pages/newsletters.js";
 import { Ask } from "./pages/ask.js";
+import { Audit } from "./pages/audit.js";
 import { Following } from "./pages/following.js";
 import { Predictions } from "./pages/predictions.js";
 import { Search } from "./pages/search.js";
@@ -67,6 +68,8 @@ function libraryPage(screen: Screen, wide: boolean) {
       return <Predictions view={screen.view} wide={wide} />;
     case "history":
       return <History day={screen.day} wide={wide} />;
+    case "audit":
+      return <Audit wide={wide} />;
     case "newsletters":
       return <Newsletters wide={wide} />;
     case "newsletter":
@@ -113,6 +116,7 @@ function tabOf(screen: Screen): Tab | undefined {
     case "predictions":
     case "history":
     case "newsletters":
+    case "audit":
     case "newsletter":
     case "status":
     case "settings":

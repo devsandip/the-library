@@ -4,11 +4,14 @@
  */
 import { readerDay } from "@library/core/days";
 import { trackRecord } from "@library/core/predictions";
+import { byVerdict, suggest } from "@library/core/audit";
 import { followOrder, followView, type StoredFollow } from "@library/core/follow";
 import { storyRef } from "@library/core/stories";
 import { issueDoc, queryTerms, rankByWords, storyDoc } from "@library/core/search";
 import type {
   AskResponse,
+  AuditCard,
+  AuditResponse,
   DigestStats,
   Follow,
   FollowingResponse,
@@ -720,6 +723,23 @@ function seedFollows() {
 }
 
 /** Predictions in mock mode (#24): open, due and settled ones, seeded on first read. */
+/**
+ * The audit's numbers (#151), one newsletter for each reason worth showing: [publication, issues,
+ * promos, opened, useful, not useful, stories, repeats, carried first by, only here]. Must Read and
+ * muted come from the senders as they are now, so muting from the page moves a card.
+ */
+const AUDIT: [string, number, number, number, number, number, number, number, string?, number?][] =
+  [
+    ["Fortune 500 Digest", 14, 3, 1, 0, 0, 20, 9, "Business Insider", 2],
+    ["TLDR Dev", 20, 0, 6, 0, 0, 40, 30, "TLDR", 3],
+    ["Pirate Wires Daily", 8, 0, 4, 0, 3, 10, 2, "The Verge", 4],
+    ["The Ken", 9, 0, 7, 2, 0, 15, 1, "Inc42", 11],
+    ["Stratechery", 6, 0, 5, 3, 0, 12, 2, "Platformer", 7],
+    ["The Verge", 18, 1, 5, 0, 0, 30, 6, "Platformer", 9],
+    ["Exponential View", 2, 0, 1, 0, 0, 4, 0, undefined, 4],
+  ];
+const AUDIT_DAYS_SO_FAR = 19;
+
 const predictions = new Map<string, Prediction>();
 
 function seedPredictions() {
@@ -1185,6 +1205,57 @@ export class MockLibraryApi implements LibraryApi {
       : { ...rest, status: "open" };
     predictions.set(id, next);
     return next;
+  }
+
+  async audit(): Promise<AuditResponse> {
+    await delay(250);
+    const cards = AUDIT.flatMap(
+      ([publication, n, promos, opened, useful, notUseful, stories, repeats, by, only = 0]) => {
+        const s = senders.find((x) => x.publication === publication);
+        if (!s) return [];
+        const first = by ? senders.find((x) => x.publication === by) : undefined;
+        const onlyHeadlines = issues
+          .filter((i) => i.senderId === s.senderId)
+          .flatMap((i) =>
+            mockStories(i).stories.map((st) => ({ issueId: i.id, n: st.n, headline: st.headline })),
+          )
+          .slice(0, Math.min(3, only));
+        const card: AuditCard = {
+          senderId: s.senderId,
+          publication,
+          muted: s.muted,
+          mustRead: s.mustRead,
+          ...(s.unsubscribeUrl ? { unsubscribeUrl: s.unsubscribeUrl } : {}),
+          issues: n,
+          promos,
+          opened,
+          useful,
+          notUseful,
+          stories,
+          repeats,
+          ...(first && repeats
+            ? {
+                firstBy: {
+                  senderId: first.senderId,
+                  publication: first.publication,
+                  stories: Math.ceil(repeats / 2),
+                },
+              }
+            : {}),
+          only,
+          onlyHeadlines,
+          verdict: "new",
+          reason: "few",
+        };
+        return [{ ...card, ...suggest(card) }];
+      },
+    );
+    return {
+      from: new Date(now - AUDIT_DAYS_SO_FAR * 24 * HOUR).toISOString(),
+      to: new Date().toISOString(),
+      days: AUDIT_DAYS_SO_FAR,
+      cards: cards.sort(byVerdict),
+    };
   }
 
   async source(id: string, n: number): Promise<SourceResponse> {
