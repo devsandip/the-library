@@ -1,4 +1,4 @@
-import { Duration, RemovalPolicy } from "aws-cdk-lib";
+import { Duration, RemovalPolicy, TimeZone } from "aws-cdk-lib";
 import {
   HttpApi,
   HttpMethod,
@@ -9,6 +9,8 @@ import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations
 import type { TableV2 } from "aws-cdk-lib/aws-dynamodb";
 import type { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import type { Bucket } from "aws-cdk-lib/aws-s3";
+import { Schedule, ScheduleExpression, ScheduleTargetInput } from "aws-cdk-lib/aws-scheduler";
+import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import { Construct } from "constructs";
 import { BASE_PATH, type Stage } from "./config.js";
 import { bedrockModels, nodeFunction } from "./functions.js";
@@ -78,6 +80,21 @@ export class Api extends Construct {
     this.fn.addToRolePolicy(bedrockModels(this));
 
     if (props.stage !== "prod") return;
+
+    // Who called it (#139): settle the predictions that came due, once a day after the first
+    // ingest run. A failed day is not re-run; tomorrow's takes what is left.
+    new Schedule(this, "SettleDaily", {
+      description: "The Library: settle due predictions, daily 07:30 IST",
+      schedule: ScheduleExpression.cron({
+        minute: "30",
+        hour: "7",
+        timeZone: TimeZone.ASIA_KOLKATA,
+      }),
+      target: new LambdaInvoke(this.jobsFn, {
+        input: ScheduleTargetInput.fromObject({ kind: "settle" }),
+        retryAttempts: 0,
+      }),
+    });
 
     // Keep this construct ID stable: a new HTTP API takes many minutes to get a DNS record
     // (docs/architecture.md section 4). "Http" replaced the original "HttpApi" on 2026-10-09.

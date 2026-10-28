@@ -21,6 +21,16 @@ Dated, checkable predictions from the newsletters, with who made them and when t
 - **Kept** in the `PREDICTIONS` partition, `open` until settled (#139). The issue is marked `predictedAt` with its count.
 - **The archive:** `AWS_PROFILE=admin pnpm predictions --days 120`, once, after deploy.
 
+## Settling them (#139)
+
+- **When:** every morning at 07:30 IST, after the first ingest run, a schedule (prod only) starts the jobs Lambda with `{ kind: "settle" }`; `AWS_PROFILE=admin pnpm settle` does the same by hand. It takes the predictions that are due (by their due day in India) and either open, or unclear with tries left and their retry day come; never one Sandip has set. At most 20 a day, oldest due first, four at once.
+- **Search:** the archive story by story, as Ask searches it (`searchStories`, by words and by meaning), for the prediction's sentence, from the day after it was made to today; never its own issue, promos or muted newsletters. The best 12, oldest first.
+- **Nothing found:** unclear, "Nothing in your newsletters since has mentioned it.", with no call.
+- **One Haiku call** (`settle`) with the prediction (what, who, the quote, when said, when due) and the stories: right only when a story shows this same thing happened on or before the due date; wrong only when a story shows it did not by then (delayed, cancelled, a different outcome, or later than the due date); unclear otherwise. A story about something else, even about the same company, is not evidence; silence is unclear, not wrong; dates are compared exactly. A one-sentence why, and the stories that show it.
+- **Checked:** right or wrong needs at least one of the stories sent, or it becomes unclear. The stories become the evidence (issue, story, newsletter, headline, date).
+- **Unclear is tried again** 14 days later, three tries in all, then stays unclear.
+- **Written** onto the prediction (`status`, `why`, `evidence`, `settledAt`, `tries`, `nextTry`), with a condition that Sandip has not set a verdict meanwhile (#140).
+
 ## Decisions
 
 - **Rides along with ingest, not with the story split.** Asking the split call for predictions too would change the story index's prompt and need every issue split again. A separate call that only sees forward-looking passages costs pennies a month and leaves the index alone.
@@ -28,8 +38,22 @@ Dated, checkable predictions from the newsletters, with who made them and when t
 - **Claude names the period; the code ends it.** Claude is good at reading "by the holidays" against the date sent, and the code is good at calendars. Tests cover the code's half.
 - **No quote, no prediction.** A prediction whose words are not in the issue is dropped whole, not kept without its quote.
 - **A newsletter's own calls are marked** (`own`), so its track record counts only those, not the forecasts it reports.
+- **Settled in the jobs Lambda, on a schedule.** Settling needs the archive search and its corpus, which live with the API; the jobs Lambda has them and two minutes. A separate schedule, not a step in ingest, keeps a slow settle from crowding an ingest run.
+- **From the archive only.** Later newsletters report what happened; settling by web search waits on #16's provider.
+- **Strict about wrong.** Haiku's first prompt called a prediction wrong from a story about something else (OpenAI's models coming to Google Cloud, against OpenAI retiring old ones) and was loose with dates. The prompt now asks for a story about the same thing and exact dates; most of what it still gets wrong are companies' own announced dates, which spotting should not have kept (#143).
 
-## Probe (2026-10-28, prod, read-only: `scratch/predictions-probe.ts`)
+## The archive (2026-10-28, prod)
+
+`pnpm predictions --days 120`: 566 issues screened, 160 with forward-looking passages, 172 predictions kept, no errors, in 3 minutes, for 37 cents (241,341 tokens in, 26,143 out). 32 are the newsletters' own calls. 16 were already due; 34 more come due in December 2026 and 28 at the end of 2027; the furthest is 2036.
+
+## Settling probe (2026-10-28, prod, read-only: `scratch/settle-probe.ts`)
+
+The 16 due predictions settled from the archive with writes kept in memory, after the prompt was made strict: 6 right, 2 wrong, 8 unclear (5 with nothing since), in 56 seconds for 2.2 cents.
+
+- Right and well shown: the Fed's quarter-point rise on 17 September (four stories), the Treasury enrolling 60 million children in Trump Accounts, Bumble agreeing to go private with Ithaca on 19 October.
+- Weak: OpenAI retiring GPT-4 and o1 on 23 October called wrong from a story about OpenAI's models coming to Google Cloud; Starship's "no earlier than 22 September" and Google's satellite launch dated 1 October called right. All three are companies' own announced dates, not forecasts; spotting should have skipped them (#143). Sandip can overrule any verdict (#140).
+
+## Spotting probe (2026-10-28, prod, read-only: `scratch/predictions-probe.ts`)
 
 Twenty recent issues, at most two per newsletter, screened and sent to Haiku from a laptop, nothing written.
 

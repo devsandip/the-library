@@ -1,4 +1,4 @@
-/** Shared by the scripts that run a job in the ingest Lambda (one run at a time, like ingest). */
+/** Shared by the scripts that run a job in the ingest Lambda (one run at a time, like ingest) or the jobs Lambda. */
 import { CloudFormationClient, DescribeStacksCommand } from "@aws-sdk/client-cloudformation";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
@@ -15,14 +15,27 @@ export const numberArg = (name: string, fallback: number): number =>
     : fallback;
 
 /** Invoke the stage's ingest Lambda and wait (up to 11 minutes). Exits on a function error. */
-export async function invokeIngest<T>(stage: "dev" | "prod", payload: unknown): Promise<T> {
+export function invokeIngest<T>(stage: "dev" | "prod", payload: unknown): Promise<T> {
+  return invokeOutput<T>(stage, "IngestFunction", payload);
+}
+
+/** Invoke the stage's jobs Lambda (#23, #139) and wait. Exits on a function error. */
+export function invokeJobs<T>(stage: "dev" | "prod", payload: unknown): Promise<T> {
+  return invokeOutput<T>(stage, "JobsFunction", payload);
+}
+
+async function invokeOutput<T>(
+  stage: "dev" | "prod",
+  output: string,
+  payload: unknown,
+): Promise<T> {
   const stack = (
     await new CloudFormationClient({ region }).send(
       new DescribeStacksCommand({ StackName: `TheLibrary-${stage}` }),
     )
   ).Stacks?.[0];
-  const fn = stack?.Outputs?.find((o) => o.OutputKey === "IngestFunction")?.OutputValue;
-  if (!fn) throw new Error(`TheLibrary-${stage} has no IngestFunction output`);
+  const fn = stack?.Outputs?.find((o) => o.OutputKey === output)?.OutputValue;
+  if (!fn) throw new Error(`TheLibrary-${stage} has no ${output} output`);
 
   const lambda = new LambdaClient({
     region,
