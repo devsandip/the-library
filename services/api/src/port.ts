@@ -101,11 +101,17 @@ export interface TakesPort {
   run(id: string, n: number): Promise<TakesResponse>;
 }
 
-/** A story checked against its source (#23): the kept check, or one run now. */
+/**
+ * A story checked against its source (#23): the kept check, or one started now. The check runs in
+ * the jobs Lambda, so `run` answers `running` and `get` follows it.
+ */
 export interface SourcePort {
   get(id: string, n: number): Promise<SourceResponse>;
   run(id: string, n: number): Promise<SourceResponse>;
 }
+
+/** Work the API hands to the jobs Lambda (`./jobs.ts`), which may take longer than its 28 s. */
+export type Job = { kind: "source"; id: string; n: number };
 
 /** A question answered from the newsletters (#21). */
 export interface AskPort {

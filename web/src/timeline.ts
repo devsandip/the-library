@@ -3,7 +3,8 @@
  * check (#23). One state per
  * story and kind, shared by the phone's tabs and the Mac's story index, and kept for the page's
  * life. A deep dive is written only when the reader asks, and a run carries on when its sheet
- * closes: coming back finds it writing, or done.
+ * closes: coming back finds it writing, or done. The source check runs in the background on the
+ * server, so it is read again every two seconds until it settles, on whichever device opens it.
  */
 import { useEffect, useState } from "preact/hooks";
 import type { SourceCheck, Takes, Timeline } from "@library/core/types";
@@ -22,8 +23,15 @@ export type TimelineState = DeepState<Timeline>;
 export type TakesState = DeepState<Takes>;
 export type SourceState = DeepState<SourceCheck>;
 
-/** What the API answers for a deep dive: the kept result, or why there is none. */
-type Answer<T> = Promise<{ value?: T; none?: string }>;
+/**
+ * What the API answers for a deep dive: the kept result, or why there is none, or a run going on
+ * in the background since when.
+ */
+type Answer<T> = Promise<{ value?: T; none?: string; running?: { since: string } }>;
+
+/** How often a run in the background is read again, and for how long at most. */
+const POLL_MS = 2000;
+const POLL_LIMIT_MS = 4 * 60_000;
 
 /**
  * One kind of deep dive: its states by story, reading what is kept and writing on request (one
@@ -32,6 +40,7 @@ type Answer<T> = Promise<{ value?: T; none?: string }>;
 function deepDive<T>(get: (api: LibraryApi, id: string, n: number) => Answer<T>, run: typeof get) {
   const states = new Map<string, DeepState<T>>();
   const reading = new Set<string>();
+  const polling = new Set<string>();
   const listeners = new Set<() => void>();
   const keyOf = (id: string, n: number) => `${id}#${n}`;
 
@@ -42,7 +51,40 @@ function deepDive<T>(get: (api: LibraryApi, id: string, n: number) => Answer<T>,
   const stateOf = (id: string, n: number): DeepState<T> =>
     states.get(keyOf(id, n)) ?? { status: "loading" };
 
-  /** Asks whether one is kept for the story's event. What is on screen stays meanwhile. */
+  /** Reads a run going on in the background again until it is kept or says why not. */
+  const poll = (api: LibraryApi, id: string, n: number) => {
+    const key = keyOf(id, n);
+    if (polling.has(key)) return;
+    polling.add(key);
+    const started = Date.now();
+    const next = () =>
+      setTimeout(() => {
+        get(api, id, n).then(
+          (r) => {
+            if (r.running && Date.now() - started < POLL_LIMIT_MS) return void next();
+            polling.delete(key);
+            put(
+              key,
+              r.running
+                ? { status: "error", error: "It is taking too long.", retry: "read" }
+                : r.value
+                  ? { status: "kept", value: r.value }
+                  : { status: "idle", none: r.none },
+            );
+          },
+          (err: Error) => {
+            polling.delete(key);
+            put(key, { status: "error", error: err.message, retry: "read" });
+          },
+        );
+      }, POLL_MS);
+    next();
+  };
+
+  /**
+   * Asks whether one is kept for the story's event, or is running. What is on screen stays
+   * meanwhile.
+   */
   const read = (api: LibraryApi, id: string, n: number) => {
     const key = keyOf(id, n);
     if (reading.has(key)) return;
@@ -53,7 +95,18 @@ function deepDive<T>(get: (api: LibraryApi, id: string, n: number) => Answer<T>,
         (r) => {
           // A run started meanwhile answers for itself.
           if (states.get(key)?.status === "writing") return;
-          put(key, r.value ? { status: "kept", value: r.value } : { status: "idle" });
+          if (r.running) {
+            put(key, { status: "writing", since: Date.parse(r.running.since) });
+            poll(api, id, n);
+            return;
+          }
+          // Why the latest run kept nothing, when the API says.
+          put(
+            key,
+            r.value
+              ? { status: "kept", value: r.value }
+              : { status: "idle", ...(r.none ? { none: r.none } : {}) },
+          );
         },
         (err: Error) => put(key, { status: "error", error: err.message, retry: "read" }),
       )
@@ -65,8 +118,10 @@ function deepDive<T>(get: (api: LibraryApi, id: string, n: number) => Answer<T>,
     if (states.get(key)?.status === "writing") return;
     put(key, { status: "writing", since: Date.now() });
     run(api, id, n).then(
-      (r) =>
-        put(key, r.value ? { status: "kept", value: r.value } : { status: "idle", none: r.none }),
+      (r) => {
+        if (r.running) return poll(api, id, n);
+        put(key, r.value ? { status: "kept", value: r.value } : { status: "idle", none: r.none });
+      },
       (err: Error) => put(key, { status: "error", error: err.message, retry: "write" }),
     );
   };
@@ -117,12 +172,17 @@ export const writeTimeline = timelines.write;
 export const useTimeline = timelines.use;
 
 const sources = deepDive<SourceCheck>(
-  (api, id, n) => api.source(id, n).then((r) => ({ value: r.check, none: r.none })),
-  (api, id, n) => api.checkSource(id, n).then((r) => ({ value: r.check, none: r.none })),
+  (api, id, n) =>
+    api.source(id, n).then((r) => ({ value: r.check, none: r.none, running: r.running })),
+  (api, id, n) =>
+    api.checkSource(id, n).then((r) => ({ value: r.check, none: r.none, running: r.running })),
 );
 
 export const sourceState = sources.stateOf;
-/** Checks the story against its source: a page read and one Claude call, about a cent. */
+/**
+ * Checks the story against its source in the background: a page read and one Claude call, about
+ * a cent.
+ */
 export const checkSource = sources.write;
 export const useSource = sources.use;
 

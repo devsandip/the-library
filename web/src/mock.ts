@@ -646,6 +646,9 @@ function namesIn(text: string): { names?: string[] } {
 const timelines = new Map<string, Timeline>();
 const takesKept = new Map<string, Takes>();
 const checksKept = new Map<string, SourceCheck>();
+/** Source checks running in mock mode's stand-in background, done after a few seconds. */
+const checksRunning = new Map<string, { since: string; check: SourceCheck }>();
+const MOCK_CHECK_MS = 4000;
 /** Followed stories in mock mode (#22), by event; seeded on first read. */
 const follows = new Map<string, StoredFollow>();
 
@@ -1053,20 +1056,33 @@ export class MockLibraryApi implements LibraryApi {
 
   async source(id: string, n: number): Promise<SourceResponse> {
     await delay();
-    const check = checksKept.get(`${id}#${n}`);
+    const key = `${id}#${n}`;
+    const run = checksRunning.get(key);
+    if (run && Date.now() - Date.parse(run.since) < MOCK_CHECK_MS) {
+      return { running: { since: run.since } };
+    }
+    if (run) {
+      checksRunning.delete(key);
+      checksKept.set(key, { ...run.check, ms: Date.now() - Date.parse(run.since) });
+    }
+    const check = checksKept.get(key);
     return check ? { check } : {};
   }
 
   /**
-   * A stand-in for the source check (#23): a digest's story has a link, and its check finds one
-   * claim that holds and one the newsletter took further; a story with no link has nothing.
+   * A stand-in for the source check (#23), which runs in the background for a few seconds: a
+   * digest's story has a link, and its check finds one claim that holds and one the newsletter
+   * took further; a story with no link has nothing.
    */
   async checkSource(id: string, n: number): Promise<SourceResponse> {
-    const started = Date.now();
     const story = mockStories(find(id)).stories.find((s) => s.n === n);
     if (!story) throw new Error("issue has no such story");
-    await delay(2400);
+    await delay(300);
     if (!story.link) return { none: "This story has no source link to check." };
+    const key = `${id}#${n}`;
+    const running = checksRunning.get(key);
+    if (running) return { running: { since: running.since } };
+    const since = new Date().toISOString();
     const check: SourceCheck = {
       url: story.link,
       verdict: "mixed",
@@ -1084,12 +1100,12 @@ export class MockLibraryApi implements LibraryApi {
         },
       ],
       note: "A stand-in from mock mode: the page is the company's own post.",
-      at: new Date().toISOString(),
-      ms: Date.now() - started,
+      at: since,
+      ms: 0,
       cents: 0.6,
     };
-    checksKept.set(`${id}#${n}`, check);
-    return { check };
+    checksRunning.set(key, { since, check });
+    return { running: { since } };
   }
 
   async takes(id: string, n: number): Promise<TakesResponse> {

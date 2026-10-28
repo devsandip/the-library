@@ -206,10 +206,14 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     handler: async (svc, _req, p) => ok(await svc.sources.get(param(p, 0), Number(param(p, 1)))),
   },
   {
-    // Never on its own: only when the reader asks (a page read and one Claude call).
+    // Never on its own: only when the reader asks (a page read and one Claude call). The check
+    // runs in the jobs Lambda: 202 while it runs, and GET follows it.
     method: "POST",
     pattern: new RegExp(`^/issues/${ISSUE_ID}/stories/${STORY_N}/source$`),
-    handler: async (svc, _req, p) => ok(await svc.sources.run(param(p, 0), Number(param(p, 1)))),
+    handler: async (svc, _req, p) => {
+      const res = await svc.sources.run(param(p, 0), Number(param(p, 1)));
+      return { status: res.running ? 202 : 200, body: res };
+    },
   },
   {
     method: "POST",

@@ -8,9 +8,13 @@ import {
   pageText,
   parseSource,
   passage,
+  RUN_LIMIT_MS,
+  SourceChecker,
   sourceRequest,
   Sources,
+  STOPPED,
   UNREADABLE,
+  type SourceRunItem,
   type SourceStore,
   type SourceStory,
   type StoredSource,
@@ -137,16 +141,122 @@ describe("parseSource", () => {
   });
 });
 
+/** A store in memory, with the run beside the check as DynamoRepo keeps them. */
+function memoryStore(story: SourceStory | undefined) {
+  const kept = new Map<string, SourceCheck>();
+  const runs = new Map<string, SourceRunItem>();
+  const store: SourceStore = {
+    sourceStory: vi.fn(async () => story),
+    getSource: vi.fn(async (id: string, n: number) => {
+      const check = kept.get(`${id}#${n}`);
+      const run = runs.get(`${id}#${n}`);
+      return { ...(check ? { check } : {}), ...(run ? { run } : {}) };
+    }),
+    startRun: vi.fn(async (id: string, n: number, since: string, staleBefore: string) => {
+      const run = runs.get(`${id}#${n}`);
+      if (run?.status === "running" && run.since > staleBefore) return false;
+      runs.set(`${id}#${n}`, { status: "running", since });
+      return true;
+    }),
+    endRun: vi.fn(async (id: string, n: number, none?: string) => {
+      const run = runs.get(`${id}#${n}`)!;
+      runs.set(`${id}#${n}`, {
+        since: run.since,
+        ...(none ? { status: "none", none } : { status: "failed" }),
+      });
+    }),
+    putSource: vi.fn(async (id: string, n: number, c: StoredSource) => {
+      kept.set(`${id}#${n}`, c);
+      runs.delete(`${id}#${n}`);
+    }),
+  };
+  return { store, kept, runs };
+}
+
+const T0 = Date.parse("2026-10-27T10:00:00.000Z");
+
 describe("Sources", () => {
+  function setup(opts: { story?: SourceStory | undefined; startJob?: () => Promise<void> } = {}) {
+    const mem = memoryStore("story" in opts ? opts.story : story);
+    let now = T0;
+    const startJob = vi.fn(opts.startJob ?? (async () => {}));
+    const sources = new Sources(mem.store, startJob, () => now);
+    return { ...mem, sources, startJob, later: (ms: number) => void (now += ms) };
+  }
+
+  it("starts a check in the background and says it is running until it is kept", async () => {
+    const { sources, store, startJob, later } = setup();
+    expect(await sources.get("tldr", 2)).toEqual({});
+    const since = "2026-10-27T10:00:00.000Z";
+    expect(await sources.run("tldr", 2)).toEqual({ running: { since } });
+    expect(startJob).toHaveBeenCalledWith({ kind: "source", id: "tldr", n: 2 });
+    // The API never reads the issue's text: the job does.
+    expect(store.sourceStory).toHaveBeenCalledWith("tldr", 2, { text: false });
+    later(5_000);
+    expect(await sources.get("tldr", 2)).toEqual({ running: { since } });
+    // Asking again while it runs answers the running one.
+    expect(await sources.run("tldr", 2)).toEqual({ running: { since } });
+    expect(startJob).toHaveBeenCalledTimes(1);
+
+    const check = { url: "https://example.com/filing", verdict: "holds", claims: [] } as const;
+    await store.putSource("tldr", 2, {
+      ...check,
+      claims: [],
+      at: since,
+      ms: 4000,
+      cents: 0.6,
+      model: "m",
+      inputTokens: 1,
+      outputTokens: 1,
+    });
+    expect((await sources.get("tldr", 2)).check?.url).toBe("https://example.com/filing");
+  });
+
+  it("says why the latest run kept nothing, and calls one that never finished stopped", async () => {
+    const { sources, store, later } = setup();
+    await sources.run("tldr", 2);
+    await store.endRun("tldr", 2, "The source could not be read: the page answered 403.");
+    expect(await sources.get("tldr", 2)).toEqual({
+      none: "The source could not be read: the page answered 403.",
+    });
+
+    await sources.run("tldr", 2);
+    await store.endRun("tldr", 2);
+    expect(await sources.get("tldr", 2)).toEqual({ none: STOPPED });
+
+    await sources.run("tldr", 2);
+    later(RUN_LIMIT_MS);
+    expect(await sources.get("tldr", 2)).toEqual({ none: STOPPED });
+    // A stopped run can be started again.
+    expect((await sources.run("tldr", 2)).running).toBeDefined();
+  });
+
+  it("answers at once when there is no link, and ends the run when the job cannot start", async () => {
+    const noLink = setup({ story: { ...story, link: undefined } });
+    expect(await noLink.sources.run("tldr", 2)).toEqual({ none: NO_LINK });
+    expect(noLink.startJob).not.toHaveBeenCalled();
+
+    const down = setup({
+      startJob: async () => {
+        throw new Error("lambda down");
+      },
+    });
+    await expect(down.sources.run("tldr", 2)).rejects.toThrow("lambda down");
+    expect(await down.sources.get("tldr", 2)).toEqual({ none: STOPPED });
+  });
+
+  it("404s a story the issue does not have", async () => {
+    const { sources } = setup({ story: undefined });
+    await expect(sources.get("tldr", 9)).rejects.toBeInstanceOf(HttpError);
+    await expect(sources.run("tldr", 9)).rejects.toBeInstanceOf(HttpError);
+  });
+});
+
+describe("SourceChecker", () => {
   function setup(opts: { story?: SourceStory | undefined; page?: Page | Error; answer?: unknown }) {
-    const kept = new Map<string, SourceCheck>();
-    const store: SourceStore = {
-      sourceStory: vi.fn(async () => ("story" in opts ? opts.story : story)),
-      getSource: vi.fn(async (id: string, n: number) => kept.get(`${id}#${n}`)),
-      putSource: vi.fn(
-        async (id: string, n: number, c: StoredSource) => void kept.set(`${id}#${n}`, c),
-      ),
-    };
+    const mem = memoryStore("story" in opts ? opts.story : story);
+    // The API marked the run started.
+    mem.runs.set("tldr#2", { status: "running", since: "2026-10-27T09:59:59.000Z" });
     const calls: ToolRequest[] = [];
     const claude: ClaudePort = {
       callTool: vi.fn(async (req: ToolRequest) => {
@@ -159,12 +269,17 @@ describe("Sources", () => {
       if (p instanceof Error) throw p;
       return p;
     });
-    const sources = new Sources(store, claude, read, () => Date.parse("2026-10-27T10:00:00.000Z"));
-    return { sources, store, calls, read };
+    const checker = new SourceChecker(mem.store, claude, read, () => T0);
+    const sources = new Sources(
+      mem.store,
+      async () => {},
+      () => T0,
+    );
+    return { ...mem, checker, sources, calls, read };
   }
 
-  it("reads the page, checks the claims, keeps the check and serves it back", async () => {
-    const { sources, store, calls } = setup({
+  it("reads the page, checks the claims, keeps the check and ends the run", async () => {
+    const { checker, sources, store, calls, runs } = setup({
       answer: {
         readable: true,
         verdict: "holds",
@@ -178,8 +293,7 @@ describe("Sources", () => {
         ],
       },
     });
-    expect(await sources.get("tldr", 2)).toEqual({});
-    const r = await sources.run("tldr", 2);
+    const r = await checker.check("tldr", 2);
     expect(calls).toHaveLength(1);
     expect(r.check).toMatchObject({
       url: "https://example.com/filing",
@@ -187,41 +301,45 @@ describe("Sources", () => {
       claims: [{ quote: "The company plans to list in the spring." }],
       cents: 0.6,
     });
+    expect(store.sourceStory).toHaveBeenCalledWith("tldr", 2);
     expect(store.putSource).toHaveBeenCalledWith(
       "tldr",
       2,
       expect.objectContaining({ inputTokens: 4000 }),
     );
+    expect(runs.size).toBe(0);
     expect((await sources.get("tldr", 2)).check?.verdict).toBe("holds");
   });
 
-  it("says why when there is no link or the page cannot be read, without a call", async () => {
+  it("ends the run with why when there is no link or the page cannot be read, without a call", async () => {
     const noLink = setup({ story: { ...story, link: undefined } });
-    expect(await noLink.sources.run("tldr", 2)).toEqual({ none: NO_LINK });
+    expect(await noLink.checker.check("tldr", 2)).toEqual({ none: NO_LINK });
     expect(noLink.read).not.toHaveBeenCalled();
+    expect(await noLink.sources.get("tldr", 2)).toEqual({ none: NO_LINK });
 
     const blocked = setup({ page: new PageError("the address is not a public one") });
-    expect(await blocked.sources.run("tldr", 2)).toEqual({
-      none: "The source could not be read: the address is not a public one.",
-    });
+    const none = "The source could not be read: the address is not a public one.";
+    expect(await blocked.checker.check("tldr", 2)).toEqual({ none });
     expect(blocked.calls).toHaveLength(0);
+    expect(await blocked.sources.get("tldr", 2)).toEqual({ none });
 
     const thin = setup({
       page: { url: "https://x.test", contentType: "text/plain", body: "Subscribe." },
     });
-    expect(await thin.sources.run("tldr", 2)).toEqual({ none: UNREADABLE });
+    expect(await thin.checker.check("tldr", 2)).toEqual({ none: UNREADABLE });
   });
 
   it("keeps nothing when Claude says the page is not the article", async () => {
-    const { sources, store } = setup({
+    const { checker, store } = setup({
       answer: { readable: false, claims: [], verdict: "missing" },
     });
-    expect(await sources.run("tldr", 2)).toEqual({ none: UNREADABLE });
+    expect(await checker.check("tldr", 2)).toEqual({ none: UNREADABLE });
     expect(store.putSource).not.toHaveBeenCalled();
   });
 
-  it("404s a story the issue does not have", async () => {
-    const { sources } = setup({ story: undefined });
-    await expect(sources.get("tldr", 9)).rejects.toBeInstanceOf(HttpError);
+  it("ends the run as failed and throws when something else goes wrong", async () => {
+    const { checker, sources } = setup({ page: new Error("socket hang up") });
+    await expect(checker.check("tldr", 2)).rejects.toThrow("socket hang up");
+    expect(await sources.get("tldr", 2)).toEqual({ none: STOPPED });
   });
 });

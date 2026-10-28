@@ -85,8 +85,19 @@ export function createHandler(svc: Services) {
   };
 }
 
-const { TABLE_NAME, BUCKET_NAME, INGEST_FUNCTION, STAGE } = process.env;
+const { TABLE_NAME, BUCKET_NAME, INGEST_FUNCTION, JOBS_FUNCTION, STAGE } = process.env;
 const lambda = new LambdaClient({});
+
+/** Starts a Lambda without waiting for it. */
+async function invokeAsync(functionName: string, payload: unknown): Promise<void> {
+  await lambda.send(
+    new InvokeCommand({
+      FunctionName: functionName,
+      InvocationType: "Event",
+      Payload: Buffer.from(JSON.stringify(payload)),
+    }),
+  );
+}
 
 const repo = new DynamoRepo({
   table: TABLE_NAME!,
@@ -106,16 +117,8 @@ export const handler = createHandler({
   related: new Related(repo, corpus),
   timelines: new Timelines(repo, corpus, claude),
   takes: new Takes(repo, corpus, claude),
-  sources: new Sources(repo, claude),
+  sources: new Sources(repo, (job) => invokeAsync(JOBS_FUNCTION!, job)),
   ask: new Asks(repo, corpus, new TitanEmbedder(), claude),
   following: new Following(repo),
-  startIngest: async () => {
-    await lambda.send(
-      new InvokeCommand({
-        FunctionName: INGEST_FUNCTION,
-        InvocationType: "Event",
-        Payload: Buffer.from("{}"),
-      }),
-    );
-  },
+  startIngest: () => invokeAsync(INGEST_FUNCTION!, {}),
 });
