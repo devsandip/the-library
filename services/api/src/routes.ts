@@ -1,5 +1,7 @@
 import { isReaderDay, readerDay } from "@library/core/days";
 import type {
+  PredictionStatus,
+  PredictionView,
   Rating,
   ReaderState,
   SearchSort,
@@ -38,6 +40,10 @@ const STORY_STATES: readonly StoryState[] = ["unread", "read", "archived"];
 const STORY_VIEWS: readonly Exclude<View, "saved">[] = ["unread", "all", "archived"];
 const SHELVES: readonly Shelf[] = ["news", "learning"];
 const SORTS: readonly SearchSort[] = ["best", "newest"];
+const PREDICTION_VIEWS: readonly PredictionView[] = ["open", "settled"];
+const VERDICTS: readonly Exclude<PredictionStatus, "open">[] = ["right", "wrong", "unclear"];
+/** A prediction's id: `<issueId>.<k>`. */
+const PREDICTION_ID = "([A-Za-z0-9_-]{1,64}\\.[1-9][0-9]?)";
 
 const ok = (body: unknown): Response => ({ status: 200, body });
 
@@ -346,6 +352,30 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
       const day = req.query.day ?? readerDay(Date.now());
       if (!isReaderDay(day)) throw badRequest("day must be a date like 2026-10-10");
       return ok(await svc.repo.history(day));
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/predictions$/,
+    handler: async (svc, req) => {
+      const view = (req.query.view ?? "open") as PredictionView;
+      if (!PREDICTION_VIEWS.includes(view)) throw badRequest("view must be open or settled");
+      return ok(await svc.predictions.list(view));
+    },
+  },
+  {
+    // Sandip's verdict on a prediction (#140), or null to hand it back to the daily settling.
+    method: "PATCH",
+    pattern: new RegExp(`^/predictions/${PREDICTION_ID}$`),
+    handler: async (svc, req, p) => {
+      const body = json<{ verdict?: unknown }>(req);
+      const verdict = body.verdict;
+      if (verdict !== null && !VERDICTS.includes(verdict as (typeof VERDICTS)[number])) {
+        throw badRequest("verdict must be right, wrong, unclear or null");
+      }
+      return ok(
+        await svc.predictions.set(param(p, 0), verdict as (typeof VERDICTS)[number] | null),
+      );
     },
   },
   {

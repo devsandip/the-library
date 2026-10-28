@@ -10,6 +10,10 @@ import type {
   IssueStory,
   LearningListResponse,
   NowReadingResponse,
+  Prediction,
+  PredictionStatus,
+  PredictionsResponse,
+  PredictionView,
   Rating,
   ReaderState,
   RelatedResponse,
@@ -121,6 +125,13 @@ export interface AskPort {
   ask(q: string): Promise<AskResponse>;
 }
 
+/** Predictions (#24, #140): listed by view, and Sandip's verdicts. */
+export interface PredictionsPort {
+  list(view: PredictionView): Promise<PredictionsResponse>;
+  /** Sandip's verdict, or null to hand it back to settling. */
+  set(id: string, verdict: Exclude<PredictionStatus, "open"> | null): Promise<Prediction>;
+}
+
 /** Followed stories (#22): follow a story's event, list them, unfollow, mark them seen. */
 export interface FollowPort {
   list(): Promise<FollowingResponse>;
@@ -138,6 +149,7 @@ export interface Services {
   sources: SourcePort;
   ask: AskPort;
   following: FollowPort;
+  predictions: PredictionsPort;
   /** Fire-and-forget ingest run ("refresh now"). */
   startIngest(): Promise<void>;
 }

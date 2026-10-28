@@ -131,6 +131,23 @@ function setup(overrides: Partial<RepoPort> = {}) {
       unfollow: vi.fn(async () => undefined),
       seen: vi.fn(async () => undefined),
     },
+    predictions: {
+      list: vi.fn(async () => ({ items: [], due: 0 })),
+      set: vi.fn(async (id: string, verdict: unknown) => ({
+        id,
+        issueId: id.split(".")[0]!,
+        senderId: "s0123456789ab",
+        publication: "X",
+        saidAt: "2026-09-01T08:00:00.000Z",
+        text: "It will happen by March.",
+        who: "Someone",
+        own: false,
+        quote: "it will happen by March",
+        by: "2027-03",
+        due: "2027-03-31",
+        status: (verdict ?? "open") as "open",
+      })),
+    },
     startIngest: vi.fn(async () => undefined),
   };
   const handler = createHandler(svc);
@@ -298,6 +315,27 @@ describe("routing and validation", () => {
     const ran = await call("POST", "/issues/abc123/stories/2/source");
     expect(ran.status).toBe(202);
     expect(ran.body).toEqual({ running: { since } });
+  });
+
+  it("lists predictions by view and takes Sandip's verdict, or null (#140)", async () => {
+    const { call, svc } = setup();
+    expect((await call("GET", "/predictions")).body).toEqual({ items: [], due: 0 });
+    expect(svc.predictions.list).toHaveBeenCalledWith("open");
+    await call("GET", "/predictions", { query: { view: "settled" } });
+    expect(svc.predictions.list).toHaveBeenLastCalledWith("settled");
+    expect((await call("GET", "/predictions", { query: { view: "all" } })).status).toBe(400);
+
+    const set = await call("PATCH", "/predictions/abc123.2", { body: { verdict: "wrong" } });
+    expect(set.status).toBe(200);
+    expect(svc.predictions.set).toHaveBeenCalledWith("abc123.2", "wrong");
+    await call("PATCH", "/predictions/abc123.2", { body: { verdict: null } });
+    expect(svc.predictions.set).toHaveBeenLastCalledWith("abc123.2", null);
+    expect(
+      (await call("PATCH", "/predictions/abc123.2", { body: { verdict: "open" } })).status,
+    ).toBe(400);
+    expect(
+      (await call("PATCH", "/predictions/abc123", { body: { verdict: "right" } })).status,
+    ).toBe(404);
   });
 
   it("follows and unfollows a story, lists what is followed, marks it seen (#22)", async () => {

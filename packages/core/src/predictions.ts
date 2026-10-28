@@ -4,6 +4,7 @@
  * costs nothing. Claude gives each prediction's period as a date, month, quarter or year, and the
  * code turns it into the day it comes due: the period's end.
  */
+import type { Prediction, TrackRecord } from "./types.js";
 
 /** Words that look forward: something will, or is expected to, happen. */
 const FORWARD =
@@ -95,4 +96,17 @@ export const comparable = (s: string) =>
 export function quoteIn(text: string, quote: string): boolean {
   const q = comparable(quote);
   return q.length >= 8 && comparable(text).includes(q);
+}
+
+/** A newsletter's track record from its own calls (#24); undefined when it has made none. */
+export function trackRecord(list: Prediction[], senderId: string): TrackRecord | undefined {
+  const own = list.filter((p) => p.senderId === senderId && p.own);
+  if (!own.length) return undefined;
+  const count = (status: Prediction["status"]) => own.filter((p) => p.status === status).length;
+  return {
+    right: count("right"),
+    wrong: count("wrong"),
+    unclear: count("unclear"),
+    open: count("open"),
+  };
 }

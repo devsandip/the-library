@@ -51,6 +51,7 @@ import {
   sourceRunKey,
   PREDICTIONS_PK,
   predictionKeyFromId,
+  trackRecord,
   takesKey,
   timelineKey,
   TOPICS_KEY,
@@ -104,6 +105,7 @@ import type { CorpusIssue, CorpusSource, CorpusStory } from "./corpus.js";
 import type { OwnStory, RelatedSource } from "./related.js";
 import type { FollowStore } from "./following.js";
 import type { SearchSource } from "./search.js";
+import type { PredictionStore, Verdict } from "./predictions.js";
 import type { Settlement, SettleStore, StoredPrediction } from "./settle.js";
 import type { SourceRunItem, SourceStore, SourceStory, StoredSource } from "./source.js";
 import type { StoredTakes, TakesStore } from "./takes.js";
@@ -201,6 +203,32 @@ function inReadingOrder(items: LearningItem[]): LearningItem[] {
 
 /** What Learning reads of a story (#81): never its embedding. */
 const STORY_ATTRIBUTES = ["id", "n", "headline", "summary", "link", "names", "shelf", "state"];
+
+/** A stored prediction (#24) as the API reads it. */
+function toPrediction(i: Record<string, unknown>): StoredPrediction {
+  return {
+    id: i.id as string,
+    issueId: i.issueId as string,
+    ...(typeof i.n === "number" ? { n: i.n } : {}),
+    senderId: i.senderId as string,
+    publication: i.publication as string,
+    saidAt: i.saidAt as string,
+    text: i.text as string,
+    who: i.who as string,
+    own: i.own === true,
+    ...(i.kind === "forecast" || i.kind === "promise" ? { kind: i.kind } : {}),
+    quote: i.quote as string,
+    by: i.by as string,
+    due: i.due as string,
+    status: i.status as StoredPrediction["status"],
+    ...(typeof i.settledAt === "string" ? { settledAt: i.settledAt } : {}),
+    ...(typeof i.why === "string" ? { why: i.why } : {}),
+    ...(Array.isArray(i.evidence) ? { evidence: i.evidence as StoredPrediction["evidence"] } : {}),
+    ...(i.setBy === "sandip" ? { setBy: "sandip" as const } : {}),
+    ...(typeof i.tries === "number" ? { tries: i.tries } : {}),
+    ...(typeof i.nextTry === "string" ? { nextTry: i.nextTry } : {}),
+  };
+}
 
 function isConditionFailure(err: unknown): boolean {
   const e = err as { name?: string; CancellationReasons?: { Code?: string }[] };
@@ -319,7 +347,8 @@ export class DynamoRepo
     TakesStore,
     SourceStore,
     FollowStore,
-    SettleStore
+    SettleStore,
+    PredictionStore
 {
   private readonly ddb: DynamoDBDocumentClient;
   private readonly s3: S3Client;
@@ -1470,32 +1499,7 @@ export class DynamoRepo
         ExpressionAttributeValues: { ":p": PREDICTIONS_PK },
         ExclusiveStartKey: start,
       });
-      for (const i of res.Items ?? []) {
-        out.push({
-          id: i.id as string,
-          issueId: i.issueId as string,
-          ...(typeof i.n === "number" ? { n: i.n } : {}),
-          senderId: i.senderId as string,
-          publication: i.publication as string,
-          saidAt: i.saidAt as string,
-          text: i.text as string,
-          who: i.who as string,
-          own: i.own === true,
-          ...(i.kind === "forecast" || i.kind === "promise" ? { kind: i.kind } : {}),
-          quote: i.quote as string,
-          by: i.by as string,
-          due: i.due as string,
-          status: i.status as StoredPrediction["status"],
-          ...(typeof i.settledAt === "string" ? { settledAt: i.settledAt } : {}),
-          ...(typeof i.why === "string" ? { why: i.why } : {}),
-          ...(Array.isArray(i.evidence)
-            ? { evidence: i.evidence as StoredPrediction["evidence"] }
-            : {}),
-          ...(i.setBy === "sandip" ? { setBy: "sandip" as const } : {}),
-          ...(typeof i.tries === "number" ? { tries: i.tries } : {}),
-          ...(typeof i.nextTry === "string" ? { nextTry: i.nextTry } : {}),
-        });
-      }
+      for (const i of res.Items ?? []) out.push(toPrediction(i));
       start = res.LastEvaluatedKey;
     } while (start);
     return out;
@@ -1535,6 +1539,44 @@ export class DynamoRepo
     } catch (err) {
       // Sandip set the verdict while it was being settled: his stands.
       if (!isConditionFailure(err)) throw err;
+    }
+  }
+
+  /**
+   * Sandip's verdict on a prediction (#140), which settling never changes; or, with null, the
+   * prediction handed back to settling, open again with what settling wrote cleared.
+   */
+  async setPredictionVerdict(
+    id: string,
+    verdict: Verdict,
+    at: string,
+  ): Promise<StoredPrediction | undefined> {
+    const key = predictionKeyFromId(id);
+    if (!key) return undefined;
+    try {
+      const res = await this.ddb.send(
+        new UpdateCommand({
+          TableName: this.table,
+          Key: key,
+          ...(verdict
+            ? {
+                UpdateExpression: "SET #st = :v, setBy = :sandip, settledAt = :at",
+                ExpressionAttributeValues: { ":v": verdict, ":sandip": "sandip", ":at": at },
+              }
+            : {
+                UpdateExpression:
+                  "SET #st = :open REMOVE setBy, why, evidence, settledAt, tries, nextTry",
+                ExpressionAttributeValues: { ":open": "open" },
+              }),
+          ConditionExpression: "attribute_exists(pk)",
+          ExpressionAttributeNames: { "#st": "status" },
+          ReturnValues: "ALL_NEW",
+        }),
+      );
+      return toPrediction(res.Attributes!);
+    } catch (err) {
+      if (isConditionFailure(err)) return undefined;
+      throw err;
     }
   }
 
@@ -1760,10 +1802,12 @@ export class DynamoRepo
       ScanIndexForward: false,
       Limit: 100,
     });
+    const record = trackRecord(await this.listPredictions(), senderId);
     return {
       ...toSender(res.Item),
       addresses: [...((res.Item.addresses as Set<string> | undefined) ?? [])].sort(),
       issues: (issues.Items ?? []).map(toListItem),
+      ...(record ? { record } : {}),
     };
   }
 
