@@ -135,7 +135,21 @@ describe("replacePredictions", () => {
       found("rates fall this year"),
       found("A new one here"),
     ]);
-    expect(got).toEqual({ remove: [2], add: [{ k: 2, prediction: found("A new one here") }] });
+    // The new one takes 2, overwriting the open one there; with nothing new, 2 is removed.
+    expect(got).toEqual({ remove: [], add: [{ k: 2, prediction: found("A new one here") }] });
+    expect(replacePredictions(existing, [])).toEqual({ remove: [2], add: [] });
+  });
+
+  it("never removes and adds the same number, which one batch cannot do", () => {
+    const existing: ExistingPrediction[] = [1, 2, 3].map((k) => ({
+      k,
+      quote: `Old open ${k}`,
+      status: "open",
+    }));
+    expect(replacePredictions(existing, [found("A new one here")])).toEqual({
+      remove: [2, 3],
+      add: [{ k: 1, prediction: found("A new one here") }],
+    });
   });
 });
 
@@ -244,7 +258,8 @@ describe("spotPredictions", () => {
     );
     const stats = await spotPredictions(store, model, { sinceIso: "2026-01-01", force: true });
     expect(stats).toMatchObject({ checked: 1, screened: 1, predictions: 1 });
-    expect(removed.get("done")).toEqual([2]);
+    // Number 1 is settled and stays, so the new one takes 2 and overwrites the open one there.
+    expect(removed.get("done")).toEqual([]);
     expect(put.get("done")).toHaveLength(1);
   });
 
