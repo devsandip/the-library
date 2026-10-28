@@ -7,6 +7,8 @@ import {
   MAX_PAGES,
   numberedPage,
   parseFinding,
+  siteOf,
+  followable,
 } from "../src/hunt.js";
 import { PageError, type Page } from "../src/page.js";
 import type { SourceStory } from "../src/source.js";
@@ -67,10 +69,31 @@ describe("numberedPage", () => {
       ]),
     );
     expect(p.links).toEqual(["https://news.test/paper", "https://lab.test/post"]);
-    expect(p.text).toContain("the paper [1]");
+    expect(p.text).toContain("the paper [1 news.test]");
     expect(
       numberedPage({ url: "https://x.test", contentType: "text/plain", body: " Plain. " }),
     ).toEqual({ url: "https://x.test", text: "Plain.", links: [] });
+  });
+});
+
+describe("siteOf", () => {
+  it("is a host's last two names, or three under a shared suffix", () => {
+    expect(siteOf("https://newsletter.pragmaticengineer.com/p/x")).toBe("pragmaticengineer.com");
+    expect(siteOf("https://www.fortune.com/2026/10/28/x")).toBe("fortune.com");
+    expect(siteOf("https://www.bbc.co.uk/news/x")).toBe("bbc.co.uk");
+    expect(siteOf("https://apple.github.io/x")).toBe("apple.github.io");
+    expect(siteOf("https://lenny.substack.com/p/x")).toBe("lenny.substack.com");
+  });
+});
+
+describe("followable", () => {
+  it("is a link to a site not read yet that can be a source", () => {
+    const read = new Set(["fortune.com"]);
+    expect(followable("https://lab.test/post", read)).toBe(true);
+    expect(followable("https://www.fortune.com/other", read)).toBe(false);
+    expect(followable("https://www.instagram.com/fortune", read)).toBe(false);
+    expect(followable("https://fortunecustomerservice.zendesk.com/hc", read)).toBe(false);
+    expect(followable("https://apps.apple.com/app/x", read)).toBe(false);
   });
 });
 
@@ -83,8 +106,9 @@ describe("findRequest and parseFinding", () => {
     const req = findRequest(story, "The passage.", page);
     expect(req.tool.name).toBe("find_original");
     expect(req.user).toContain("Headline: A lab's model beats GPT on maths");
-    expect(req.user).toContain("the paper [1]");
-    expect(req.user).not.toContain("arxiv.test");
+    // Each link's host, to judge it by; never its address, to choose it by.
+    expect(req.user).toContain("the paper [1 arxiv.test]");
+    expect(req.user).not.toContain("https://arxiv.test/abs/1");
   });
 
   it("turns link numbers back into the page's own links and drops any it does not have", () => {
@@ -190,6 +214,40 @@ describe("hunt", () => {
     });
   });
 
+  it("reads one page per site, and never offers a link within a site already read", async () => {
+    const read = reader({
+      "https://news.test/story": html("https://news.test/story", [
+        ["https://news.test/other", "another story"],
+        ["https://docs.lab.test/a", "the docs"],
+        ["https://lab.test/b", "the post"],
+      ]),
+      "https://docs.lab.test/a": html("https://docs.lab.test/a", [
+        ["https://lab.test/c", "more docs"],
+      ]),
+    });
+    const { claude, calls } = claudeBy({
+      "https://news.test/story": {
+        readable: true,
+        original: false,
+        next: [
+          { link: 1, what: "the docs" },
+          { link: 2, what: "the post" },
+        ],
+      },
+    });
+    const h = await hunt(story, undefined, { read, claude, now });
+    // The story's own site is never numbered; lab.test is read once, as docs.lab.test.
+    expect(calls[0]!.user).not.toContain("another story [");
+    expect(calls[0]!.user).toContain("the docs [1 docs.lab.test]");
+    expect(calls[1]!.user).not.toContain("more docs [");
+    expect(h.path.map((p) => p.url)).toEqual([
+      "https://news.test/story",
+      "https://docs.lab.test/a",
+    ]);
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(h.original).toBe(false);
+  });
+
   it("passes over a dead link for the next, and never reads a page twice", async () => {
     const read = reader({
       "https://news.test/story": html("https://news.test/story", [
@@ -225,8 +283,8 @@ describe("hunt", () => {
     const pages: Record<string, Page> = {};
     const answers: Record<string, unknown> = {};
     for (let k = 0; k < 8; k++) {
-      const url = k === 0 ? story.link : `https://hop.test/${k}`;
-      pages[url] = html(url, [[`https://hop.test/${k + 1}`, "more"]]);
+      const url = k === 0 ? story.link : `https://hop${k}.test/`;
+      pages[url] = html(url, [[`https://hop${k + 1}.test/`, "more"]]);
       answers[url] = { readable: true, original: false, next: [{ link: 1, what: `hop ${k + 1}` }] };
     }
     const { claude } = claudeBy(answers);
