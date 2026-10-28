@@ -1884,6 +1884,69 @@ dialog {
   margin: 4px 0 14px;
 }
 
+/* Subscription audit (#25): a card per newsletter, worth dropping first. */
+.audit-note {
+  margin: 4px 0 6px;
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+
+.audit-group .group-label {
+  margin-left: 0;
+}
+
+.audit-group.drop .group-label {
+  color: var(--irr);
+}
+
+.audit-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.audit-card {
+  padding: 14px 0 12px;
+  border-top: 1px solid var(--line);
+}
+
+.audit-name {
+  font: 600 16px/1.35 var(--font-text);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.audit-why {
+  margin-top: 3px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.audit-counts {
+  margin-top: 4px;
+  color: var(--ink-3);
+}
+
+.audit-only {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+
+.audit-only li + li {
+  margin-top: 3px;
+}
+
+.audit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 /* Takes (#17): groups under a label, each newsletter's sentence opening its story. */
 .takes-group + .takes-group {
   margin-top: 14px;

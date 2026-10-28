@@ -36,6 +36,13 @@ In order, the first that applies:
 
 The cards come worth dropping first, then kept, then too new, each group with the most issues first. The thresholds are constants in `packages/core/src/audit.ts`; #152 checks them against prod.
 
+## The page (#151)
+
+- **Phone:** Subscription audit in Library, after Newsletters, with how many are worth dropping ("3 worth dropping") or "Nothing to drop". **Mac:** the same page from ⌘K. The ⌘K hint shows the count only once the page has been opened, so starting the console never reads a month of the archive.
+- **`/library/audit`:** the window ("Last 19 days", with "Counting from 9 Oct" while it is under 30 days), then three groups: Worth dropping, Keep, Too new to tell. Each card has the newsletter's name, opening its page; why, in numbers ("Opened 1 of 14 issues, and never rated useful."); what it sent and what I did with it ("14 issues · 3 promos · 1 opened"); its stories ("20 stories · 9 ran first elsewhere, 5 in Business Insider · 2 only here"); and up to three headlines only it carried, each opening its issue at the story.
+- **Worth dropping** cards have Unsubscribe ↗, the newsletter's own link opened in a new tab only on a tap, and Mute. Muting moves the card at once by the same rules the API uses (`suggest` in `@library/core/audit`), then the audit is read again, since a muted newsletter no longer counts as having carried a story first.
+- **Mock mode** has seven newsletters: one worth dropping for each of unopened, mostly repeats and rated not useful; kept for Must Read, useful and opened; and one too new to tell.
+
 ## Decisions
 
 - **Rules in code, not a model.** Every number is a count from the table, and the suggestion is a few comparisons on them. A model would add cost and a reason to doubt the verdict without knowing anything the counts do not.
@@ -43,4 +50,5 @@ The cards come worth dropping first, then kept, then too new, each group with th
 - **Opens, not read states.** Opened or peeked at is what I did; a read state can come from a swipe or Mark all read.
 - **Carried first, not seen first.** A repeat is a story another newsletter carried earlier, whether or not I opened that one. It says the newsletter is redundant to my inbox, which is what dropping it fixes.
 - **Must Read is never worth dropping.** Starring is the way to tell the audit to leave a newsletter alone, so there is no separate Keep button.
+- **Mute on the card, not unsubscribe.** Nutgraf cannot unsubscribe for me: the link is the newsletter's own and may ask questions. Mute is the step Nutgraf can take at once, and undo.
 - **Thumbs up overrides opens and repeats.** A newsletter I rated useful is kept even if I rarely open it or it mostly repeats others; only more thumbs down than up outweighs that.

@@ -1,5 +1,6 @@
 import type {
   AskResponse,
+  AuditResponse,
   Follow,
   FollowingResponse,
   Prediction,
@@ -113,6 +114,8 @@ export interface LibraryApi {
   seenFollowing(): Promise<void>;
   /** Who called it (#24): open predictions by due date, or settled ones latest first. */
   predictions(view: PredictionView): Promise<PredictionsResponse>;
+  /** Subscription audit (#25): a report card per newsletter over the last 30 days. */
+  audit(): Promise<AuditResponse>;
   /** Sandip's verdict on a prediction, or null to hand it back to settling. */
   setVerdict(id: string, verdict: Exclude<PredictionStatus, "open"> | null): Promise<Prediction>;
   /** What the newsletters said (#53): by words, then by meaning. */
@@ -290,6 +293,9 @@ export class HttpLibraryApi implements LibraryApi {
   }
   seenFollowing() {
     return this.request<void>("POST", "/following/seen");
+  }
+  audit() {
+    return this.request<AuditResponse>("GET", "/audit");
   }
   predictions(view: PredictionView) {
     return this.request<PredictionsResponse>("GET", `/predictions?view=${view}`);

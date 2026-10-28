@@ -4,10 +4,12 @@ import { useApp } from "../context.js";
 import { clock } from "../format.js";
 import { useFollowing } from "../following.js";
 import { usePredictions } from "../predictions.js";
+import { dropCount, useAudit } from "../audit.js";
 import { useAsync } from "../hooks.js";
 import { useLibrary } from "../library.js";
 import {
   askHref,
+  auditHref,
   followingHref,
   predictionsHref,
   historyHref,
@@ -34,8 +36,8 @@ export function health(s: StatusResponse | undefined): { word: string; tone: str
 }
 
 /**
- * Library (P6): Search on top, then Ask, Following, Predictions, History, Newsletters, Status and
- * Settings;
+ * Library (P6): Search on top, then Ask, Following, Predictions, History, Newsletters, Subscription
+ * audit, Status and Settings;
  * under them the places still to come. New destinations arrive here, so the tab bar never grows.
  */
 export function LibraryHome() {
@@ -49,6 +51,8 @@ export function LibraryHome() {
       ? { unseen: followed.data.unseen, count: followed.data.items.length }
       : { unseen: 0, count: 0 };
   const predicted = usePredictions("open", false).state;
+  const audited = useAudit("once").state;
+  const drop = dropCount(audited);
   const history = useAsync(() => api.history(today), [today], `history:${today}`);
   const all = senders.data?.items ?? [];
   const h = health(status.data);
@@ -110,6 +114,19 @@ export function LibraryHome() {
           <span class="group-name">Newsletters</span>
           <span class="label">
             {all.length > 0 && `${all.length} · ${all.filter((s) => s.mustRead).length} ★`}
+          </span>
+          <span class="chev" aria-hidden="true">
+            ›
+          </span>
+        </a>
+        <a class="group-row" href={auditHref()}>
+          <span class="group-name">Subscription audit</span>
+          <span class={`label${drop ? " follow-new" : ""}`}>
+            {drop === undefined
+              ? "Keep or drop"
+              : drop
+                ? `${drop} worth dropping`
+                : "Nothing to drop"}
           </span>
           <span class="chev" aria-hidden="true">
             ›
