@@ -2,8 +2,9 @@
  * Spotting predictions (#24): after the story index, each new issue is screened for dated,
  * checkable predictions. A cheap screen (`forwardPassages`) keeps only sentences that look forward
  * and name a time, with their neighbours; an issue with none is marked screened without a call.
- * Otherwise one Haiku call names up to five, each with who made it, the newsletter's own words and
- * its period. A prediction is kept only when its words are in the issue word for word and it comes
+ * Otherwise one Haiku call names up to five, each with who made it, the newsletter's own words, its
+ * period and its kind: forecasts and promises are kept, schedules (a date its organiser controls)
+ * are not. A prediction is kept only when its words are in the issue word for word and it comes
  * due after the issue was sent.
  */
 import { forwardPassages, periodEnd, quoteIn, READER } from "@library/core";
@@ -24,6 +25,7 @@ export interface NewPrediction {
   text: string;
   who: string;
   own: boolean;
+  kind: "forecast" | "promise";
   quote: string;
   by: string;
   due: string;
@@ -48,14 +50,24 @@ export function predictionsRequest(
       "- has a time frame, stated or plain from the text (by March, next year, in Q3, within " +
         "two years);",
       "- could be checked later from the news.",
-      "Skip vague views (AI will change everything), conditions without a time, dates already " +
-        "fixed by whoever runs them (a launch event a company has scheduled, an election date), " +
-        "and things that have already happened.",
+      "Skip vague views (AI will change everything), conditions without a time, and things " +
+        "that have already happened.",
       "For each:",
       "- text: the prediction in one plain sentence that stands on its own: who expects what, " +
         "by when.",
       "- who: who made it: the person or organisation quoted, or the newsletter's writer.",
       "- own: true when it is the newsletter's own call, not one it reports.",
+      "- kind: forecast when someone expects or predicts an outcome they do not control " +
+        "(markets, numbers, rivals, governments, a deal closing); promise when a person or " +
+        "company commits to an outcome of its own by a deadline, with some doubt in it " +
+        "(we'll ship by March, profitable within two years, a target); schedule when it is a " +
+        "date set for something its organiser controls, said as fact (ships, launches, " +
+        "releases, retires or opens on a day; a rule or change takes effect on a day; someone " +
+        "starts a job on a day; an event, vote or report is held on a day; a launch no " +
+        "earlier than a day; a company's plan for this week). It is a schedule only when the " +
+        "organiser itself says it as fact: when others expect it (analysts, markets, sources, " +
+        "the newsletter) or it is hedged (could, expected to, as soon as, likely), it is a " +
+        "forecast.",
       "- quote: the passage's exact words that make it, at most 40 words, copied exactly.",
       "- by: when it comes due, as YYYY-MM-DD, YYYY-MM, YYYY-Qn or YYYY, working out words like " +
         "next year or this quarter from the date sent. The period the text gives, not a guess.",
@@ -88,11 +100,12 @@ export function predictionsRequest(
                 text: { type: "string" },
                 who: { type: "string" },
                 own: { type: "boolean" },
+                kind: { type: "string", enum: ["forecast", "promise", "schedule"] },
                 quote: { type: "string" },
                 by: { type: "string", description: "YYYY-MM-DD, YYYY-MM, YYYY-Qn or YYYY." },
                 story: { type: "integer" },
               },
-              required: ["text", "who", "own", "quote", "by"],
+              required: ["text", "who", "own", "kind", "quote", "by"],
             },
           },
         },
@@ -133,17 +146,54 @@ export function parsePredictions(
     const quote = clean(o.quote, 400).replace(/^["“]|["”]$/g, "");
     const by = clean(o.by, 10);
     const due = periodEnd(by);
-    if (!text || !who || !due || due <= sent || due > latest) return [];
+    // A schedule (a date its organiser controls) is not a prediction; nor is a missing kind.
+    const kind = o.kind === "forecast" || o.kind === "promise" ? o.kind : undefined;
+    if (!text || !who || !kind || !due || due <= sent || due > latest) return [];
     if (!quoteIn(issue.text, quote) || seen.has(quote.toLowerCase())) return [];
     seen.add(quote.toLowerCase());
     const n = Number(o.story);
     const story = issue.stories.some((s) => s.n === n) ? n : undefined;
-    return [{ text, who, own: o.own === true, quote, by, due, ...(story ? { n: story } : {}) }];
+    return [
+      { text, who, own: o.own === true, kind, quote, by, due, ...(story ? { n: story } : {}) },
+    ];
   });
+}
+
+/** One of an issue's stored predictions, as a forced screening weighs it. */
+export interface ExistingPrediction {
+  k: number;
+  quote: string;
+  status: string;
+  setBy?: string;
+}
+
+/**
+ * A forced screening's changes to one issue: its open predictions go, unless Sandip set them;
+ * settled ones and his stay, and a new one with a staying one's words is not added again. New
+ * ones take the lowest numbers not kept.
+ */
+export function replacePredictions(
+  existing: ExistingPrediction[],
+  found: NewPrediction[],
+): { remove: number[]; add: { k: number; prediction: NewPrediction }[] } {
+  const stays = existing.filter((e) => e.status !== "open" || e.setBy);
+  const taken = new Set(stays.map((e) => e.k));
+  const quotes = new Set(stays.map((e) => e.quote.toLowerCase()));
+  const add: { k: number; prediction: NewPrediction }[] = [];
+  let k = 1;
+  for (const prediction of found) {
+    if (quotes.has(prediction.quote.toLowerCase())) continue;
+    while (taken.has(k)) k++;
+    taken.add(k);
+    add.push({ k, prediction });
+  }
+  return { remove: existing.filter((e) => !stays.includes(e)).map((e) => e.k), add };
 }
 
 export interface PredictionOptions {
   sinceIso: string;
+  /** Screen issues again (after a prompt change), keeping settled predictions and Sandip's. */
+  force?: boolean;
   concurrency?: number;
   /** Epoch ms after which no new issue is started; the rest wait for the next run. */
   deadline?: number;
@@ -184,9 +234,11 @@ export async function spotPredictions(
       stats.outputTokens += res.outputTokens;
       found = parsePredictions(res.input, { text, receivedAt: issue.receivedAt, stories });
     }
-    await store.putPredictions(issue, found);
+    const existing = opts.force ? await store.issuePredictions(issue.id) : [];
+    const changes = replacePredictions(existing, found);
+    await store.putPredictions(issue, changes.add, changes.remove);
     stats.screened++;
-    stats.predictions += found.length;
+    stats.predictions += changes.add.length;
   };
 
   const [candidates, senders] = await Promise.all([
@@ -195,7 +247,7 @@ export async function spotPredictions(
   ]);
   const todo = candidates
     .filter((c) => !c.promo && !senders.get(c.senderId)?.muted)
-    .filter((c) => !c.predicted && (c.predictionAttempts ?? 0) < MAX_ATTEMPTS)
+    .filter((c) => opts.force || (!c.predicted && (c.predictionAttempts ?? 0) < MAX_ATTEMPTS))
     .sort((a, b) => a.receivedAt.localeCompare(b.receivedAt) || a.id.localeCompare(b.id));
   stats.checked = todo.length;
 

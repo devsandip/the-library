@@ -1481,6 +1481,7 @@ export class DynamoRepo
           text: i.text as string,
           who: i.who as string,
           own: i.own === true,
+          ...(i.kind === "forecast" || i.kind === "promise" ? { kind: i.kind } : {}),
           quote: i.quote as string,
           by: i.by as string,
           due: i.due as string,

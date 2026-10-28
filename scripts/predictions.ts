@@ -1,6 +1,8 @@
 /**
  * Who called it (#24): screen stored issues for dated, checkable predictions.
  *   AWS_PROFILE=admin pnpm predictions [--days 120]   issues not screened yet
+ *   ... --force       screen them all again (after a prompt change); settled predictions and
+ *                     Sandip's stay
  *   ... --stage dev
  * New issues are screened after every ingest run; this is for the archive. A run stops starting
  * new issues after 8.5 minutes; run it again to continue.
@@ -13,7 +15,7 @@ const USD_PER_M = { input: 1, output: 5 };
 
 const stage = stageArg();
 const s = await invokeIngest<PredictionStats>(stage, {
-  predictions: { days: numberArg("--days", 120) },
+  predictions: { days: numberArg("--days", 120), force: process.argv.includes("--force") },
 });
 const cost = (s.inputTokens * USD_PER_M.input + s.outputTokens * USD_PER_M.output) / 1e6;
 console.log(

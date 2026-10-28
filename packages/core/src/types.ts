@@ -539,6 +539,8 @@ export interface Prediction {
   who: string;
   /** The newsletter's own call, rather than one it reports. */
   own: boolean;
+  /** A forecast of what others will do, or a promise about one's own (#143); absent before. */
+  kind?: "forecast" | "promise";
   /** The newsletter's words, found in the issue word for word. */
   quote: string;
   /** Its period as given (2027-03, 2027-Q3, 2027), and the day that period ends. */

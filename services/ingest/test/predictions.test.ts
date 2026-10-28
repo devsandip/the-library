@@ -4,7 +4,9 @@ import type { EnrichCandidate } from "../src/enrich.js";
 import {
   parsePredictions,
   predictionsRequest,
+  replacePredictions,
   spotPredictions,
+  type ExistingPrediction,
   type NewPrediction,
 } from "../src/predictions.js";
 import type { Store } from "../src/store.js";
@@ -35,6 +37,7 @@ describe("parsePredictions", () => {
     text: "OpenAI will ship GPT-6 by March 2027.",
     who: "OpenAI's chief executive",
     own: false,
+    kind: "promise",
     quote: "OpenAI will ship GPT-6 by March 2027",
     by: "2027-03",
     story: 1,
@@ -46,12 +49,19 @@ describe("parsePredictions", () => {
         text: "OpenAI will ship GPT-6 by March 2027.",
         who: "OpenAI's chief executive",
         own: false,
+        kind: "promise",
         quote: "OpenAI will ship GPT-6 by March 2027",
         by: "2027-03",
         due: "2027-03-31",
         n: 1,
       },
     ]);
+  });
+
+  it("drops a schedule, a date its organiser controls, and one with no kind (#143)", () => {
+    const schedule = { ...ok, kind: "schedule" };
+    const { kind: _kind, ...noKind } = ok;
+    expect(parsePredictions({ predictions: [schedule, noKind] }, issue)).toEqual([]);
   });
 
   it("drops one whose words are not in the issue, or that comes due by the day it was sent", () => {
@@ -70,6 +80,7 @@ describe("parsePredictions", () => {
       text: "Rates fall in December.",
       who: "the newsletter",
       own: true,
+      kind: "forecast",
       quote: "We think rates fall in December",
       by: "2026-12",
       story: 0,
@@ -80,6 +91,7 @@ describe("parsePredictions", () => {
         text: "Rates fall in December.",
         who: "the newsletter",
         own: true,
+        kind: "forecast",
         quote: "We think rates fall in December",
         by: "2026-12",
         due: "2026-12-31",
@@ -89,6 +101,41 @@ describe("parsePredictions", () => {
 
   it("throws on an answer with no list, so the issue is tried again", () => {
     expect(() => parsePredictions({}, issue)).toThrow("no prediction list");
+  });
+});
+
+describe("replacePredictions", () => {
+  const found = (quote: string): NewPrediction => ({
+    text: quote,
+    who: "someone",
+    own: false,
+    kind: "forecast",
+    quote,
+    by: "2027",
+    due: "2027-12-31",
+  });
+
+  it("numbers a first screening's predictions from 1", () => {
+    expect(replacePredictions([], [found("a b c d e f g h"), found("i j k l m n o p")])).toEqual({
+      remove: [],
+      add: [
+        { k: 1, prediction: found("a b c d e f g h") },
+        { k: 2, prediction: found("i j k l m n o p") },
+      ],
+    });
+  });
+
+  it("removes open ones, keeps settled ones and Sandip's, and never adds a kept one again", () => {
+    const existing: ExistingPrediction[] = [
+      { k: 1, quote: "Rates fall this year", status: "right" },
+      { k: 2, quote: "Old open one", status: "open" },
+      { k: 3, quote: "Sandip kept this", status: "open", setBy: "sandip" },
+    ];
+    const got = replacePredictions(existing, [
+      found("rates fall this year"),
+      found("A new one here"),
+    ]);
+    expect(got).toEqual({ remove: [2], add: [{ k: 2, prediction: found("A new one here") }] });
   });
 });
 
@@ -107,13 +154,26 @@ describe("spotPredictions", () => {
 
   function setup(candidates: EnrichCandidate[], texts: Record<string, string>, answer?: unknown) {
     const put = new Map<string, NewPrediction[]>();
+    const removed = new Map<string, number[]>();
     const errors: string[] = [];
     const store = {
       enrichCandidates: vi.fn(async () => candidates),
       senderSettings: vi.fn(async () => new Map([["muted", { muted: true }]])),
       getText: vi.fn(async (id: string) => texts[id]),
       issueStories: vi.fn(async () => [{ n: 1, headline: "OpenAI's next model" }]),
-      putPredictions: vi.fn(async (i: { id: string }, p: NewPrediction[]) => void put.set(i.id, p)),
+      issuePredictions: vi.fn(async (): Promise<ExistingPrediction[]> => [
+        { k: 1, quote: "Settled earlier", status: "wrong" },
+        { k: 2, quote: "Open earlier", status: "open" },
+      ]),
+      putPredictions: vi.fn(
+        async (i: { id: string }, add: { prediction: NewPrediction }[], remove: number[] = []) => {
+          put.set(
+            i.id,
+            add.map((a) => a.prediction),
+          );
+          removed.set(i.id, remove);
+        },
+      ),
       putPredictionError: vi.fn(async (id: string) => void errors.push(id)),
     } as unknown as Store;
     const calls: ToolRequest[] = [];
@@ -125,7 +185,7 @@ describe("spotPredictions", () => {
       }),
       embed: vi.fn(),
     };
-    return { store, model, put, errors, calls };
+    return { store, model, put, removed, errors, calls };
   }
 
   const answer = {
@@ -134,6 +194,7 @@ describe("spotPredictions", () => {
         text: "OpenAI will ship GPT-6 by March 2027.",
         who: "OpenAI's chief executive",
         own: false,
+        kind: "promise",
         quote: "OpenAI will ship GPT-6 by March 2027",
         by: "2027-03",
         story: 1,
@@ -173,6 +234,18 @@ describe("spotPredictions", () => {
     expect(errors).toEqual(["a"]);
     expect(put.size).toBe(0);
     expect(stats).toMatchObject({ checked: 1, errors: 1, screened: 0 });
+  });
+
+  it("screens done issues again when forced, removing their open predictions (#143)", async () => {
+    const { store, model, put, removed } = setup(
+      [issue("done", { predicted: true }), issue("promo", { promo: true, predicted: true })],
+      { done: text },
+      answer,
+    );
+    const stats = await spotPredictions(store, model, { sinceIso: "2026-01-01", force: true });
+    expect(stats).toMatchObject({ checked: 1, screened: 1, predictions: 1 });
+    expect(removed.get("done")).toEqual([2]);
+    expect(put.get("done")).toHaveLength(1);
   });
 
   it("leaves the rest for the next run when time is up", async () => {

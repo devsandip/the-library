@@ -6,10 +6,11 @@ Dated, checkable predictions from the newsletters, with who made them and when t
 
 - **When:** after the shelves on every ingest run (`services/ingest/src/predictions.ts`), each issue not screened yet, oldest first, inside the run's time budget. Promos and muted newsletters are skipped, as they are from stories. It never fails the run; a screening that fails three times is left alone.
 - **A cheap screen first** (`forwardPassages`, `packages/core/src/predictions.ts`): the issue's clean text cut into sentences, keeping those that look forward (will, expects, forecasts, plans to, on track, likely to) and name a time (a year from 2020, a quarter, a month, "next year", "within two years", "by the end of the year"), each with the sentences either side, up to 8,000 characters. An issue with none is marked screened with no Claude call.
-- **One Haiku call** (`record_predictions`) with the date sent, the issue's story headlines and the passages. It returns up to five predictions that say something specific will or will not happen, with a time frame, that could be checked from later news. It skips vague views, conditions without a time, dates fixed by whoever runs them (a scheduled launch event, an election) and things already done. Each comes with:
+- **One Haiku call** (`record_predictions`) with the date sent, the issue's story headlines and the passages. It returns up to five predictions that say something specific will or will not happen, with a time frame, that could be checked from later news. It skips vague views, conditions without a time and things already done. Each comes with:
   - `text`: the prediction in one sentence that stands on its own;
   - `who`: the person or organisation quoted, or the newsletter's writer;
   - `own`: whether it is the newsletter's own call;
+  - `kind` (#143): `forecast` (someone expects an outcome they do not control), `promise` (a person or company commits to an outcome of its own by a deadline, with some doubt) or `schedule` (a date its organiser controls, said by the organiser as fact: ships, launches, retires or takes effect on a day; someone starts on a day; "no earlier than"). Schedules are dropped. When others expect it (analysts, markets, sources, the newsletter) or it is hedged (could, expected to, as soon as), it is a forecast;
   - `quote`: the newsletter's exact words, at most 40;
   - `by`: the period, as a day, a month, a quarter or a year, which Claude works out from words like "next year" given the date sent;
   - the story it belongs to.
@@ -19,7 +20,7 @@ Dated, checkable predictions from the newsletters, with who made them and when t
   - due is the period's last day: "2027-03" is 31 March, "2027-Q3" is 30 September, "2027" is 31 December;
   - a quote counts once per issue.
 - **Kept** in the `PREDICTIONS` partition, `open` until settled (#139). The issue is marked `predictedAt` with its count.
-- **The archive:** `AWS_PROFILE=admin pnpm predictions --days 120`, once, after deploy.
+- **The archive:** `AWS_PROFILE=admin pnpm predictions --days 120`, once, after deploy. `--force` screens screened issues again after a prompt change (#143): an issue's open predictions are replaced, settled ones and Sandip's stay, a new one with a kept one's words is not added again, and new ones take the lowest numbers free.
 
 ## Settling them (#139)
 
@@ -40,11 +41,20 @@ Dated, checkable predictions from the newsletters, with who made them and when t
 - **A newsletter's own calls are marked** (`own`), so its track record counts only those, not the forecasts it reports.
 - **Settled in the jobs Lambda, on a schedule.** Settling needs the archive search and its corpus, which live with the API; the jobs Lambda has them and two minutes. A separate schedule, not a step in ingest, keeps a slow settle from crowding an ingest run.
 - **From the archive only.** Later newsletters report what happened; settling by web search waits on #16's provider.
+- **Classify, then drop, rather than ask to skip (#143).** Told to skip "dates fixed by whoever runs them", Haiku kept them anyway: Meta shipping frames on 13 October, OpenAI retiring models on the 23rd, Disney's CTO starting on the 2nd. Asked to label each prediction a forecast, a promise or a schedule, it labels them well, and the code drops schedules. The first wording dropped forecasts too (Bumble's deal "as soon as this week", per sources), so a date is a schedule only when the organiser itself says it as fact.
 - **Strict about wrong.** Haiku's first prompt called a prediction wrong from a story about something else (OpenAI's models coming to Google Cloud, against OpenAI retiring old ones) and was loose with dates. The prompt now asks for a story about the same thing and exact dates; most of what it still gets wrong are companies' own announced dates, which spotting should not have kept (#143).
 
 ## The archive (2026-10-28, prod)
 
 `pnpm predictions --days 120`: 566 issues screened, 160 with forward-looking passages, 172 predictions kept, no errors, in 3 minutes, for 37 cents (241,341 tokens in, 26,143 out). 32 are the newsletters' own calls. 16 were already due; 34 more come due in December 2026 and 28 at the end of 2027; the furthest is 2036.
+
+## Forecasts, not schedules (2026-10-28, prod, read-only: `scratch/predictions-respot-probe.ts`)
+
+The 15 issues behind the 16 predictions due on 28 October, spotted again with each wording, for 4 to 4.4 cents a run:
+
+- **Asked to skip schedules:** 21 predictions; every company date stayed.
+- **Asked for a kind, schedules dropped:** 7. All ten announced dates went (Starship no earlier than 22 September, Chrome 155 from 6 October, Disney's CTO on 2 October, Meta's frames on 13 October, Google's satellite on 1 October, the DNS root key on 11 October, Starbucks closing cafes this week, Chapek's memoir next week, OpenAI retiring models on 23 October, Apple's debut on 28 October), but so did Bumble's deal and the Fed raising rates this week.
+- **A date is a schedule only when the organiser says it as fact:** 9. The Fed's rise priced by futures, the Fed raising rates this week, Bumble's deal and Trump expecting talks with Iran stay; the announced dates still go; new long-range forecasts appear (AI inference spending reaching $350 billion by 2027, China's nuclear warheads by 2030, US silicon photonics by 2035).
 
 ## Settling probe (2026-10-28, prod, read-only: `scratch/settle-probe.ts`)
 

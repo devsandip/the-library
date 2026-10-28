@@ -64,7 +64,7 @@ import type { RecentStory } from "./follow.js";
 import { mapLimit } from "./ingest.js";
 import type { SenderFields, SenderPlan, StoredIssue, StoredSender } from "./senders.js";
 import type { StoredNarrative, StoryText } from "./narrative.js";
-import type { NewPrediction } from "./predictions.js";
+import type { ExistingPrediction, NewPrediction } from "./predictions.js";
 import type { ShelfCandidate } from "./shelves.js";
 import { carriedOver, type NewStory, type OldStory, type StoredStory } from "./stories.js";
 
@@ -1452,18 +1452,46 @@ export class Store {
       .sort((a, b) => a.n - b.n);
   }
 
-  /** An issue's predictions (#24), then the issue marked as screened. */
+  /** An issue's stored predictions (#24), as a forced screening weighs them. */
+  async issuePredictions(id: string): Promise<ExistingPrediction[]> {
+    const res = await this.ddb.send(
+      new QueryCommand({
+        TableName: this.table,
+        KeyConditionExpression: "pk = :pk AND begins_with(sk, :issue)",
+        ExpressionAttributeValues: {
+          ":pk": predictionKey(id, 1).pk,
+          ":issue": `${id}#`,
+        },
+        ProjectionExpression: "sk, quote, #st, setBy",
+        ExpressionAttributeNames: { "#st": "status" },
+        ConsistentRead: true,
+      }),
+    );
+    return (res.Items ?? []).map((i) => ({
+      k: Number((i.sk as string).slice(id.length + 1)),
+      quote: (i.quote as string | undefined) ?? "",
+      status: (i.status as string | undefined) ?? "open",
+      ...(typeof i.setBy === "string" ? { setBy: i.setBy } : {}),
+    }));
+  }
+
+  /**
+   * An issue's new predictions (#24), numbered, and those a forced screening removes; then the
+   * issue marked as screened.
+   */
   async putPredictions(
     issue: { id: string; senderId: string; publication: string; receivedAt: string },
-    predictions: NewPrediction[],
+    add: { k: number; prediction: NewPrediction }[],
+    remove: number[] = [],
   ): Promise<void> {
     const now = new Date().toISOString();
-    await this.batchWrite(
-      predictions.map((p, k) => ({
+    await this.batchWrite([
+      ...remove.map((k) => ({ DeleteRequest: { Key: predictionKey(issue.id, k) } })),
+      ...add.map(({ k, prediction: p }) => ({
         PutRequest: {
           Item: {
-            ...predictionKey(issue.id, k + 1),
-            id: `${issue.id}.${k + 1}`,
+            ...predictionKey(issue.id, k),
+            id: `${issue.id}.${k}`,
             issueId: issue.id,
             ...(p.n ? { n: p.n } : {}),
             senderId: issue.senderId,
@@ -1472,6 +1500,7 @@ export class Store {
             text: p.text,
             who: p.who,
             own: p.own,
+            kind: p.kind,
             quote: p.quote,
             by: p.by,
             due: p.due,
@@ -1481,7 +1510,7 @@ export class Store {
           },
         },
       })),
-    );
+    ]);
     await this.ddb.send(
       new UpdateCommand({
         TableName: this.table,
@@ -1489,7 +1518,7 @@ export class Store {
         UpdateExpression:
           "SET predictedAt = :at, predictionCount = :n REMOVE predictionError, predictionAttempts",
         ConditionExpression: "attribute_exists(pk)",
-        ExpressionAttributeValues: { ":at": now, ":n": predictions.length },
+        ExpressionAttributeValues: { ":at": now, ":n": add.length },
       }),
     );
   }
