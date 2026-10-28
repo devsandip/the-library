@@ -102,4 +102,42 @@ describe("predictions on dev", () => {
     const again = await spotPredictions(store, model, { sinceIso: since });
     expect(again).toMatchObject({ checked: 0, screened: 0, called: 0 });
   });
+
+  it("screens again when forced, overwriting the open prediction in one batch (#143)", async () => {
+    const reworded: ModelPort = {
+      ...model,
+      callTool: async () => ({
+        input: {
+          predictions: [
+            {
+              text: "Acme's first robot ships by March 2027.",
+              who: "Acme's founder",
+              own: false,
+              kind: "promise",
+              quote: "its first robot by March 2027, its founder told investors",
+              by: "2027-03",
+              story: 0,
+            },
+          ],
+        },
+        inputTokens: 1,
+        outputTokens: 1,
+      }),
+    };
+    const stats = await spotPredictions(store, reworded, { sinceIso: since, force: true });
+    expect(stats).toMatchObject({ screened: FIXTURE_NEWSLETTER_IDS.length, errors: 0 });
+    const kept = await ddb.send(
+      new QueryCommand({
+        TableName: stack.tableName,
+        KeyConditionExpression: "pk = :p",
+        ExpressionAttributeValues: { ":p": PREDICTIONS_PK },
+        ConsistentRead: true,
+      }),
+    );
+    expect(kept.Items).toHaveLength(1);
+    expect(kept.Items![0]).toMatchObject({
+      id: "fx-tldr.1",
+      quote: "its first robot by March 2027, its founder told investors",
+    });
+  });
 });

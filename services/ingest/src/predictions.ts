@@ -170,7 +170,7 @@ export interface ExistingPrediction {
 /**
  * A forced screening's changes to one issue: its open predictions go, unless Sandip set them;
  * settled ones and his stay, and a new one with a staying one's words is not added again. New
- * ones take the lowest numbers not kept.
+ * ones take the lowest numbers not kept, overwriting the open ones there.
  */
 export function replacePredictions(
   existing: ExistingPrediction[],
@@ -187,7 +187,10 @@ export function replacePredictions(
     taken.add(k);
     add.push({ k, prediction });
   }
-  return { remove: existing.filter((e) => !stays.includes(e)).map((e) => e.k), add };
+  // A number a new one takes is overwritten, not removed: one batch cannot do both to a key.
+  const reused = new Set(add.map((a) => a.k));
+  const remove = existing.filter((e) => !stays.includes(e) && !reused.has(e.k)).map((e) => e.k);
+  return { remove, add };
 }
 
 export interface PredictionOptions {
