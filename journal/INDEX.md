@@ -1,7 +1,7 @@
 # Nutgraf: Journal
 
-Last refreshed: 2026-10-27 23:55
-Latest entry: [2026-10-27-2355-source-and-follow.md](entries/2026-10-27-2355-source-and-follow.md)
+Last refreshed: 2026-10-28 08:40
+Latest entry: [2026-10-28-0840-the-hunt-for-the-original.md](entries/2026-10-28-0840-the-hunt-for-the-original.md)
 
 A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Called The Library until 2026-10-12. Live at https://sandip.dev/nutgraf/.
 
@@ -21,10 +21,13 @@ Since 2026-10-12 the app is Nutgraf, at sandip.dev/nutgraf, and every /thelibrar
 
 Since 2026-10-27 Learning lists stories, not issues: Jev calls each story craft or news, so a how-to inside a TLDR digest shows up in Learning while the digest stays in News, and reading it leaves the digest unread. An issue is Learning only when all its stories are, and the day in brief takes News stories by their own shelf. Ask Nutgraf answers a question from the archive with a link to every story it used, and a story's Takes tab shows how each of my newsletters covered the same news, beside its Timeline (#19, since 2026-10-23). A story's Source tab checks it against the page it links to, quoting the page only where the quote is really there, and Follow keeps a story's dated steps current: after each ingest, only stories that move it on are added, marked new in Library › Following. All five were built overnight on 2026-10-27 and checked through the API on prod, not yet by me on a device. The repository is public since then, to keep GitHub Actions free, and work runs one GitHub milestone at a time.
 
+Since 2026-10-28 Check the source follows a news page's links to the original, the paper, filing or company post its claims come from, up to five pages, and checks the story against that. It runs in the background for up to two minutes, and the Source tab lists each page as it is read and the way there once kept. Nothing has hunted a real link yet: the probe on prod stories (#133) waits on my AWS sign-in, and milestone 6 stays open until it. After every milestone I now get a status report, filed in `docs/status/`.
+
 Since 2026-10-19 the thumbs ask one thing: was it useful? Relevant and Irrelevant are gone. Ratings had stalled at 12 in ten days, none for six, and a swipe both rated a card and cleared it. Now a swipe on Today only moves to the next card or back, and a thumb changes nothing but the rating. Work is tracked on the GitHub project Nutgraf (#86). Jev, TypeSafe's decision model, is to sort each story into News or Learning (#81): its scoring script shipped (#87) and the step after ingest waits to merge (#88).
 
 ## Recent entries
 
+- [2026-10-28 08:40: The hunt for the original](entries/2026-10-28-0840-the-hunt-for-the-original.md)
 - [2026-10-27 23:55: Check the source, and Follow a story](entries/2026-10-27-2355-source-and-follow.md)
 - [2026-10-27 22:30: Learning lists stories, Ask, and Takes](entries/2026-10-27-2230-learning-ask-and-takes.md)
 - [2026-10-19 11:35: Thumbs instead of Relevant](entries/2026-10-19-1135-thumbs-instead-of-relevant.md)
@@ -58,6 +61,7 @@ Since 2026-10-19 the thumbs ask one thing: was it useful? Relevant and Irrelevan
 - How do the day in brief's threads and cost hold up on a weekday, with about 90 news stories?
 - Jev sorts story shelves (#81, live since 2026-10-23, listing since 2026-10-27). Is it the model for the other bounded calls too (#27)?
 - Will I work through Learning's unread stories (428 on 2026-10-27, none expiring), or will it become a backlog to archive?
+- How often does the source check's hunt reach the original on real links, and at what cost (#133)?
 - Which search provider, if any, for the web halves of Ask, Backstory and Takes (#16, #17)?
 - What to do about `robots.txt` on `sandip.dev` (#7)?
 - When does the AWS account get Haiku 5.5?

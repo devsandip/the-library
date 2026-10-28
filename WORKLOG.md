@@ -462,3 +462,38 @@ Sandip's standing word for the night held: build milestone by milestone and make
 - Moves come only from the check after each ingest, over the last three days so a late split still counts; every candidate is remembered so nothing is asked twice; one call for all follows, none without candidates.
 - The check names each follow's matter and gives every candidate a kind before wording moves; only stories called moves count.
 - Unfollow is by story, not event id, so no `#` travels in a path; the web learns which stories are followed from the list, not a request per story.
+
+## 2026-10-28: Check the source follows links to the original (#127 to #133)
+
+Sandip said "continue", then "You merge them" for milestone 6, and asked for a status report after every milestone, filed in an md file.
+
+**Did:**
+
+- Cleared the main checkout's stale `WORKLOG.md` edit (the first 395 lines of main's copy, word for word) and ran `pnpm sync-main`.
+- Milestone 6, [Check the source: the hunt for the original (#23)](https://github.com/devsandip/the-library/milestone/6): #127 (PR 130) the check runs in a new jobs Lambda (2 minutes, async invoke, no retries), `POST` answers 202 and the phone and Mac poll `GET` every 2 seconds; #128 (PR 131) the hunt: one Haiku call per page (`find_original`) on the page's text with links numbered, links followed depth first by number, up to five pages or 70 seconds, then the same check against the original or the story's own page; #129 (PR 132) the Source tab lists the pages as they are read and, once kept, what the story was checked against and the way there.
+- #133 filed for the milestone's exit step, the probe on real prod links; `scratch/source-hunt-probe.ts` is in the main checkout's `scratch/`.
+- Status reports: `docs/status/2026-10-28-baseline.md` (this morning, before milestone 6) and `docs/status/2026-10-28-milestone-6.md`; `AGENTS.md` now asks for one after every milestone.
+
+**State now:**
+
+- Prod runs 9be4192 (PR 132's Deploy). The Deploys for PRs 130, 131 and 132 each passed dev, its integration tests and prod.
+- The hunt has run in unit tests, on dev against RFC 2606 (a page that links nowhere) and in mock mode. It has not hunted a real news link. The Source tab's "~2¢ · under a minute" is an estimate from token counts.
+- PR 130 was deployed to dev from the laptop before it merged, using the AWS CLI's cached session (`aws configure export-credentials`) after the SDK saw the SSO token as expired. By PR 131 the session had expired outright, so that pull request relied on the Deploy's integration tests.
+- Claude Code's auto mode refused a local run of the probe against prod's table with those exported credentials.
+- None of today's screens has been used signed in on a device.
+
+**Next:**
+
+- Sandip: `aws sso login --profile admin`, then from the main checkout `AWS_PROFILE=admin pnpm exec tsx scratch/source-hunt-probe.ts 10 3` (or allow me to run it). Its numbers go into `docs/features/source.md` and the tab's cost line, which closes #133 and milestone 6.
+- Try Check source on the phone on a TLDR item about a paper or a launch, and see whether the path ends on the paper or the company's post.
+- The next milestone, my pick: decide the search provider (it unblocks Backstory #16 and the web layers of #17, #21 and #22, and the jobs Lambda is ready for Backstory's longer runs). Without one: #24 (Who called it), from the archive alone.
+
+**Decisions:**
+
+- The check runs as a job that the web polls, not a longer request: HTTP API waits at most 30 seconds, and a phone that sleeps mid-check finds the result when it wakes.
+- The run is an item beside the check (sort key `RUN`), so starting or failing a run never rewrites a kept check; the latest run answers for the story.
+- The hunt is depth first, five pages including unreadable ones, 70 seconds; Claude names links by number; no page is read twice.
+- The check's prompt and quote matching did not change; it reads the original, and is told when it was reached from a report.
+- The path's classes are prefixed `source-`: the app's global `.failed` (its error panel) was centring the path's unreadable pages.
+- Milestone 6 closes on the probe's evidence, not on its merged pull requests.
+- Every pull request today was merged by me on Sandip's word for milestone 6.
