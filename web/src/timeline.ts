@@ -7,7 +7,7 @@
  * server, so it is read again every two seconds until it settles, on whichever device opens it.
  */
 import { useEffect, useState } from "preact/hooks";
-import type { SourceCheck, Takes, Timeline } from "@library/core/types";
+import type { SourceCheck, SourceRun, Takes, Timeline } from "@library/core/types";
 import type { LibraryApi } from "./api.js";
 import { useApp } from "./context.js";
 
@@ -15,7 +15,8 @@ export type DeepState<T> =
   | { status: "loading" }
   /** Nothing kept. `none` says why the last run found nothing to tell. */
   | { status: "idle"; none?: string }
-  | { status: "writing"; since: number }
+  /** `run`, for a run in the background: the pages it has read so far (#129). */
+  | { status: "writing"; since: number; run?: Omit<SourceRun, "since"> }
   | { status: "kept"; value: T }
   | { status: "error"; error: string; retry: "read" | "write" };
 
@@ -27,7 +28,7 @@ export type SourceState = DeepState<SourceCheck>;
  * What the API answers for a deep dive: the kept result, or why there is none, or a run going on
  * in the background since when.
  */
-type Answer<T> = Promise<{ value?: T; none?: string; running?: { since: string } }>;
+type Answer<T> = Promise<{ value?: T; none?: string; running?: SourceRun }>;
 
 /** How often a run in the background is read again, and for how long at most. */
 const POLL_MS = 2000;
@@ -48,6 +49,16 @@ function deepDive<T>(get: (api: LibraryApi, id: string, n: number) => Answer<T>,
     states.set(key, state);
     for (const l of listeners) l();
   };
+  /** A run going on in the background, kept from when it started, with its pages so far. */
+  const running = (key: string, r: SourceRun): DeepState<T> => {
+    const s = states.get(key);
+    const { since, ...run } = r;
+    return {
+      status: "writing",
+      since: s?.status === "writing" ? s.since : Date.parse(since),
+      ...(run.pages || run.reading ? { run } : {}),
+    };
+  };
   const stateOf = (id: string, n: number): DeepState<T> =>
     states.get(keyOf(id, n)) ?? { status: "loading" };
 
@@ -61,7 +72,10 @@ function deepDive<T>(get: (api: LibraryApi, id: string, n: number) => Answer<T>,
       setTimeout(() => {
         get(api, id, n).then(
           (r) => {
-            if (r.running && Date.now() - started < POLL_LIMIT_MS) return void next();
+            if (r.running && Date.now() - started < POLL_LIMIT_MS) {
+              put(key, running(key, r.running));
+              return void next();
+            }
             polling.delete(key);
             put(
               key,
@@ -96,7 +110,7 @@ function deepDive<T>(get: (api: LibraryApi, id: string, n: number) => Answer<T>,
           // A run started meanwhile answers for itself.
           if (states.get(key)?.status === "writing") return;
           if (r.running) {
-            put(key, { status: "writing", since: Date.parse(r.running.since) });
+            put(key, running(key, r.running));
             poll(api, id, n);
             return;
           }

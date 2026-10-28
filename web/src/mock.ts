@@ -648,7 +648,7 @@ const takesKept = new Map<string, Takes>();
 const checksKept = new Map<string, SourceCheck>();
 /** Source checks running in mock mode's stand-in background, done after a few seconds. */
 const checksRunning = new Map<string, { since: string; check: SourceCheck }>();
-const MOCK_CHECK_MS = 4000;
+const MOCK_CHECK_MS = 5500;
 /** Followed stories in mock mode (#22), by event; seeded on first read. */
 const follows = new Map<string, StoredFollow>();
 
@@ -1058,8 +1058,18 @@ export class MockLibraryApi implements LibraryApi {
     await delay();
     const key = `${id}#${n}`;
     const run = checksRunning.get(key);
-    if (run && Date.now() - Date.parse(run.since) < MOCK_CHECK_MS) {
-      return { running: { since: run.since } };
+    const ran = run ? Date.now() - Date.parse(run.since) : 0;
+    if (run && ran < MOCK_CHECK_MS) {
+      // A page read every 1.5 seconds, along the path the check keeps.
+      const path = run.check.path ?? [];
+      const done = Math.min(path.length, Math.floor(ran / 1500));
+      return {
+        running: {
+          since: run.since,
+          pages: path.slice(0, done),
+          ...(done < path.length ? { reading: path[done]!.url } : {}),
+        },
+      };
     }
     if (run) {
       checksRunning.delete(key);
@@ -1071,8 +1081,9 @@ export class MockLibraryApi implements LibraryApi {
 
   /**
    * A stand-in for the source check (#23), which runs in the background for a few seconds: a
-   * digest's story has a link, and its check finds one claim that holds and one the newsletter
-   * took further; a story with no link has nothing.
+   * digest's story has a link to a news report, the hunt (#128) follows it to a wire story that
+   * cannot be read and then to the company's own post, and the check finds one claim that holds
+   * and one the newsletter took further; a story with no link has nothing.
    */
   async checkSource(id: string, n: number): Promise<SourceResponse> {
     const story = mockStories(find(id)).stories.find((s) => s.n === n);
@@ -1083,8 +1094,19 @@ export class MockLibraryApi implements LibraryApi {
     const running = checksRunning.get(key);
     if (running) return { running: { since: running.since } };
     const since = new Date().toISOString();
+    const post = "https://example.test/company/blog/announcement";
     const check: SourceCheck = {
-      url: story.link,
+      url: post,
+      original: true,
+      path: [
+        { url: story.link },
+        {
+          url: "https://wire.example.test/story",
+          why: "the wire report",
+          failed: "the page answered 403",
+        },
+        { url: post, why: "the company's post", what: "the company's own announcement" },
+      ],
       verdict: "mixed",
       claims: [
         {
@@ -1099,10 +1121,10 @@ export class MockLibraryApi implements LibraryApi {
           verdict: "further",
         },
       ],
-      note: "A stand-in from mock mode: the page is the company's own post.",
+      note: "A stand-in from mock mode: the story links to a report of the company's own post.",
       at: since,
       ms: 0,
-      cents: 0.6,
+      cents: 1.4,
     };
     checksRunning.set(key, { since, check });
     return { running: { since } };
