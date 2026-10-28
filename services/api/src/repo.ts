@@ -52,6 +52,8 @@ import {
   PREDICTIONS_PK,
   predictionKeyFromId,
   type AuditData,
+  type TuneupData,
+  TUNEUP_KEY,
   trackRecord,
   takesKey,
   timelineKey,
@@ -103,6 +105,7 @@ import type {
 import { badRequest, conflict, notFound } from "./errors.js";
 import type { ListOptions, RepoPort } from "./port.js";
 import type { AuditStore } from "./audit.js";
+import type { TuneupStore } from "./tuneup.js";
 import type { CorpusIssue, CorpusSource, CorpusStory } from "./corpus.js";
 import type { OwnStory, RelatedSource } from "./related.js";
 import type { FollowStore } from "./following.js";
@@ -351,7 +354,8 @@ export class DynamoRepo
     FollowStore,
     SettleStore,
     PredictionStore,
-    AuditStore
+    AuditStore,
+    TuneupStore
 {
   private readonly ddb: DynamoDBDocumentClient;
   private readonly s3: S3Client;
@@ -1868,6 +1872,84 @@ export class DynamoRepo
       // Sort keys are "<openedAt>#<issueId>".
       opened: opens.map((o) => (o.gsi1sk as string).split("#")[1]!),
     };
+  }
+
+  // ---------- weekly tune-up (#26, #158) ----------
+
+  /**
+   * What the tune-up is worked out from: every issue and story (a few hundred bytes each, so a
+   * couple of 1 MB pages), every sender, and the proposals put off.
+   */
+  async readTuneup(): Promise<TuneupData> {
+    const all = (p: string, attrs: string[]) =>
+      this.queryAll({
+        ...this.partition(p),
+        ProjectionExpression: attrs.map((_, k) => `#a${k}`).join(", "),
+        ExpressionAttributeNames: Object.fromEntries(attrs.map((a, k) => [`#a${k}`, a])),
+      });
+    const issueAttrs = ["id", "senderId", "autoArchived"];
+    const [inbox, archive, stories, senders, state] = await Promise.all([
+      all(PARTITION.inbox, issueAttrs),
+      all(PARTITION.archive, issueAttrs),
+      all(PARTITION.stories, [
+        "id",
+        "n",
+        "senderId",
+        "receivedAt",
+        "headline",
+        "learning",
+        "shelf",
+        "shelfSetBy",
+      ]),
+      this.listSenders(),
+      this.ddb.send(new GetCommand({ TableName: this.table, Key: TUNEUP_KEY })),
+    ]);
+    const issue = (i: Item, archived: boolean) => ({
+      id: i.id as string,
+      senderId: i.senderId as string,
+      ...(i.autoArchived === "promo" || i.autoArchived === "old-news"
+        ? { autoArchived: i.autoArchived as "promo" | "old-news" }
+        : {}),
+      archived,
+    });
+    return {
+      senders,
+      issues: [...inbox.map((i) => issue(i, false)), ...archive.map((i) => issue(i, true))],
+      stories: stories.map((s) => ({
+        id: s.id as string,
+        n: s.n as number,
+        senderId: s.senderId as string,
+        receivedAt: s.receivedAt as string,
+        headline: s.headline as string,
+        ...(typeof s.learning === "number" ? { learning: s.learning } : {}),
+        ...(s.shelf === "news" || s.shelf === "learning" ? { shelf: s.shelf as Shelf } : {}),
+        ...(s.shelfSetBy === "jev" || s.shelfSetBy === "sender" || s.shelfSetBy === "sandip"
+          ? { shelfSetBy: s.shelfSetBy as StoryShelfSetBy }
+          : {}),
+      })),
+      dismissed: (state.Item?.dismissed as Record<string, number> | undefined) ?? {},
+    };
+  }
+
+  async dismissTuneup(id: string, fixes: number): Promise<void> {
+    // One item, so a first Not now creates the map and later ones add to it.
+    await this.ddb.send(
+      new UpdateCommand({
+        TableName: this.table,
+        Key: TUNEUP_KEY,
+        UpdateExpression: "SET dismissed = if_not_exists(dismissed, :empty)",
+        ExpressionAttributeValues: { ":empty": {} },
+      }),
+    );
+    await this.ddb.send(
+      new UpdateCommand({
+        TableName: this.table,
+        Key: TUNEUP_KEY,
+        UpdateExpression: "SET dismissed.#id = :n",
+        ExpressionAttributeNames: { "#id": id },
+        ExpressionAttributeValues: { ":n": fixes },
+      }),
+    );
   }
 
   async updateSender(senderId: string, patch: SenderPatch): Promise<SenderListItem> {

@@ -1,6 +1,7 @@
 import type {
   AskResponse,
   AuditResponse,
+  TuneupResponse,
   Follow,
   FollowingResponse,
   HistoryResponse,
@@ -138,6 +139,13 @@ export interface AuditPort {
   audit(): Promise<AuditResponse>;
 }
 
+/** Weekly tune-up (#26, #158): newsletter rules proposed from Sandip's corrections. */
+export interface TuneupPort {
+  tuneup(): Promise<TuneupResponse>;
+  /** Not now: hidden until his moves toward it grow. */
+  dismiss(id: string): Promise<TuneupResponse>;
+}
+
 /** Followed stories (#22): follow a story's event, list them, unfollow, mark them seen. */
 export interface FollowPort {
   list(): Promise<FollowingResponse>;
@@ -157,6 +165,7 @@ export interface Services {
   following: FollowPort;
   predictions: PredictionsPort;
   audit: AuditPort;
+  tuneup: TuneupPort;
   /** Fire-and-forget ingest run ("refresh now"). */
   startIngest(): Promise<void>;
 }

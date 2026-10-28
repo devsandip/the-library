@@ -108,10 +108,8 @@ export const SHELF_QUESTIONS: Record<"craft", Question> = {
   },
 };
 
-/** Unsure answers. They are shelved by 0.5 like the rest; the stored probability finds them later. */
-export const UNSURE = { from: 0.4, to: 0.6 } as const;
-
-export const isUnsure = (p: number) => p >= UNSURE.from && p < UNSURE.to;
+// Unsure answers live in core now, so the tune-up (#158) counts them by the same band.
+export { UNSURE, isUnsure } from "@library/core";
 
 export function storyState(s: { publication: string; headline: string; summary: string }) {
   return [

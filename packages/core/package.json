@@ -11,6 +11,7 @@
     "./predictions": "./src/predictions.ts",
     "./search": "./src/search.ts",
     "./stories": "./src/stories.ts",
+    "./tuneup": "./src/tuneup.ts",
     "./types": "./src/types.ts"
   },
   "scripts": {

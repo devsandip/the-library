@@ -29,6 +29,7 @@ import {
   takesKey,
   timelineKey,
   TOPICS_KEY,
+  TUNEUP_KEY,
   vectorBytes,
 } from "@library/core";
 import type {
@@ -55,6 +56,7 @@ import type {
   SummaryResponse,
   TimelineResponse,
   TopicListResponse,
+  TuneupResponse,
   UnreadCountsResponse,
 } from "@library/core/types";
 import {
@@ -1756,6 +1758,157 @@ describe("API on dev", () => {
       await Promise.all(
         keys.map((Key) => ddb.send(new DeleteCommand({ TableName: stack.tableName, Key }))),
       );
+    }
+  });
+
+  it("tune-up: moves against Jev counted, a newsletter rule proposed, put off with Not now (#158)", async () => {
+    const DAY = 86_400_000;
+    const ago = (d: number) => new Date(Date.now() - d * DAY).toISOString();
+    const alpha = senderIdentity("alpha@tuneup.example.test", "").senderId;
+    const publication = "Tune Alpha";
+    const id = "int-tun-a1";
+    const receivedAt = ago(2);
+    // Jev put three of its twelve stories on News; Sandip moves them to Learning below.
+    const learning = (n: number) => (n <= 3 ? 0.2 : 0.8);
+    const ns = Array.from({ length: 12 }, (_, k) => k + 1);
+    const promos = [
+      { id: "int-tun-p1", state: "unread" as const },
+      { id: "int-tun-p2", state: "archived" as const },
+    ];
+    const proposal = `${alpha}.learning`;
+    const keys = [
+      senderItemKey(alpha),
+      issueKey(id),
+      ...promos.map((p) => issueKey(p.id)),
+      ...ns.map((n) => storyKey(id, n)),
+    ];
+    try {
+      await ddb.send(
+        new PutCommand({
+          TableName: stack.tableName,
+          Item: {
+            ...senderItemKey(alpha),
+            senderId: alpha,
+            senderKey: "alpha@tuneup.example.test",
+            publication,
+            muted: false,
+            mustRead: false,
+            up: 0,
+            down: 0,
+            issueCount: 3,
+            lastSeenAt: receivedAt,
+            ...senderIndexAttributes(alpha, publication),
+          },
+        }),
+      );
+      for (const x of [{ id, state: "unread" as const }, ...promos]) {
+        const promo = x.id === id ? {} : { promo: true, autoArchived: "promo" };
+        await ddb.send(
+          new PutCommand({
+            TableName: stack.tableName,
+            Item: {
+              ...issueKey(x.id),
+              id: x.id,
+              senderId: alpha,
+              publication,
+              subject: x.id,
+              receivedAt,
+              state: x.state,
+              ...promo,
+              ...issueIndexAttributes({ id: x.id, senderId: alpha, receivedAt, state: x.state })
+                .set,
+            },
+          }),
+        );
+      }
+      for (const n of ns) {
+        const shelf = shelfFor(learning(n));
+        await ddb.send(
+          new PutCommand({
+            TableName: stack.tableName,
+            Item: {
+              ...storyKey(id, n),
+              id,
+              n,
+              senderId: alpha,
+              receivedAt,
+              headline: `Tune story ${n}`,
+              summary: "",
+              names: [],
+              shelf,
+              shelfSetBy: "jev",
+              learning: learning(n),
+              gsi1pk: "STORIES",
+              gsi1sk: `${receivedAt}#${storyRef(id, n)}`,
+              ...storyIndexAttributes({ issueId: id, n, receivedAt, shelf }).set,
+            },
+          }),
+        );
+      }
+      for (const n of [1, 2, 3]) {
+        const moved = await call("PATCH", `/issues/${id}/stories/${n}`, {
+          body: { shelf: "learning" },
+        });
+        expect(moved.status).toBe(200);
+      }
+
+      const r = await eventually(
+        () => call<TuneupResponse>("GET", "/tuneup"),
+        (x) =>
+          x.body.proposals?.some((p) => p.id === proposal) === true &&
+          x.body.newsletters.find((n) => n.senderId === alpha)?.pulledBack === 1,
+      );
+      expect(r.status).toBe(200);
+      expect(r.body.proposals.find((p) => p.id === proposal)).toMatchObject({
+        senderId: alpha,
+        publication,
+        shelf: "learning",
+        fixes: 3,
+        moves: 0,
+        stories: 12,
+        onShelf: 12,
+        wouldMove: [],
+      });
+      expect(r.body.proposals.find((p) => p.id === proposal)!.fixed).toHaveLength(3);
+      expect(r.body.newsletters.find((n) => n.senderId === alpha)).toEqual({
+        senderId: alpha,
+        publication,
+        stories: 12,
+        learning: 12,
+        moved: 3,
+        toLearning: 3,
+        toNews: 0,
+        unsure: 0,
+        promos: 2,
+        pulledBack: 1,
+      });
+
+      // Not now hides it, and it stays hidden while no more stories move.
+      const put = await call<TuneupResponse>("POST", "/tuneup/dismissed", {
+        body: { id: proposal },
+      });
+      expect(put.status).toBe(200);
+      expect(put.body.proposals.map((p) => p.id)).not.toContain(proposal);
+      expect(put.body.dismissed).toBeGreaterThanOrEqual(1);
+      const again = await call<TuneupResponse>("GET", "/tuneup");
+      expect(again.body.proposals.map((p) => p.id)).not.toContain(proposal);
+      const gone = await call("POST", "/tuneup/dismissed", { body: { id: proposal } });
+      expect(gone.status).toBe(404);
+    } finally {
+      await Promise.all(
+        keys.map((Key) => ddb.send(new DeleteCommand({ TableName: stack.tableName, Key }))),
+      );
+      await ddb
+        .send(
+          new UpdateCommand({
+            TableName: stack.tableName,
+            Key: TUNEUP_KEY,
+            UpdateExpression: "REMOVE dismissed.#id",
+            ConditionExpression: "attribute_exists(dismissed)",
+            ExpressionAttributeNames: { "#id": proposal },
+          }),
+        )
+        .catch(() => undefined);
     }
   });
 });

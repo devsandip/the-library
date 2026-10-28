@@ -5,6 +5,7 @@ import { Audits } from "./audit.js";
 import { HttpError } from "./errors.js";
 import { Following } from "./following.js";
 import { Predictions } from "./predictions.js";
+import { Tuneups } from "./tuneup.js";
 import type { Services } from "./port.js";
 import { BedrockClaude } from "./claude.js";
 import { TitanEmbedder } from "./embed.js";
@@ -124,5 +125,6 @@ export const handler = createHandler({
   following: new Following(repo),
   predictions: new Predictions(repo),
   audit: new Audits(repo),
+  tuneup: new Tuneups(repo),
   startIngest: () => invokeAsync(INGEST_FUNCTION!, {}),
 });

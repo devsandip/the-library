@@ -42,6 +42,8 @@ const SHELVES: readonly Shelf[] = ["news", "learning"];
 const SORTS: readonly SearchSort[] = ["best", "newest"];
 const PREDICTION_VIEWS: readonly PredictionView[] = ["open", "settled"];
 const VERDICTS: readonly Exclude<PredictionStatus, "open">[] = ["right", "wrong", "unclear"];
+/** A tune-up proposal's id (#158): `<senderId>.<shelf>`. */
+const TUNEUP_ID = new RegExp(`^${SENDER_ID}\\.(news|learning)$`);
 /** A prediction's id: `<issueId>.<k>`. */
 const PREDICTION_ID = "([A-Za-z0-9_-]{1,64}\\.[1-9][0-9]?)";
 
@@ -334,6 +336,23 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     method: "GET",
     pattern: /^\/audit$/,
     handler: async (svc) => ok(await svc.audit.audit()),
+  },
+  {
+    method: "GET",
+    pattern: /^\/tuneup$/,
+    handler: async (svc) => ok(await svc.tuneup.tuneup()),
+  },
+  {
+    // Not now on a proposed newsletter rule (#158).
+    method: "POST",
+    pattern: /^\/tuneup\/dismissed$/,
+    handler: async (svc, req) => {
+      const { id } = json<{ id?: unknown }>(req);
+      if (typeof id !== "string" || !TUNEUP_ID.test(id)) {
+        throw badRequest("id must be <senderId>.news or <senderId>.learning");
+      }
+      return ok(await svc.tuneup.dismiss(id));
+    },
   },
   {
     method: "GET",

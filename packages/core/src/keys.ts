@@ -12,6 +12,8 @@ export const INGEST_STATE_KEY = { pk: "STATE", sk: "INGEST" } as const;
 export const NARRATIVE_KEY = { pk: "STATE", sk: "NARRATIVE" } as const;
 /** The issue Now reading points at (#44), and the place in it. One item, overwritten. */
 export const NOW_READING_KEY = { pk: "STATE", sk: "NOW_READING" } as const;
+/** The tune-up's proposals put off with Not now (#158): `dismissed`, id to Sandip's moves then. */
+export const TUNEUP_KEY = { pk: "STATE", sk: "TUNEUP" } as const;
 /** The topic list Claude proposed (`pnpm topics`). */
 export const TOPICS_KEY = { pk: "CONFIG", sk: "TOPICS" } as const;
 /** The five interests, embedded once by enrichment; they seed the ranking's taste profile. */
