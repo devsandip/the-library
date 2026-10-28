@@ -556,3 +556,35 @@ Sandip chose #24 for milestone 7 and said "Build and merge".
 - Settled in the jobs Lambda on its own schedule, from the archive only; right or wrong needs a story about the same thing.
 - A newsletter's track record counts only its own calls.
 - Every pull request today was merged by me on Sandip's word for milestone 7.
+
+## 2026-10-28, afternoon: Subscription audit, the archive layer (#150 to #155)
+
+Sandip said "continue building", then "Build and merge" for milestone 8.
+
+**Did:**
+
+- Milestone 8, [Subscription audit (#25, archive layer)](https://github.com/devsandip/the-library/milestone/8), closed: #150 (PR 153) `GET /audit`, a report card per newsletter over the last 30 days from the first open logged, with a suggestion worked out in code; #151 (PR 154) the page in Library after Newsletters and from ⌘K, worth dropping first with Unsubscribe ↗ and Mute; #152 (PR 155) the thresholds checked against prod and kept, "Too few to tell" for the third group, and a Must Read card that says when only the star keeps it.
+- Sandip ran the read-only probe of prod's archive (auto mode refuses a prod read from Claude Code). By the deployed rules his month comes to about 7 worth dropping, 16 kept and 7 too few, every drop for being hardly opened. Write-up in `docs/features/audit.md`.
+- `docs/status/2026-10-28-milestone-8.md`.
+
+**State now:**
+
+- Prod runs edb110b (PR 155's Deploy). Every Deploy today passed dev, its integration tests and prod.
+- The audit page was checked in mock mode on the phone and the Mac, light and dark; not yet signed in on a device, and not read from the deployed endpoint on prod.
+- `scratch/audit-probe.ts` in the design-handoff worktree runs the deployed code read-only against a stage (`--stage dev` works); `scratch/audit-probe-raw.ts` is the one Sandip ran.
+- Auto mode refused auto-merge on a pull request; each was merged by hand once its check passed.
+
+**Next:**
+
+- Sandip: open Library › Subscription audit on the phone and mute or unsubscribe from what is worth dropping; on or after 8 November, when the window is a full 30 days, look again.
+- The next milestone, my pick: a search provider decision, which unblocks the most (the other half of #25, web settling, Backstory and four web layers). Without one, Weekly tune-up (#26), though it has few corrections to learn from.
+
+**Decisions:**
+
+- The suggestion is a few rules on counts, worked out when asked: no model, nothing stored, no schedule.
+- The window starts at the first open logged, so issues from before the reader look neither read nor ignored.
+- A repeat is a story another unmuted newsletter carried earlier; a story's newsletter is its issue's.
+- Must Read is never worth dropping, but the card says when only the star keeps it.
+- Thresholds unchanged after prod: 10% opened, 4 issues, 2 thumbs down, 8 stories at 60% repeats.
+- Per-newsletter reading numbers stay out of the public repo; the page shows them.
+- Every pull request today was merged by me on Sandip's word for milestone 8.
