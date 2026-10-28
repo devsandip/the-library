@@ -5,11 +5,13 @@ import { clock } from "../format.js";
 import { useFollowing } from "../following.js";
 import { usePredictions } from "../predictions.js";
 import { dropCount, useAudit } from "../audit.js";
+import { useTuneup, waitingCount } from "../tuneup.js";
 import { useAsync } from "../hooks.js";
 import { useLibrary } from "../library.js";
 import {
   askHref,
   auditHref,
+  tuneupHref,
   followingHref,
   predictionsHref,
   historyHref,
@@ -37,7 +39,7 @@ export function health(s: StatusResponse | undefined): { word: string; tone: str
 
 /**
  * Library (P6): Search on top, then Ask, Following, Predictions, History, Newsletters, Subscription
- * audit, Status and Settings;
+ * audit, Tune-up, Status and Settings;
  * under them the places still to come. New destinations arrive here, so the tab bar never grows.
  */
 export function LibraryHome() {
@@ -53,6 +55,7 @@ export function LibraryHome() {
   const predicted = usePredictions("open", false).state;
   const audited = useAudit("once").state;
   const drop = dropCount(audited);
+  const waiting = waitingCount(useTuneup("once").state);
   const history = useAsync(() => api.history(today), [today], `history:${today}`);
   const all = senders.data?.items ?? [];
   const h = health(status.data);
@@ -127,6 +130,19 @@ export function LibraryHome() {
               : drop
                 ? `${drop} worth dropping`
                 : "Nothing to drop"}
+          </span>
+          <span class="chev" aria-hidden="true">
+            ›
+          </span>
+        </a>
+        <a class="group-row" href={tuneupHref()}>
+          <span class="group-name">Tune-up</span>
+          <span class={`label${waiting ? " follow-new" : ""}`}>
+            {waiting === undefined
+              ? "Rules from your moves"
+              : waiting
+                ? `${waiting} ${waiting === 1 ? "rule" : "rules"} to look at`
+                : "Nothing to change"}
           </span>
           <span class="chev" aria-hidden="true">
             ›

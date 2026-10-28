@@ -12,6 +12,9 @@ import type {
   AskResponse,
   AuditCard,
   AuditResponse,
+  TuneupNewsletter,
+  TuneupProposal,
+  TuneupResponse,
   DigestStats,
   Follow,
   FollowingResponse,
@@ -741,6 +744,23 @@ const AUDIT: [string, number, number, number, number, number, number, number, st
   ];
 const AUDIT_DAYS_SO_FAR = 19;
 
+/**
+ * The tune-up's corrections (#159): [publication, stories, on Learning, moved, to Learning, to News,
+ * unsure, promos, pulled back], and the rules they propose: [publication, shelf, fixes, moves].
+ * A proposal goes once its newsletter has a setting or is put off with Not now.
+ */
+const TUNEUP: [string, number, number, number, number, number, number, number, number][] = [
+  ["ByteByteGo", 62, 56, 4, 4, 0, 1, 0, 0],
+  ["TLDR Dev", 382, 133, 5, 3, 1, 2, 0, 0],
+  ["The Juggernaut", 40, 0, 3, 0, 3, 0, 0, 0],
+  ["Fortune 500 Digest", 31, 1, 0, 0, 0, 0, 3, 2],
+];
+const TUNEUP_RULES: [string, Shelf, number, number][] = [
+  ["ByteByteGo", "learning", 4, 2],
+  ["The Juggernaut", "news", 3, 0],
+];
+const tuneupPutOff = new Set<string>();
+
 const predictions = new Map<string, Prediction>();
 
 function seedPredictions() {
@@ -1257,6 +1277,76 @@ export class MockLibraryApi implements LibraryApi {
       days: AUDIT_DAYS_SO_FAR,
       cards: cards.sort(byVerdict),
     };
+  }
+
+  async tuneup(): Promise<TuneupResponse> {
+    await delay(250);
+    const by = (publication: string) => senders.find((x) => x.publication === publication);
+    const headlines = (senderId: string) =>
+      issues
+        .filter((i) => i.senderId === senderId)
+        .flatMap((i) =>
+          mockStories(i).stories.map((st) => ({ issueId: i.id, n: st.n, headline: st.headline })),
+        );
+    const proposals = TUNEUP_RULES.flatMap(([publication, shelf, fixes, moves]) => {
+      const s = by(publication);
+      const id = s && `${s.senderId}.${shelf}`;
+      if (!s || !id || s.shelf || tuneupPutOff.has(id)) return [];
+      const all = headlines(s.senderId);
+      const p: TuneupProposal = {
+        id,
+        senderId: s.senderId,
+        publication,
+        shelf,
+        fixes,
+        moves,
+        stories: TUNEUP.find((t) => t[0] === publication)![1],
+        onShelf: TUNEUP.find((t) => t[0] === publication)![1] - moves,
+        fixed: all.slice(0, Math.min(3, fixes)),
+        wouldMove: all.slice(3, 3 + Math.min(3, moves)),
+      };
+      return [p];
+    });
+    const newsletters = TUNEUP.flatMap(
+      ([publication, stories, learning, moved, toLearning, toNews, unsure, promos, pulledBack]) => {
+        const s = by(publication);
+        if (!s) return [];
+        const n: TuneupNewsletter = {
+          senderId: s.senderId,
+          publication,
+          ...(s.shelf ? { shelf: s.shelf } : {}),
+          stories,
+          learning: s.shelf === "learning" ? stories : s.shelf === "news" ? 0 : learning,
+          moved,
+          toLearning,
+          toNews,
+          unsure,
+          promos,
+          pulledBack,
+        };
+        return [n];
+      },
+    );
+    const sum = (k: keyof TuneupResponse["totals"]) => newsletters.reduce((t, n) => t + n[k], 0);
+    return {
+      proposals,
+      dismissed: tuneupPutOff.size,
+      newsletters,
+      totals: {
+        stories: 2713,
+        moved: sum("moved"),
+        toLearning: sum("toLearning"),
+        toNews: sum("toNews"),
+        unsure: sum("unsure"),
+        promos: sum("promos"),
+        pulledBack: sum("pulledBack"),
+      },
+    };
+  }
+
+  async dismissTuneup(id: string): Promise<TuneupResponse> {
+    tuneupPutOff.add(id);
+    return this.tuneup();
   }
 
   async source(id: string, n: number): Promise<SourceResponse> {
