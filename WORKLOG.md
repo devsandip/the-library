@@ -618,3 +618,32 @@ Sandip said "continue", then "try again" once auto mode was off for the prod rea
 - Worked out when asked, no schedule, no model call.
 - Thresholds unchanged after prod: no corrections to test them on, and 75% is where Jev's split divides 25 near-uniform newsletters from 4 mixed ones.
 - No "never a promo" setting: prod has no pullbacks.
+
+## 2026-10-29 — Nutgraf for any reader: highlights hidden, the plan, milestones 11 and 12
+
+Sandip said Nutgraf is for any reader, not only Sandip ("the obsidian is just something i use"), then: build it for Sandip for now, anyone signs up at a broader launch; stay on `sandip.dev`, sign in by email code or link, Google sign-in and mail in later; "build it, test it and then merge to main".
+
+**Did:**
+
+- Hid highlights in the live app (#174, PR 175); parked the Obsidian script (PR 173 draft, #169 Backlog).
+- Audited what was built for one reader (`docs/reports/2026-10-29-single-reader-audit.md`) and wrote the plan (`docs/features/multi-reader.md`): milestones 11 to 15 now, then mail in, Google sign-in and launch (PRs 177, 178; #176 closed).
+- Milestone 11 closed: the API reads the reader from the token (PR 182, #179); `CONFIG/OWNER` and `pnpm name-owner` (PR 183, #180). #181 moved to 13.
+- Milestone 12 closed: settings per reader (PR 189), days in the reader's zone (PR 190), prompts with the reader's line (PR 191), ranking and Learning from settings (PR 192), the Settings page (PR 193).
+- `docs/status/2026-10-29-milestone-11.md` and `-12.md`.
+
+**State now:**
+
+- Prod runs PR 193's code; nothing changed for Sandip, who has no settings item and no owner named.
+- PR 191's Deploy failed on dev twice (a fixture sender seen in the wrong state, then a Claude timeout in Takes) before passing; the API tests all passed from the laptop. PR 183's prod hosting check failed once on an unchanged page.
+- Settings checked in mock mode on phone and Mac, not signed in on a device.
+
+**Next:**
+
+- Milestone 13 (every item has an owner): create its issues from `docs/features/multi-reader.md`, write the key design into `docs/architecture.md` first, then move each area to reader keys behind a switch, with isolation tests for two readers on dev. Sandip runs `AWS_PROFILE=admin pnpm name-owner` on prod before the move.
+
+**Decisions:**
+
+- Reader id is the Cognito `sub`; each reader's services are kept warm per reader, 20 at most.
+- Settings live under `READER#<id>`; a reader without them gets today's values, so every step is a no-op for Sandip until the data moves.
+- "reader" instead of "sandip" in stored moves rides with the data move (13), not a separate rewrite.
+- Topics proposed on their own move to milestone 14, with the per-reader jobs.
