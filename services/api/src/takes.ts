@@ -140,10 +140,14 @@ export function takesItems(
     .map((i, k) => ({ id: String(k + 1), ...i }));
 }
 
-export function takesRequest(items: TakesItem[], timeZone = READER_TIME_ZONE): ToolRequest {
+export function takesRequest(
+  items: TakesItem[],
+  timeZone = READER_TIME_ZONE,
+  about = READER,
+): ToolRequest {
   return {
     system: [
-      `You compare how one reader's newsletters covered the same news. ${READER}`,
+      `You compare how one reader's newsletters covered the same news. ${about}`,
       "",
       "The user sends one story per newsletter, oldest first, one per line: an id, the date, the " +
         "newsletter, the headline and summary, and the names involved. The line marked READING " +
@@ -288,9 +292,8 @@ export class Takes implements TakesPort {
     const items = takesItems(story, corpus, eligible);
     if (items.length < 2) return { none: onlyOne(story.publication) };
 
-    const res = await this.claude.callTool(
-      takesRequest(items, (await this.store.settings()).timeZone),
-    );
+    const settings = await this.store.settings();
+    const res = await this.claude.callTool(takesRequest(items, settings.timeZone, settings.about));
     const parsed = parseTakes(res.input, items);
     if (!parsed) return { none: onlyOne(story.publication) };
     const takes: TakesResult = {

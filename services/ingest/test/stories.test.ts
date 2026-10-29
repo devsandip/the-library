@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from "@library/core/settings";
 import { describe, expect, it, vi } from "vitest";
 import type { ModelPort, ToolRequest } from "../src/bedrock.js";
 import type { EnrichCandidate } from "../src/enrich.js";
@@ -113,6 +114,7 @@ function fakeStore(opts: {
 }) {
   const put: { id: string; stories: NewStory[] }[] = [];
   const store = {
+    settings: async () => DEFAULT_SETTINGS,
     enrichCandidates: vi.fn(async () => opts.candidates),
     senderSettings: vi.fn(
       async () =>
@@ -237,6 +239,7 @@ describe("relinkStories", () => {
       }) satisfies StoredStory;
     const setEventIds = vi.fn(async () => undefined);
     const store = {
+      settings: async () => DEFAULT_SETTINGS,
       storiesBetween: vi.fn(async () => [
         story("a", "s1", 5, [1, 0, 0], "a#01"),
         story("b", "s2", 6, [0.9, 0.436, 0], "b#01"),

@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from "@library/core/settings";
 import { describe, expect, it, vi } from "vitest";
 import type { ModelPort } from "../src/bedrock.js";
 import type { EnrichCandidate } from "../src/enrich.js";
@@ -122,6 +123,7 @@ function fakes(opts: {
 }) {
   const putNarrative = vi.fn(async () => undefined);
   const store = {
+    settings: async () => DEFAULT_SETTINGS,
     storyTexts: vi.fn(async () => opts.stories),
     enrichCandidates: vi.fn(async () => opts.issues),
     senderSettings: vi.fn(

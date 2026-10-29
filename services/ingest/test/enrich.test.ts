@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from "@library/core/settings";
 import { describe, expect, it, vi } from "vitest";
 import { INTERESTS } from "@library/core";
 import type { Shelf, Topic } from "@library/core/types";
@@ -51,6 +52,7 @@ function fakes(opts: {
   let stored: Topic[] | undefined = opts.topics;
   let interests: { name: string; text: string; vector: number[] }[] | undefined;
   const store = {
+    settings: async () => DEFAULT_SETTINGS,
     enrichCandidates: async () => opts.candidates,
     getTopics: async () => stored,
     putTopics: async (t: Topic[]) => void (stored = t),

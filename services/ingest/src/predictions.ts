@@ -36,11 +36,12 @@ export function predictionsRequest(
   issue: { publication: string; subject: string; receivedAt: string },
   stories: { n: number; headline: string }[],
   passages: string,
+  about = READER,
 ): ToolRequest {
   return {
     system: [
       `You find predictions in one newsletter issue, for a page that checks later whether they ` +
-        `came true. ${READER}`,
+        `came true. ${about}`,
       "",
       "The user sends the date the issue was sent, its stories, and passages from it that may " +
         "hold predictions.",
@@ -211,6 +212,7 @@ export async function spotPredictions(
   model: ModelPort,
   opts: PredictionOptions,
 ): Promise<PredictionStats> {
+  const { about } = await store.settings();
   const started = Date.now();
   const stats: PredictionStats = {
     checked: 0,
@@ -231,7 +233,7 @@ export async function spotPredictions(
     let found: NewPrediction[] = [];
     if (passages) {
       const stories = await store.issueStories(issue.id);
-      const res = await model.callTool(predictionsRequest(issue, stories, passages));
+      const res = await model.callTool(predictionsRequest(issue, stories, passages, about));
       stats.called++;
       stats.inputTokens += res.inputTokens;
       stats.outputTokens += res.outputTokens;

@@ -132,10 +132,14 @@ export function timelineItems(
     .map((i, k) => ({ id: String(k + 1), ...i }));
 }
 
-export function timelineRequest(items: TimelineItem[], timeZone = READER_TIME_ZONE): ToolRequest {
+export function timelineRequest(
+  items: TimelineItem[],
+  timeZone = READER_TIME_ZONE,
+  about = READER,
+): ToolRequest {
   return {
     system: [
-      `You tell one reader how a story developed, from the stories in their own newsletters. ${READER}`,
+      `You tell one reader how a story developed, from the stories in their own newsletters. ${about}`,
       "",
       "The user sends stories from the reader's newsletters, oldest first, one per line: an id, " +
         "the date, the newsletter, the headline and summary, and the names involved. The line " +
@@ -287,8 +291,9 @@ export class Timelines implements TimelinePort {
     if (!matches.length) return { none: NOTHING_CLOSE };
 
     const items = timelineItems(story, matches, corpus);
+    const settings = await this.store.settings();
     const res = await this.claude.callTool(
-      timelineRequest(items, (await this.store.settings()).timeZone),
+      timelineRequest(items, settings.timeZone, settings.about),
     );
     const { gist, points } = parseTimeline(res.input, items);
     if (points.length < 2) return { none: NOTHING_MOVES };

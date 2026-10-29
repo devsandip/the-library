@@ -111,9 +111,12 @@ export const SHELF_QUESTIONS: Record<"craft", Question> = {
 // Unsure answers live in core now, so the tune-up (#158) counts them by the same band.
 export { UNSURE, isUnsure } from "@library/core";
 
-export function storyState(s: { publication: string; headline: string; summary: string }) {
+export function storyState(
+  s: { publication: string; headline: string; summary: string },
+  about = READER,
+) {
   return [
-    READER,
+    about,
     `Newsletter: ${s.publication}`,
     `Headline: ${s.headline}`,
     `Summary: ${s.summary}`,

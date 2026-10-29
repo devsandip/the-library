@@ -99,10 +99,11 @@ export function findRequest(
   story: SourceStory,
   passage: string | undefined,
   page: NumberedPage,
+  about = READER,
 ): ToolRequest {
   return {
     system: [
-      `You look for the original source behind one story in a reader's newsletter. ${READER}`,
+      `You look for the original source behind one story in a reader's newsletter. ${about}`,
       "",
       "The original is where the story's claims come from: the paper (or its abstract page), " +
         "the company's or organisation's own announcement, the filing, the repository, the " +
@@ -223,6 +224,8 @@ export async function hunt(
     read: (link: string) => Promise<Page>;
     claude: ClaudePort;
     now: () => number;
+    /** The reader's line for the prompt (#186); today's when missing. */
+    about?: string;
     /** Told the pages so far and the one being read, for the run's progress. */
     progress?: (path: SourceHop[], reading?: string) => Promise<void>;
   },
@@ -262,7 +265,7 @@ export async function hunt(
 
     const numbered = numberedPage(page, (href) => followable(href, sites));
     if (numbered.text.length < 200) continue;
-    const res = await deps.claude.callTool(findRequest(story, passage, numbered));
+    const res = await deps.claude.callTool(findRequest(story, passage, numbered, deps.about));
     calls.push(res);
     const found = parseFinding(res.input, numbered);
     if (!found.readable) continue;

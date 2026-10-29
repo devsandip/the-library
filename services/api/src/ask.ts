@@ -77,10 +77,10 @@ export interface AskItem {
 
 const day = /^\d{4}-\d{2}-\d{2}$/;
 
-export function planRequest(q: string, today: string): ToolRequest {
+export function planRequest(q: string, today: string, about = READER): ToolRequest {
   return {
     system: [
-      `You plan searches of one reader's newsletter archive to answer their question. ${READER}`,
+      `You plan searches of one reader's newsletter archive to answer their question. ${about}`,
       `The archive holds about two months of their newsletters, split into stories: a headline, a ` +
         `short summary and the names involved. Today is ${today}.`,
       "",
@@ -226,10 +226,11 @@ export function answerRequest(
   items: AskItem[],
   today: string,
   timeZone = READER_TIME_ZONE,
+  about = READER,
 ): ToolRequest {
   return {
     system: [
-      `You answer one reader's question from the stories in their own newsletters. ${READER} ` +
+      `You answer one reader's question from the stories in their own newsletters. ${about} ` +
         `Today is ${today}.`,
       "",
       "The user sends the question, then stories from the reader's newsletters, oldest first, " +
@@ -347,12 +348,12 @@ export class Asks implements AskPort {
 
   async ask(q: string): Promise<AskResponse> {
     const started = this.now();
-    const { timeZone } = await this.source.settings();
+    const { timeZone, about } = await this.source.settings();
     const today = readerDay(started, timeZone);
     const [corpus, senders, plan] = await Promise.all([
       this.corpus.load(),
       this.source.listSenders(),
-      this.claude.callTool(planRequest(q, today)),
+      this.claude.callTool(planRequest(q, today, about)),
     ]);
     const searches = parsePlan(plan.input, q, today);
     const vectors = await Promise.all(searches.map((s) => this.embedder.embed(s.query)));
@@ -372,7 +373,7 @@ export class Asks implements AskPort {
       return { ...base, paragraphs: [], none, ms: this.now() - started, cents };
     }
 
-    const res = await this.claude.callTool(answerRequest(q, items, today, timeZone));
+    const res = await this.claude.callTool(answerRequest(q, items, today, timeZone, about));
     cents = claudeCents(plan.inputTokens + res.inputTokens, plan.outputTokens + res.outputTokens);
     const answer = parseAnswer(res.input, items);
     const ms = this.now() - started;

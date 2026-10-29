@@ -88,11 +88,12 @@ export interface StoredStory extends EventCandidate {
 export function storiesRequest(
   issue: { publication: string; subject: string },
   text: string,
+  about = READER,
 ): ToolRequest {
   return {
     system: [
       `You split one newsletter issue into its stories, for an index that follows news across ` +
-        `newsletters. ${READER}`,
+        `newsletters. ${about}`,
       "",
       "Call record_stories with the stories in the issue, in the order they appear:",
       "- A story is one news item, announcement, argument or piece of analysis about one " +
@@ -191,6 +192,7 @@ export async function indexStories(
   model: ModelPort,
   opts: StoryOptions,
 ): Promise<StoryStats> {
+  const { about } = await store.settings();
   const started = Date.now();
   const stats: StoryStats = {
     checked: 0,
@@ -219,7 +221,7 @@ export async function indexStories(
       ? storyText(html)
       : { text: (await store.getText(issue.id)) ?? "", links: [] };
     if (!text.trim()) throw new Error("no text");
-    const res = await model.callTool(storiesRequest(issue, text));
+    const res = await model.callTool(storiesRequest(issue, text, about));
     stats.inputTokens += res.inputTokens;
     stats.outputTokens += res.outputTokens;
     const out: (ParsedStory & { vector: number[] })[] = [];

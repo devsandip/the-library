@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from "@library/core/settings";
 import { describe, expect, it, vi } from "vitest";
 import type { SourceCheck, SourceHop } from "@library/core/types";
 import type { ClaudePort, ToolRequest } from "../src/claude.js";
@@ -146,6 +147,7 @@ function memoryStore(story: SourceStory | undefined) {
   const kept = new Map<string, SourceCheck>();
   const runs = new Map<string, SourceRunItem>();
   const store: SourceStore = {
+    settings: vi.fn(async () => DEFAULT_SETTINGS),
     sourceStory: vi.fn(async () => story),
     getSource: vi.fn(async (id: string, n: number) => {
       const check = kept.get(`${id}#${n}`);
