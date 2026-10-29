@@ -141,12 +141,11 @@ describe("data and ingest", () => {
     expect(Object.keys(t.findOutputs("JobsFunction"))).toHaveLength(1);
   });
 
-  it("prod settles due predictions daily at 07:30 IST through the jobs Lambda (#139)", () => {
+  it("prod settles due predictions in an hourly round, each reader at their 07:00 (#139, #211)", () => {
     synth("prod").hasResourceProperties("AWS::Scheduler::Schedule", {
-      ScheduleExpression: "cron(30 7 * * ? *)",
-      ScheduleExpressionTimezone: "Asia/Kolkata",
+      ScheduleExpression: "cron(0 * * * ? *)",
       Target: Match.objectLike({
-        Input: JSON.stringify({ kind: "settle" }),
+        Input: JSON.stringify({ kind: "daily" }),
         RetryPolicy: Match.objectLike({ MaximumRetryAttempts: 0 }),
       }),
     });

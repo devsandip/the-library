@@ -1,4 +1,4 @@
-import { Duration, RemovalPolicy, TimeZone } from "aws-cdk-lib";
+import { Duration, RemovalPolicy } from "aws-cdk-lib";
 import {
   HttpApi,
   HttpMethod,
@@ -83,17 +83,14 @@ export class Api extends Construct {
 
     if (props.stage !== "prod") return;
 
-    // Who called it (#139): settle the predictions that came due, once a day after the first
-    // ingest run. A failed day is not re-run; tomorrow's takes what is left.
-    new Schedule(this, "SettleDaily", {
-      description: "The Library: settle due predictions, daily 07:30 IST",
-      schedule: ScheduleExpression.cron({
-        minute: "30",
-        hour: "7",
-        timeZone: TimeZone.ASIA_KOLKATA,
-      }),
+    // Who called it (#139): settle the predictions that came due, each reader at their 07:00
+    // (#211). Every hour on the hour UTC, so a reader in India settles at 07:30 as before. A
+    // failed round is not re-run; tomorrow's takes what is left.
+    new Schedule(this, "DailyRound", {
+      description: "The Library: settle due predictions, for each reader at their 07:00",
+      schedule: ScheduleExpression.cron({ minute: "0" }),
       target: new LambdaInvoke(this.jobsFn, {
-        input: ScheduleTargetInput.fromObject({ kind: "settle" }),
+        input: ScheduleTargetInput.fromObject({ kind: "daily" }),
         retryAttempts: 0,
       }),
     });

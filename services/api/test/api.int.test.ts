@@ -2129,4 +2129,19 @@ describe("two readers on dev (#198)", () => {
     expect(readers[0]).toEqual(INT_READER);
     expect(readers).toContainEqual({ id: other.sub });
   });
+
+  it("settles each reader at their 07:00 in the hourly round (#211)", async () => {
+    // 07:15 UTC on 29 October: 07:15 in London (the second reader), 12:45 in India (the owner).
+    const res = await lambda.send(
+      new InvokeCommand({
+        FunctionName: stack.jobsFunction!,
+        Payload: Buffer.from(JSON.stringify({ kind: "daily", at: "2026-10-29T07:15:00.000Z" })),
+      }),
+    );
+    expect(res.FunctionError).toBeUndefined();
+    const round = JSON.parse(Buffer.from(res.Payload!).toString()) as {
+      settled: { reader?: string }[];
+    };
+    expect(round.settled.map((s) => s.reader)).toEqual([other.sub]);
+  });
 });
