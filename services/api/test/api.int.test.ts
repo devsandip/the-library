@@ -13,6 +13,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { isDeepStrictEqual } from "node:util";
 import * as fixtures from "../../../packages/core/test/fixtures.js";
 import { Store } from "../../ingest/src/store.js";
 
@@ -129,6 +130,14 @@ async function eventually<T>(read: () => Promise<T>, ok: (v: T) => boolean): Pro
     await new Promise((r) => setTimeout(r, 500));
   }
   return last as T;
+}
+
+/**
+ * A list read from a GSI right after a write: read until it is `want`, then assert it. Without the
+ * wait, one lagging read fails the test before it puts its fixtures back (#227).
+ */
+async function settles<T>(read: () => Promise<T>, want: T): Promise<void> {
+  expect(await eventually(read, (v) => isDeepStrictEqual(v, want))).toEqual(want);
 }
 
 /** A source check runs in the jobs Lambda (#23): read it until it is no longer running. */
@@ -717,9 +726,17 @@ describe("API on dev", () => {
         }),
       );
     await setState("filtered");
-    const gone = await call<HistoryResponse>("GET", "/history", { query: { day: earlierDay } });
-    expect(gone.body.items).toEqual([]);
-    await setState("unread");
+    try {
+      await settles(
+        () =>
+          call<HistoryResponse>("GET", "/history", { query: { day: earlierDay } }).then(
+            (r) => r.body.items,
+          ),
+        [],
+      );
+    } finally {
+      await setState("unread");
+    }
   });
 
   it("search: by words, by meaning, and the story inside a digest (#53)", async () => {
@@ -1216,85 +1233,97 @@ describe("API on dev", () => {
       ),
     );
     // fx-tldr (AI) holds one craft story among news; fx-bytebytego (Engineering) is all craft.
-    await put("fx-tldr", 11, "learning");
-    await put("fx-tldr", 12, "news");
-    await put("fx-bytebytego", 11, "learning");
-    await put("fx-bytebytego", 12, "learning", "read");
-    const learning = (query: Record<string, string> = {}) =>
-      call<LearningListResponse>("GET", "/learning", { query }).then((r) =>
-        r.body.items.map(
-          (i) => `${i.issue.id} ${i.story.n}${i.story.state ? ` ${i.story.state}` : ""}`,
+    // Put back even when a step fails, so a failure here stays here (#227).
+    try {
+      await put("fx-tldr", 11, "learning");
+      await put("fx-tldr", 12, "news");
+      await put("fx-bytebytego", 11, "learning");
+      await put("fx-bytebytego", 12, "learning", "read");
+      const learning = (query: Record<string, string> = {}) =>
+        call<LearningListResponse>("GET", "/learning", { query }).then((r) =>
+          r.body.items.map(
+            (i) => `${i.issue.id} ${i.story.n}${i.story.state ? ` ${i.story.state}` : ""}`,
+          ),
+        );
+
+      // Newest issue first (fx-tldr's own date is the later one), each issue's stories in order.
+      await settles(learning, ["fx-tldr 11", "fx-bytebytego 11"]);
+      await settles(
+        () => learning({ view: "all" }),
+        ["fx-tldr 11", "fx-bytebytego 11", "fx-bytebytego 12 read"],
+      );
+      await settles(() => learning({ topic: "AI" }), ["fx-tldr 11"]);
+      await settles(() => learning({ sender: BBG }), ["fx-bytebytego 11"]);
+      const page = await call<LearningListResponse>("GET", "/learning", { query: { limit: "1" } });
+      expect(page.body.items).toHaveLength(1);
+      const rest = await call<LearningListResponse>("GET", "/learning", {
+        query: { limit: "1", cursor: page.body.cursor! },
+      });
+      expect(rest.body.items.map((i) => i.issue.id)).toEqual(["fx-bytebytego"]);
+
+      // Counted by newsletter and the issue's topic.
+      const counts = (
+        await eventually(
+          () => call<UnreadCountsResponse>("GET", "/unread-counts"),
+          (r) => r.body.learning.reduce((n, c) => n + c.n, 0) === 2,
+        )
+      ).body.learning;
+      expect(counts).toContainEqual({
+        senderId: BBG,
+        shelf: "learning",
+        topic: "Engineering",
+        n: 1,
+      });
+      expect(counts.reduce((n, c) => n + c.n, 0)).toBe(2);
+
+      // Reading a story takes it out of Unread, not its issue; archiving the issue leaves it listed.
+      const issueState = (await getItem("fx-tldr"))?.state;
+      const read = await call("PATCH", "/issues/fx-tldr/stories/11", { body: { state: "read" } });
+      expect(read.body).toMatchObject({ n: 11, shelf: "learning", state: "read" });
+      await settles(learning, ["fx-bytebytego 11"]);
+      expect((await getItem("fx-tldr"))?.state).toBe(issueState);
+      await call("PATCH", "/issues/fx-bytebytego", { body: { state: "archived" } });
+      await settles(learning, ["fx-bytebytego 11"]);
+      await call("PATCH", "/issues/fx-bytebytego/stories/11", { body: { state: "archived" } });
+      await settles(() => learning({ view: "archived" }), ["fx-bytebytego 11 archived"]);
+      await call("PATCH", "/issues/fx-tldr/stories/11", { body: { state: "unread" } });
+      await settles(learning, ["fx-tldr 11"]);
+
+      // Moving the craft story to News takes it off Learning; the issue was News and stays so.
+      const moved = await call("PATCH", "/issues/fx-tldr/stories/11", { body: { shelf: "news" } });
+      expect(moved.body).toMatchObject({ shelf: "news" });
+      await settles(learning, []);
+      // Moving fx-tldr's news story to Learning, with the craft one back, makes the issue Learning.
+      await call("PATCH", "/issues/fx-tldr/stories/11", { body: { shelf: "learning" } });
+      await call("PATCH", "/issues/fx-tldr/stories/12", { body: { shelf: "learning" } });
+      expect(await getItem("fx-tldr")).toMatchObject({ shelf: "learning", shelfSetBy: "stories" });
+      const stories = (await call<IssueStoriesResponse>("GET", "/issues/fx-tldr/stories")).body
+        .stories;
+      expect(stories.filter((st) => st.n > 10)).toEqual([
+        expect.objectContaining({ n: 11, shelf: "learning" }),
+        expect.objectContaining({ n: 12, shelf: "learning" }),
+      ]);
+      expect(
+        (await call("PATCH", "/issues/fx-tldr/stories/42", { body: { state: "read" } })).status,
+      ).toBe(404);
+    } finally {
+      await call("PATCH", "/issues/fx-bytebytego", { body: { state: "unread" } });
+      await Promise.all(
+        [
+          ["fx-tldr", 11],
+          ["fx-tldr", 12],
+          ["fx-bytebytego", 11],
+          ["fx-bytebytego", 12],
+        ].map(([id, n]) =>
+          ddb.send(
+            new DeleteCommand({
+              TableName: stack.tableName,
+              Key: devKeys.story(id as string, n as number),
+            }),
+          ),
         ),
       );
-
-    // Newest issue first (fx-tldr's own date is the later one), each issue's stories in order.
-    expect(await learning()).toEqual(["fx-tldr 11", "fx-bytebytego 11"]);
-    expect(await learning({ view: "all" })).toEqual([
-      "fx-tldr 11",
-      "fx-bytebytego 11",
-      "fx-bytebytego 12 read",
-    ]);
-    expect(await learning({ topic: "AI" })).toEqual(["fx-tldr 11"]);
-    expect(await learning({ sender: BBG })).toEqual(["fx-bytebytego 11"]);
-    const page = await call<LearningListResponse>("GET", "/learning", { query: { limit: "1" } });
-    expect(page.body.items).toHaveLength(1);
-    const rest = await call<LearningListResponse>("GET", "/learning", {
-      query: { limit: "1", cursor: page.body.cursor! },
-    });
-    expect(rest.body.items.map((i) => i.issue.id)).toEqual(["fx-bytebytego"]);
-
-    // Counted by newsletter and the issue's topic.
-    const counts = (await call<UnreadCountsResponse>("GET", "/unread-counts")).body.learning;
-    expect(counts).toContainEqual({ senderId: BBG, shelf: "learning", topic: "Engineering", n: 1 });
-    expect(counts.reduce((n, c) => n + c.n, 0)).toBe(2);
-
-    // Reading a story takes it out of Unread, not its issue; archiving the issue leaves it listed.
-    const issueState = (await getItem("fx-tldr"))?.state;
-    const read = await call("PATCH", "/issues/fx-tldr/stories/11", { body: { state: "read" } });
-    expect(read.body).toMatchObject({ n: 11, shelf: "learning", state: "read" });
-    expect(await learning()).toEqual(["fx-bytebytego 11"]);
-    expect((await getItem("fx-tldr"))?.state).toBe(issueState);
-    await call("PATCH", "/issues/fx-bytebytego", { body: { state: "archived" } });
-    expect(await learning()).toEqual(["fx-bytebytego 11"]);
-    await call("PATCH", "/issues/fx-bytebytego/stories/11", { body: { state: "archived" } });
-    expect(await learning({ view: "archived" })).toEqual(["fx-bytebytego 11 archived"]);
-    await call("PATCH", "/issues/fx-tldr/stories/11", { body: { state: "unread" } });
-    expect(await learning()).toEqual(["fx-tldr 11"]);
-
-    // Moving the craft story to News takes it off Learning; the issue was News and stays so.
-    const moved = await call("PATCH", "/issues/fx-tldr/stories/11", { body: { shelf: "news" } });
-    expect(moved.body).toMatchObject({ shelf: "news" });
-    expect(await learning()).toEqual([]);
-    // Moving fx-tldr's news story to Learning, with the craft one back, makes the issue Learning.
-    await call("PATCH", "/issues/fx-tldr/stories/11", { body: { shelf: "learning" } });
-    await call("PATCH", "/issues/fx-tldr/stories/12", { body: { shelf: "learning" } });
-    expect(await getItem("fx-tldr")).toMatchObject({ shelf: "learning", shelfSetBy: "stories" });
-    const stories = (await call<IssueStoriesResponse>("GET", "/issues/fx-tldr/stories")).body
-      .stories;
-    expect(stories.filter((st) => st.n > 10)).toEqual([
-      expect.objectContaining({ n: 11, shelf: "learning" }),
-      expect.objectContaining({ n: 12, shelf: "learning" }),
-    ]);
-    expect(
-      (await call("PATCH", "/issues/fx-tldr/stories/42", { body: { state: "read" } })).status,
-    ).toBe(404);
-
-    await call("PATCH", "/issues/fx-bytebytego", { body: { state: "unread" } });
-    await Promise.all(
-      [
-        ["fx-tldr", 11],
-        ["fx-tldr", 12],
-        ["fx-bytebytego", 11],
-        ["fx-bytebytego", 12],
-      ].map(([id, n]) =>
-        ddb.send(
-          new DeleteCommand({
-            TableName: stack.tableName,
-            Key: devKeys.story(id as string, n as number),
-          }),
-        ),
-      ),
-    );
+    }
   });
 
   it("ask: answers from the newsletters, citing the story, or says there is nothing (#21)", async () => {
