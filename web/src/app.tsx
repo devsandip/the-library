@@ -26,6 +26,7 @@ import { Following } from "./pages/following.js";
 import { HIGHLIGHTS } from "./features.js";
 import { setReaderZone } from "./zone.js";
 import { Highlights } from "./pages/highlights.js";
+import { Onboarding } from "./pages/onboarding.js";
 import { Predictions } from "./pages/predictions.js";
 import { Search } from "./pages/search.js";
 import { Settings } from "./pages/settings.js";
@@ -39,9 +40,11 @@ import { BrowseIcon, LibraryIcon, SavedIcon, TodayIcon } from "./components/icon
 import { ToastProvider, ToastView } from "./components/toast.js";
 
 type Boot =
-  { kind: "loading" } | { kind: "ready"; ctx: AppContext } | { kind: "error"; message: string };
+  | { kind: "loading" }
+  | { kind: "ready"; ctx: AppContext; onboarded: boolean }
+  | { kind: "error"; message: string };
 
-async function boot(): Promise<AppContext> {
+async function boot(): Promise<{ ctx: AppContext; onboarded: boolean }> {
   const cfg = await loadConfig();
   // Build-time flag first: production builds drop the mock entirely, and no config.json can
   // switch a production build into mock mode.
@@ -59,13 +62,19 @@ async function boot(): Promise<AppContext> {
   return started({ cfg, auth, api: new HttpLibraryApi(cfg, auth) });
 }
 
-/** The reader's time zone before the first screen, so no date shows in another zone first (#185). */
-async function started(ctx: AppContext): Promise<AppContext> {
-  await ctx.api.settings().then(
-    (s) => setReaderZone(s.timeZone),
-    () => undefined,
+/**
+ * The reader's time zone before the first screen, so no date shows in another zone first (#185),
+ * and whether they have been through onboarding (#221).
+ */
+async function started(ctx: AppContext): Promise<{ ctx: AppContext; onboarded: boolean }> {
+  const onboarded = await ctx.api.settings().then(
+    (s) => {
+      setReaderZone(s.timeZone);
+      return s.onboarded !== false;
+    },
+    () => true,
   );
-  return ctx;
+  return { ctx, onboarded };
 }
 
 /** Library's pages are the same on both devices. */
@@ -240,7 +249,7 @@ export function App() {
 
   useEffect(() => {
     boot().then(
-      (ctx) => setState({ kind: "ready", ctx }),
+      (ready) => setState({ kind: "ready", ...ready }),
       (err: Error) => setState({ kind: "error", message: err.message }),
     );
   }, []);
@@ -254,6 +263,14 @@ export function App() {
           Try again
         </button>
       </main>
+    );
+  }
+
+  if (!state.onboarded) {
+    return (
+      <Ctx.Provider value={state.ctx}>
+        <Onboarding onDone={() => setState({ ...state, onboarded: true })} />
+      </Ctx.Provider>
     );
   }
 

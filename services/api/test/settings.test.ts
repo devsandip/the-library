@@ -6,6 +6,7 @@ function setup(embed = vi.fn(async (text: string) => new Float32Array([text.leng
   const put: EmbeddedInterest[][] = [];
   const store = {
     settings: vi.fn(async () => DEFAULT_SETTINGS),
+    onboarded: vi.fn(async () => false),
     saveSettings: vi.fn(async (patch: Partial<ReaderSettings>) => ({
       ...DEFAULT_SETTINGS,
       ...patch,
@@ -37,5 +38,11 @@ describe("settings (#187)", () => {
     const { store, settings } = setup(vi.fn(async () => Promise.reject(new Error("titan down"))));
     await expect(settings.save({ interests: [{ name: "a", text: "b" }] })).rejects.toThrow("titan");
     expect(store.saveSettings).not.toHaveBeenCalled();
+  });
+
+  it("says whether the reader has been through onboarding, and a save finishes it (#221)", async () => {
+    const { settings } = setup();
+    expect((await settings.get()).onboarded).toBe(false);
+    expect((await settings.save({ timeZone: "UTC" })).onboarded).toBe(true);
   });
 });

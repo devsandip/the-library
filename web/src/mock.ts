@@ -17,7 +17,7 @@ import {
 } from "@library/core/highlights";
 import { readerZone } from "./zone.js";
 import { EXPORT_ABOUT, type ReaderExport } from "@library/core/export";
-import { DEFAULT_SETTINGS, type ReaderSettings } from "@library/core/settings";
+import { DEFAULT_SETTINGS, type ReaderSettings, type SettingsAnswer } from "@library/core/settings";
 import type {
   AskResponse,
   AuditCard,
@@ -74,6 +74,9 @@ import type {
   PredictionView,
 } from "@library/core/types";
 import type { LibraryApi, ListIssuesOptions, ListLearningOptions } from "./api.js";
+
+/** VITE_ONBOARDING=1 starts the mock as a new reader, who sees onboarding first (#221). */
+let mockOnboarded = import.meta.env.VITE_ONBOARDING !== "1";
 
 /** The reader's settings (#184): VITE_ZONE starts the mock in another time zone. */
 let mockSettings: ReaderSettings = {
@@ -1132,9 +1135,9 @@ export class MockLibraryApi implements LibraryApi {
     await delay();
     return { topics };
   }
-  async settings(): Promise<ReaderSettings> {
+  async settings(): Promise<SettingsAnswer> {
     await delay();
-    return structuredClone(mockSettings);
+    return { ...structuredClone(mockSettings), onboarded: mockOnboarded };
   }
   async deleteAccount(): Promise<{ deleting: true }> {
     await delay();
@@ -1162,10 +1165,11 @@ export class MockLibraryApi implements LibraryApi {
       usage: [],
     };
   }
-  async saveSettings(patch: Partial<ReaderSettings>): Promise<ReaderSettings> {
+  async saveSettings(patch: Partial<ReaderSettings>): Promise<SettingsAnswer> {
     await delay();
     mockSettings = { ...mockSettings, ...structuredClone(patch) };
-    return structuredClone(mockSettings);
+    mockOnboarded = true;
+    return { ...structuredClone(mockSettings), onboarded: true };
   }
   async unreadCounts(): Promise<UnreadCountsResponse> {
     await delay();

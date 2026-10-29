@@ -197,8 +197,12 @@ function setup(overrides: Partial<RepoPort> = {}) {
     },
     account: { delete: vi.fn(async () => ({ deleting: true as const })) },
     settings: {
-      get: vi.fn(async () => DEFAULT_SETTINGS),
-      save: vi.fn(async (patch: Partial<ReaderSettings>) => ({ ...DEFAULT_SETTINGS, ...patch })),
+      get: vi.fn(async () => ({ ...DEFAULT_SETTINGS, onboarded: true })),
+      save: vi.fn(async (patch: Partial<ReaderSettings>) => ({
+        ...DEFAULT_SETTINGS,
+        ...patch,
+        onboarded: true,
+      })),
     },
     startIngest: vi.fn(async () => undefined),
   };
