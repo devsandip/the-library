@@ -11,7 +11,7 @@ import {
   ScanCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import * as fixtures from "../../../packages/core/test/fixtures.js";
 import { Store } from "../../ingest/src/store.js";
@@ -51,7 +51,9 @@ import type {
   RelatedResponse,
   SearchResponse,
   SenderDetailResponse,
+  SenderListItem,
   SenderListResponse,
+  SenderPatch,
   StatusResponse,
   SummaryResponse,
   TimelineResponse,
@@ -150,6 +152,25 @@ const setSorted = (id: string, shelf: string, topic: string) =>
     }),
   );
 
+/**
+ * Changes a newsletter's settings and waits until the senders list shows them. Lists, related
+ * stories and Ask read senders from a GSI, which lags the write (#227).
+ */
+async function setSender(id: string, patch: SenderPatch) {
+  const res = await call<SenderListItem>("PATCH", `/senders/${id}`, { body: patch });
+  const shows = (s: SenderListItem) =>
+    s.senderId === id &&
+    (patch.muted === undefined || s.muted === patch.muted) &&
+    (patch.mustRead === undefined || s.mustRead === patch.mustRead) &&
+    (patch.shelf === undefined || (s.shelf ?? null) === patch.shelf);
+  const list = await eventually(
+    () => call<SenderListResponse>("GET", "/senders"),
+    (r) => r.body.items.some(shows),
+  );
+  if (!list.body.items.some(shows)) throw new Error(`the senders list never showed ${id}'s change`);
+  return res;
+}
+
 beforeAll(async () => {
   stack = await devStack();
   if (!stack.apiFunction) throw new Error("dev stack has no ApiFunction output; deploy it");
@@ -159,6 +180,15 @@ beforeAll(async () => {
     () => call<IssueListResponse>("GET", "/issues"),
     (r) => r.body.items.length === 6,
   );
+});
+
+// A test that fails midway leaves its newsletter settings behind, and every later test that reads
+// that newsletter fails too. Put them back, so a failure stays in its own test (#227).
+afterEach(async () => {
+  const left = (await call<SenderListResponse>("GET", "/senders")).body.items.filter(
+    (s) => s.muted || s.mustRead || s.shelf,
+  );
+  for (const s of left) await setSender(s.senderId, { muted: false, mustRead: false, shelf: null });
 });
 
 describe("API on dev", () => {
@@ -242,23 +272,20 @@ describe("API on dev", () => {
   });
 
   it("muting hides a sender from home views but not from its own page", async () => {
-    expect((await call("PATCH", `/senders/${BBG}`, { body: { muted: true } })).body).toMatchObject({
-      muted: true,
-    });
+    expect((await setSender(BBG, { muted: true })).body).toMatchObject({ muted: true });
     const unread = await call<IssueListResponse>("GET", "/issues");
     expect(ids(unread)).not.toContain("fx-bytebytego");
     expect(unread.body.items).toHaveLength(5);
     const own = await call<IssueListResponse>("GET", "/issues", { query: { sender: BBG } });
     expect(ids(own)).toEqual(["fx-bytebytego"]);
-    await call("PATCH", `/senders/${BBG}`, { body: { muted: false } });
+    await setSender(BBG, { muted: false });
     expect((await call<IssueListResponse>("GET", "/issues")).body.items).toHaveLength(6);
   });
 
   it("Must Read: starred newsletters' unread issues come first, marked, across pages", async () => {
     const PRAG = senderIdentity("pragmaticengineer@substack.com", "").senderId;
     const CASEY = senderIdentity("casey@platformer.news", "").senderId;
-    const star = (id: string, mustRead: boolean) =>
-      call<SenderListResponse["items"][number]>("PATCH", `/senders/${id}`, { body: { mustRead } });
+    const star = (id: string, mustRead: boolean) => setSender(id, { mustRead });
     expect((await star(PRAG, true)).body).toMatchObject({ mustRead: true });
     await star(CASEY, true);
 
@@ -298,12 +325,12 @@ describe("API on dev", () => {
     expect(all.body.items.find((i) => i.id === "fx-pragmatic")?.mustRead).toBe(true);
 
     // Muting wins over the star.
-    await call("PATCH", `/senders/${PRAG}`, { body: { muted: true } });
+    await setSender(PRAG, { muted: true });
     expect(ids(await call<IssueListResponse>("GET", "/issues"))).toEqual(
       expected.filter((id) => id !== "fx-pragmatic"),
     );
 
-    await call("PATCH", `/senders/${PRAG}`, { body: { muted: false, mustRead: false } });
+    await setSender(PRAG, { muted: false, mustRead: false });
     await star(CASEY, false);
     expect(ids(await call<IssueListResponse>("GET", "/issues"))).toEqual(FIXTURE_NEWSLETTER_IDS);
   });
@@ -341,22 +368,26 @@ describe("API on dev", () => {
     expect(moved.body).toMatchObject({ shelf: "news" });
     expect(await getItem("fx-pragmatic")).toMatchObject({ shelfSetBy: "reader" });
 
-    expect(
-      (await call("PATCH", `/senders/${LENNY}`, { body: { shelf: "learning" } })).body,
-    ).toMatchObject({ shelf: "learning" });
-    expect(await learning()).toEqual(["fx-bytebytego", "fx-lenny"]);
+    expect((await setSender(LENNY, { shelf: "learning" })).body).toMatchObject({
+      shelf: "learning",
+    });
+    // The setting re-shelves Lenny's issue, and the shelf list reads a GSI that lags the write.
+    expect(await eventually(learning, (r) => r.join() === "fx-bytebytego,fx-lenny")).toEqual([
+      "fx-bytebytego",
+      "fx-lenny",
+    ]);
 
     // Sandip's own move beats the sender setting.
-    await call("PATCH", `/senders/${PRAG}`, { body: { shelf: "learning" } });
+    await setSender(PRAG, { shelf: "learning" });
     expect((await getItem("fx-pragmatic"))?.shelf).toBe("news");
 
     // Clearing the setting hands issues back to Claude: unsorted here, so back under News.
-    await call("PATCH", `/senders/${LENNY}`, { body: { shelf: null } });
+    await setSender(LENNY, { shelf: null });
     expect((await getItem("fx-lenny"))?.shelf).toBeUndefined();
     expect(
       (await call<SenderDetailResponse>("GET", `/senders/${LENNY}`)).body.shelf,
     ).toBeUndefined();
-    await call("PATCH", `/senders/${PRAG}`, { body: { shelf: null } });
+    await setSender(PRAG, { shelf: null });
   });
 
   it("settings: kept for the reader, answered whole, a bad zone refused (#184)", async () => {
@@ -420,20 +451,22 @@ describe("API on dev", () => {
       ),
     ).toEqual(["fx-bytebytego", "fx-lenny"]);
 
-    await call("PATCH", `/senders/${LENNY}`, { body: { muted: true } });
+    await setSender(LENNY, { muted: true });
     expect(await list({ sender: `${BBG},${LENNY}`, view: "all" })).toEqual([
       "fx-bytebytego",
       "fx-lenny",
     ]);
     expect(await list({})).not.toContain("fx-lenny");
-    await call("PATCH", `/senders/${LENNY}`, { body: { muted: false } });
+    await setSender(LENNY, { muted: false });
 
     await setSorted("fx-platformer", "news", "Business");
     await setSorted("fx-tldr", "news", "AI");
-    expect(await list({ shelf: "news", topic: "AI,Business" })).toEqual([
-      "fx-platformer",
-      "fx-tldr",
-    ]);
+    expect(
+      await eventually(
+        () => list({ shelf: "news", topic: "AI,Business" }),
+        (r) => r.join() === "fx-platformer,fx-tldr",
+      ),
+    ).toEqual(["fx-platformer", "fx-tldr"]);
   });
 
   it("counts unread issues by sender, shelf and topic", async () => {
@@ -505,7 +538,7 @@ describe("API on dev", () => {
         }),
       );
     }
-    await call("PATCH", `/senders/${CASEY}`, { body: { mustRead: true } });
+    await setSender(CASEY, { mustRead: true });
 
     const r = await eventually(
       () => call<SummaryResponse>("GET", "/summary"),
@@ -517,7 +550,7 @@ describe("API on dev", () => {
     );
     for (const i of r.body.items) expect(i.scoreReason?.length).toBeGreaterThan(0);
     expect(r.body.items.find((i) => i.id === "fx-platformer")?.mustRead).toBe(true);
-    await call("PATCH", `/senders/${CASEY}`, { body: { mustRead: false } });
+    await setSender(CASEY, { mustRead: false });
 
     // Today's digest is the top 5 as first shown, the same on every later call (#5).
     const digest = r.body.digest ?? [];
@@ -596,10 +629,10 @@ describe("API on dev", () => {
     expect(found[0]!.publication.length).toBeGreaterThan(0);
 
     const LENNY = (await getItem("fx-lenny"))!.senderId as string;
-    await call("PATCH", `/senders/${LENNY}`, { body: { muted: true } });
+    await setSender(LENNY, { muted: true });
     const muted = await call<RelatedResponse>("GET", "/issues/fx-tldr/related");
     expect([...muted.body.earlier, ...muted.body.since]).toEqual([]);
-    await call("PATCH", `/senders/${LENNY}`, { body: { muted: false } });
+    await setSender(LENNY, { muted: false });
   });
   it("history: issues read on a day, latest first and once each, with the days around it", async () => {
     for (const id of ["fx-lenny", "fx-tldr", "fx-lenny"]) {
@@ -798,10 +831,10 @@ describe("API on dev", () => {
       ]);
 
       const TLDR = (await getItem("fx-tldr"))!.senderId as string;
-      await call("PATCH", `/senders/${TLDR}`, { body: { muted: true } });
+      await setSender(TLDR, { muted: true });
       const muted = await call<RelatedResponse>("GET", "/issues/fx-lenny/related");
       expect([...muted.body.earlier, ...muted.body.since]).toEqual([]);
-      await call("PATCH", `/senders/${TLDR}`, { body: { muted: false } });
+      await setSender(TLDR, { muted: false });
     } finally {
       await ddb.send(
         new DeleteCommand({ TableName: stack.tableName, Key: devKeys.story("fx-lenny", 1) }),
@@ -1108,7 +1141,7 @@ describe("API on dev", () => {
     // A newsletter's setting re-shelves Jev's stories; clearing it hands them back to Jev.
     await jevStory(1, 0.9);
     await jevStory(2, 0.7);
-    await call("PATCH", `/senders/${BBG}`, { body: { shelf: "news" } });
+    await setSender(BBG, { shelf: "news" });
     expect(await shelves()).toEqual({
       stories: [
         ["news", "sender", "-"],
@@ -1116,7 +1149,7 @@ describe("API on dev", () => {
       ],
       issue: ["news", "stories"],
     });
-    await call("PATCH", `/senders/${BBG}`, { body: { shelf: null } });
+    await setSender(BBG, { shelf: null });
     expect(await shelves()).toEqual({
       stories: [
         ["learning", "jev", "LEARNING"],
