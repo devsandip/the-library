@@ -9,7 +9,7 @@ import { Schedule, ScheduleExpression } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import type { ITopic } from "aws-cdk-lib/aws-sns";
 import { Construct } from "constructs";
-import type { Stage } from "./config.js";
+import { READER_KEYS, type Stage } from "./config.js";
 import { bedrockModels, nodeFunction } from "./functions.js";
 
 export interface IngestProps {
@@ -48,6 +48,7 @@ export class Ingest extends Construct {
         GMAIL_PARAM: param,
         JEV_PARAM: jevParam,
         STAGE: props.stage,
+        READER_KEYS: READER_KEYS[props.stage] ? "1" : "0",
         NODE_OPTIONS: "--enable-source-maps",
       },
     });

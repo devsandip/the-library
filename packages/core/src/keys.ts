@@ -172,3 +172,86 @@ export const s3Keys = (id: string) => ({
   html: `html/${id}.html`,
   text: `text/${id}.txt`,
 });
+
+// ---------- Keys bound to a reader (milestone 13 of docs/features/multi-reader.md) ----------
+
+/** What a reader's partition keys and index partitions start with; nothing for today's keys. */
+export const readerPrefix = (readerId?: string) => (readerId ? `R#${readerId}#` : "");
+
+/** Index partition attributes, the ones a reader's prefix goes on. */
+const INDEX_PK = /^gsi[1-4]pk$/;
+
+/**
+ * Every key, partition and index value bound to a reader: the reader's prefix in front of each
+ * partition key and index partition, sort keys and ids unchanged. Without a reader, today's
+ * keys. `CONFIG/OWNER` and `READER#<id>` items are not a reader's and stay as they are.
+ */
+export function keysFor(readerId?: string) {
+  const p = readerPrefix(readerId);
+  const key = <K extends { pk: string; sk: string }>(k: K): K => ({ ...k, pk: `${p}${k.pk}` });
+  const indexed = <T extends Record<string, unknown>>(attrs: T): T =>
+    Object.fromEntries(
+      Object.entries(attrs).map(([k, v]) => [
+        k,
+        INDEX_PK.test(k) && typeof v === "string" ? p + v : v,
+      ]),
+    ) as T;
+  const issuePk = `${p}ISSUE#`;
+  return {
+    prefix: p,
+    issue: (id: string) => key(issueKey(id)),
+    senderItem: (senderId: string) => key(senderItemKey(senderId)),
+    event: (id: string, at: string, rand: string) => key(eventKey(id, at, rand)),
+    ingestState: key(INGEST_STATE_KEY),
+    narrative: key(NARRATIVE_KEY),
+    nowReading: key(NOW_READING_KEY),
+    tuneup: key(TUNEUP_KEY),
+    topics: key(TOPICS_KEY),
+    interests: key(INTERESTS_KEY),
+    digest: (day: string) => key(digestKey(day)),
+    embedding: (id: string) => key(embeddingKey(id)),
+    story: (id: string, n: number) => key(storyKey(id, n)),
+    timeline: (eventId: string) => key(timelineKey(eventId)),
+    source: (id: string, n: number) => key(sourceKey(id, n)),
+    sourceRun: (id: string, n: number) => key(sourceRunKey(id, n)),
+    takes: (eventId: string) => key(takesKey(eventId)),
+    followingPk: `${p}${FOLLOWING_PK}`,
+    follow: (eventId: string) => key(followKey(eventId)),
+    predictionsPk: `${p}${PREDICTIONS_PK}`,
+    prediction: (issueId: string, k: number) => key(predictionKey(issueId, k)),
+    predictionFromId: (id: string) => {
+      const k = predictionKeyFromId(id);
+      return k && key(k);
+    },
+    highlight: (issueId: string, k: string) => key(highlightKey(issueId, k)),
+    highlightFromId: (id: string) => {
+      const k = highlightKeyFromId(id);
+      return k && key(k);
+    },
+    highlightIndex: (issueId: string, k: string, at: string) =>
+      indexed(highlightIndexAttributes(issueId, k, at)),
+    partition: Object.fromEntries(
+      Object.entries(PARTITION).map(([name, v]) => [name, `${p}${v}`]),
+    ) as { [K in keyof typeof PARTITION]: string },
+    /** A sender's partition in `gsi3`. */
+    senderPartition: (senderId: string) => `${p}SENDER#${senderId}`,
+    issueIndex: (issue: Parameters<typeof issueIndexAttributes>[0]) => {
+      const { set, remove } = issueIndexAttributes(issue);
+      return { set: indexed(set), remove };
+    },
+    openIndex: (id: string, at: string) => indexed(openIndexAttributes(id, at)),
+    senderIndex: (senderId: string, publication: string) =>
+      indexed(senderIndexAttributes(senderId, publication)),
+    /** Any index attributes, with the reader's prefix on their partitions. */
+    indexed,
+    /** An issue's id from one of its items' pk; undefined for anything else. */
+    issueIdOf: (pk: string) => (pk.startsWith(issuePk) ? pk.slice(issuePk.length) : undefined),
+    /** A sender's id from its item's pk; undefined for anything else. */
+    senderIdOf: (pk: string) =>
+      pk.startsWith(`${p}SENDER#`) ? pk.slice(`${p}SENDER#`.length) : undefined,
+    /** Whether a partition key is this reader's (every key is, without a reader). */
+    owns: (pk: string) => pk.startsWith(p),
+  };
+}
+
+export type Keys = ReturnType<typeof keysFor>;
