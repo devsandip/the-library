@@ -12,15 +12,7 @@ import {
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
-import {
-  embeddingKey,
-  issueKey,
-  senderIdentity,
-  senderItemKey,
-  storyIndexAttributes,
-  storyKey,
-  TOPICS_KEY,
-} from "@library/core";
+import { senderIdentity, storyIndexAttributes } from "@library/core";
 import type { Topic } from "@library/core/types";
 import { Bedrock, MODELS } from "../src/bedrock.js";
 import { archiveOldNews, classifyRequest, enrich, parseClassification } from "../src/enrich.js";
@@ -32,6 +24,8 @@ import {
   seedDev,
   wipeDevTable,
   type DevStack,
+  devKeys,
+  devStore,
 } from "../../../scripts/dev-stack.js";
 
 let stack: DevStack;
@@ -65,7 +59,7 @@ const get = (key: Record<string, string>) =>
 
 beforeAll(async () => {
   stack = await devStack();
-  store = new Store(stack.tableName, stack.contentBucket);
+  store = devStore(stack);
   await wipeDevTable(stack);
   await seedDev(stack);
   try {
@@ -87,20 +81,22 @@ describe("enrichment on dev", () => {
   it("without a topic list, embeds every newsletter and waits to sort them", async () => {
     const stats = await enrich(store, bedrock, { sinceIso: since });
     expect(stats).toMatchObject({ checked: 6, embedded: 6, classified: 0, waitingForTopics: 6 });
-    const emb = await get(embeddingKey("fx-bytebytego"));
+    const emb = await get(devKeys.embedding("fx-bytebytego"));
     expect(emb?.dims).toBe(512);
     expect((emb?.vector as Uint8Array).byteLength).toBe(512 * 4);
-    expect((await get(issueKey("fx-bytebytego")))?.embeddedAt).toBeDefined();
+    expect((await get(devKeys.issue("fx-bytebytego")))?.embeddedAt).toBeDefined();
   });
 
   it("with topics, Claude sorts every newsletter within the schema", async (ctx) => {
     if (!haiku) ctx.skip();
-    await ddb.send(new PutCommand({ TableName: stack.tableName, Item: { ...TOPICS_KEY, topics } }));
+    await ddb.send(
+      new PutCommand({ TableName: stack.tableName, Item: { ...devKeys.topics, topics } }),
+    );
     const stats = await enrich(store, bedrock, { sinceIso: since });
     expect(stats).toMatchObject({ classified: 6, accountFiltered: 0, errors: 0 });
     expect(stats.inputTokens).toBeGreaterThan(0);
     for (const id of FIXTURE_NEWSLETTER_IDS) {
-      const i = await get(issueKey(id));
+      const i = await get(devKeys.issue(id));
       expect(i?.summary, id).toMatch(/\S/);
       // Claude is not asked for a shelf: the issue's follows its stories (#81), News until then.
       expect(i?.shelfAuto, id).toBeUndefined();
@@ -148,18 +144,26 @@ describe("enrichment on dev", () => {
 describe("archive rules on dev", () => {
   it("archives a promo once; once Sandip restores it, never again", async () => {
     expect(await store.autoArchive("fx-example", "promo")).toBe(true);
-    const archived = await get(issueKey("fx-example"));
-    expect(archived).toMatchObject({ state: "archived", gsi1pk: "ARCHIVE", autoArchived: "promo" });
+    const archived = await get(devKeys.issue("fx-example"));
+    expect(archived).toMatchObject({
+      state: "archived",
+      gsi1pk: devKeys.partition.archive,
+      autoArchived: "promo",
+    });
     expect(archived?.gsi2pk).toBeUndefined();
     expect(await store.autoArchive("fx-example", "promo")).toBe(false);
 
     await ddb.send(
       new UpdateCommand({
         TableName: stack.tableName,
-        Key: issueKey("fx-example"),
+        Key: devKeys.issue("fx-example"),
         UpdateExpression: "SET #st = :u, gsi1pk = :inbox, gsi2pk = :unread, gsi2sk = gsi1sk",
         ExpressionAttributeNames: { "#st": "state" },
-        ExpressionAttributeValues: { ":u": "unread", ":inbox": "INBOX", ":unread": "UNREAD" },
+        ExpressionAttributeValues: {
+          ":u": "unread",
+          ":inbox": devKeys.partition.inbox,
+          ":unread": devKeys.partition.unread,
+        },
       }),
     );
     expect(await store.autoArchive("fx-example", "promo")).toBe(false);
@@ -172,7 +176,7 @@ describe("archive rules on dev", () => {
       await ddb.send(
         new UpdateCommand({
           TableName: stack.tableName,
-          Key: issueKey(id),
+          Key: devKeys.issue(id),
           UpdateExpression: "SET shelf = :s",
           ExpressionAttributeValues: { ":s": news.includes(id) ? "news" : "learning" },
         }),
@@ -182,25 +186,25 @@ describe("archive rules on dev", () => {
     await ddb.send(
       new UpdateCommand({
         TableName: stack.tableName,
-        Key: senderItemKey(platformer),
+        Key: devKeys.senderItem(platformer),
         UpdateExpression: "SET mustRead = :t",
         ExpressionAttributeValues: { ":t": true },
       }),
     );
     // A craft story inside the TLDR digest (#81): its own state, so the rule leaves it on Learning.
-    const tldr = (await get(issueKey("fx-tldr")))!;
+    const tldr = (await get(devKeys.issue("fx-tldr")))!;
     const craft = { issueId: "fx-tldr", n: 9, receivedAt: tldr.receivedAt as string };
     await ddb.send(
       new PutCommand({
         TableName: stack.tableName,
         Item: {
-          ...storyKey("fx-tldr", 9),
+          ...devKeys.story("fx-tldr", 9),
           id: "fx-tldr",
           n: 9,
           headline: "How caches fail",
           shelf: "learning",
           shelfSetBy: "jev",
-          ...storyIndexAttributes({ ...craft, shelf: "learning" }).set,
+          ...devKeys.indexed(storyIndexAttributes({ ...craft, shelf: "learning" }).set),
         },
       }),
     );
@@ -218,11 +222,13 @@ describe("archive rules on dev", () => {
           .join() === "fx-platformer,fx-tldr",
     );
     expect(await archiveOldNews(store, { now })).toBe(1);
-    expect((await get(issueKey("fx-tldr")))?.autoArchived).toBe("old-news");
-    expect((await get(issueKey("fx-platformer")))?.state).toBe("unread"); // Must Read
-    expect((await get(issueKey("fx-lenny")))?.state).toBe("unread"); // Learning
-    expect((await get(storyKey("fx-tldr", 9)))?.gsi2pk).toBe("LEARNING");
-    await ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: storyKey("fx-tldr", 9) }));
+    expect((await get(devKeys.issue("fx-tldr")))?.autoArchived).toBe("old-news");
+    expect((await get(devKeys.issue("fx-platformer")))?.state).toBe("unread"); // Must Read
+    expect((await get(devKeys.issue("fx-lenny")))?.state).toBe("unread"); // Learning
+    expect((await get(devKeys.story("fx-tldr", 9)))?.gsi2pk).toBe(devKeys.partition.learning);
+    await ddb.send(
+      new DeleteCommand({ TableName: stack.tableName, Key: devKeys.story("fx-tldr", 9) }),
+    );
   });
 
   it("leaves a saved issue alone (#43)", async () => {
@@ -230,11 +236,11 @@ describe("archive rules on dev", () => {
     await ddb.send(
       new UpdateCommand({
         TableName: stack.tableName,
-        Key: issueKey("fx-lenny"),
+        Key: devKeys.issue("fx-lenny"),
         UpdateExpression: "SET savedAt = :at, gsi2pk = :saved, gsi2sk = :sk, shelf = :news",
         ExpressionAttributeValues: {
           ":at": savedAt,
-          ":saved": "SAVED",
+          ":saved": devKeys.partition.saved,
           ":sk": `${savedAt}#fx-lenny`,
           ":news": "news",
         },
@@ -242,15 +248,15 @@ describe("archive rules on dev", () => {
     );
     expect(await store.autoArchive("fx-lenny", "promo")).toBe(false);
     expect(await archiveOldNews(store, { now: Date.parse("2026-10-09T00:00:00.000Z") })).toBe(0);
-    expect((await get(issueKey("fx-lenny")))?.state).toBe("unread");
+    expect((await get(devKeys.issue("fx-lenny")))?.state).toBe("unread");
   });
 });
 
 describe("filing a stored issue as filtered on dev (#50)", () => {
   it("takes it out of every index, deletes its stories and lowers its sender's count", async () => {
     const id = "fx-pragmatic";
-    const issue = (await get(issueKey(id)))!;
-    const senderKey = senderItemKey(issue.senderId as string);
+    const issue = (await get(devKeys.issue(id)))!;
+    const senderKey = devKeys.senderItem(issue.senderId as string);
     const count = (await get(senderKey))?.issueCount as number;
     await store.putStories(
       { id, senderId: issue.senderId as string, receivedAt: issue.receivedAt as string },
@@ -267,18 +273,18 @@ describe("filing a stored issue as filtered on dev (#50)", () => {
     );
 
     expect(await store.fileAsFiltered(id, "account", "claude")).toBe(true);
-    const filtered = await get(issueKey(id));
+    const filtered = await get(devKeys.issue(id));
     expect(filtered).toMatchObject({ state: "filtered", filterReason: "account" });
     for (const a of ["gsi1pk", "gsi1sk", "gsi2pk", "gsi2sk", "gsi3pk", "gsi3sk"]) {
       expect(filtered?.[a], a).toBeUndefined();
     }
     expect((await get(senderKey))?.issueCount).toBe(count - 1);
-    expect(await get(storyKey(id, 1))).toBeUndefined();
+    expect(await get(devKeys.story(id, 1))).toBeUndefined();
     const events = await ddb.send(
       new QueryCommand({
         TableName: stack.tableName,
         KeyConditionExpression: "pk = :pk AND begins_with(sk, :evt)",
-        ExpressionAttributeValues: { ":pk": issueKey(id).pk, ":evt": "EVT#" },
+        ExpressionAttributeValues: { ":pk": devKeys.issue(id).pk, ":evt": "EVT#" },
       }),
     );
     expect(events.Items).toContainEqual(
@@ -300,12 +306,12 @@ describe("filing a stored issue as filtered on dev (#50)", () => {
     await ddb.send(
       new UpdateCommand({
         TableName: stack.tableName,
-        Key: issueKey("fx-bytebytego"),
+        Key: devKeys.issue("fx-bytebytego"),
         UpdateExpression: "SET rating = :r, ratedAt = :at",
         ExpressionAttributeValues: { ":r": 1, ":at": "2026-10-02T00:00:00.000Z" },
       }),
     );
     expect(await store.fileAsFiltered("fx-bytebytego", "account", "rule")).toBe(false);
-    expect((await get(issueKey("fx-bytebytego")))?.state).not.toBe("filtered");
+    expect((await get(devKeys.issue("fx-bytebytego")))?.state).not.toBe("filtered");
   });
 });

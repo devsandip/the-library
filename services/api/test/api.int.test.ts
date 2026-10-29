@@ -7,29 +7,15 @@ import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { DeleteCommand, GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
-  embeddingKey,
-  eventKey,
-  followKey,
-  INTERESTS_KEY,
-  issueIndexAttributes,
-  issueKey,
-  NARRATIVE_KEY,
-  openIndexAttributes,
   readerDay,
   senderIdentity,
   shelfFor,
   storyIndexAttributes,
-  storyKey,
   sourceKey,
   sourceRunKey,
-  predictionKey,
-  senderIndexAttributes,
-  senderItemKey,
   storyRef,
   takesKey,
   timelineKey,
-  TOPICS_KEY,
-  TUNEUP_KEY,
   vectorBytes,
 } from "@library/core";
 import type { ReaderSettings } from "@library/core/settings";
@@ -69,6 +55,8 @@ import {
   wipeDevTable,
   FIXTURE_NEWSLETTER_IDS,
   type DevStack,
+  devKeys,
+  INT_READER,
 } from "../../../scripts/dev-stack.js";
 import { TitanEmbedder } from "../src/embed.js";
 
@@ -79,7 +67,8 @@ const BBG = senderIdentity("bytebytego@substack.com", "").senderId;
 async function call<T = unknown>(
   method: string,
   path: string,
-  opts: { query?: Record<string, string>; body?: unknown } = {},
+  /** `sub`: another reader than the tests' own (#198). */
+  opts: { query?: Record<string, string>; body?: unknown; sub?: string } = {},
 ): Promise<{ status: number; body: T }> {
   const event = {
     version: "2.0",
@@ -91,7 +80,7 @@ async function call<T = unknown>(
     isBase64Encoded: false,
     requestContext: {
       http: { method, path: `/nutgraf/api${path}` },
-      authorizer: { jwt: { claims: { sub: "int-test" }, scopes: [] } },
+      authorizer: { jwt: { claims: { sub: opts.sub ?? INT_READER.id }, scopes: [] } },
     },
   };
   const res = await lambda.send(
@@ -133,7 +122,9 @@ const ids = (r: { body: IssueListResponse }) => r.body.items.map((i) => i.id);
 const ddb = docClient();
 const getItem = (id: string) =>
   ddb
-    .send(new GetCommand({ TableName: stack.tableName, Key: issueKey(id), ConsistentRead: true }))
+    .send(
+      new GetCommand({ TableName: stack.tableName, Key: devKeys.issue(id), ConsistentRead: true }),
+    )
     .then((r) => r.Item);
 
 /** Claude's call on an issue, written the way enrichment writes it. */
@@ -141,7 +132,7 @@ const setSorted = (id: string, shelf: string, topic: string) =>
   ddb.send(
     new UpdateCommand({
       TableName: stack.tableName,
-      Key: issueKey(id),
+      Key: devKeys.issue(id),
       UpdateExpression: "SET shelf = :s, shelfAuto = :s, shelfSetBy = :by, topic = :t",
       ExpressionAttributeValues: { ":s": shelf, ":by": "claude", ":t": topic },
     }),
@@ -182,7 +173,7 @@ describe("API on dev", () => {
     expect(pages).toBe(2);
 
     const forged = Buffer.from(
-      JSON.stringify({ pk: "x", sk: "y", gsi1pk: "ARCHIVE", gsi1sk: "z" }),
+      JSON.stringify({ pk: "x", sk: "y", gsi1pk: devKeys.partition.archive, gsi1sk: "z" }),
     ).toString("base64url");
     expect((await call("GET", "/issues", { query: { view: "all", cursor: forged } })).status).toBe(
       400,
@@ -374,7 +365,9 @@ describe("API on dev", () => {
 
   it("serves the topic list Claude proposed", async () => {
     const topics = [{ name: "AI", description: "Models and tools" }];
-    await ddb.send(new PutCommand({ TableName: stack.tableName, Item: { ...TOPICS_KEY, topics } }));
+    await ddb.send(
+      new PutCommand({ TableName: stack.tableName, Item: { ...devKeys.topics, topics } }),
+    );
     expect((await call<TopicListResponse>("GET", "/topics")).body.topics).toEqual(topics);
   });
 
@@ -447,7 +440,7 @@ describe("API on dev", () => {
     const age = async (id: string, hours: number) => {
       const item = (await getItem(id))!;
       const receivedAt = new Date(Date.now() - hours * 3_600_000).toISOString();
-      const idx = issueIndexAttributes({
+      const idx = devKeys.issueIndex({
         id,
         senderId: item.senderId as string,
         receivedAt,
@@ -458,7 +451,7 @@ describe("API on dev", () => {
       await ddb.send(
         new UpdateCommand({
           TableName: stack.tableName,
-          Key: issueKey(id),
+          Key: devKeys.issue(id),
           UpdateExpression: `SET ${keys.map((_, i) => `#a${i} = :a${i}`).join(", ")}`,
           ExpressionAttributeNames: Object.fromEntries(keys.map((k, i) => [`#a${i}`, k])),
           ExpressionAttributeValues: Object.fromEntries(keys.map((k, i) => [`:a${i}`, set[k]])),
@@ -480,7 +473,7 @@ describe("API on dev", () => {
       new PutCommand({
         TableName: stack.tableName,
         Item: {
-          ...INTERESTS_KEY,
+          ...devKeys.interests,
           interests: ["tech", "startups", "AI", "product", "systems"].map((name, i) => ({
             name,
             text: name,
@@ -496,7 +489,7 @@ describe("API on dev", () => {
       await ddb.send(
         new PutCommand({
           TableName: stack.tableName,
-          Item: { ...embeddingKey(id), vector: axis(i) },
+          Item: { ...devKeys.embedding(id), vector: axis(i) },
         }),
       );
     }
@@ -544,7 +537,7 @@ describe("API on dev", () => {
         new PutCommand({
           TableName: stack.tableName,
           Item: {
-            ...NARRATIVE_KEY,
+            ...devKeys.narrative,
             at,
             threads: [thread],
             stories: 9,
@@ -577,7 +570,10 @@ describe("API on dev", () => {
       ["fx-pragmatic", vector([9, 1])],
     ] as const) {
       await ddb.send(
-        new PutCommand({ TableName: stack.tableName, Item: { ...embeddingKey(id), vector: v } }),
+        new PutCommand({
+          TableName: stack.tableName,
+          Item: { ...devKeys.embedding(id), vector: v },
+        }),
       );
     }
     const r = await call<RelatedResponse>("GET", "/issues/fx-tldr/related");
@@ -637,9 +633,9 @@ describe("API on dev", () => {
       new PutCommand({
         TableName: stack.tableName,
         Item: {
-          ...eventKey("fx-pragmatic", at, "inttest1"),
+          ...devKeys.event("fx-pragmatic", at, "inttest1"),
           type: "open",
-          ...openIndexAttributes("fx-pragmatic", at),
+          ...devKeys.openIndex("fx-pragmatic", at),
         },
       }),
     );
@@ -659,7 +655,7 @@ describe("API on dev", () => {
       ddb.send(
         new UpdateCommand({
           TableName: stack.tableName,
-          Key: issueKey("fx-pragmatic"),
+          Key: devKeys.issue("fx-pragmatic"),
           UpdateExpression: "SET #st = :s",
           ExpressionAttributeNames: { "#st": "state" },
           ExpressionAttributeValues: { ":s": state },
@@ -681,7 +677,7 @@ describe("API on dev", () => {
         new PutCommand({
           TableName: stack.tableName,
           Item: {
-            ...storyKey("fx-tldr", n),
+            ...devKeys.story("fx-tldr", n),
             id: "fx-tldr",
             n,
             senderId: tldr.senderId,
@@ -691,7 +687,7 @@ describe("API on dev", () => {
             names,
             vector: vectorBytes(vector),
             dims: vector.length,
-            gsi1pk: "STORIES",
+            gsi1pk: devKeys.partition.stories,
             gsi1sk: `${tldr.receivedAt as string}#${storyRef("fx-tldr", n)}`,
           },
         }),
@@ -754,7 +750,7 @@ describe("API on dev", () => {
       new PutCommand({
         TableName: stack.tableName,
         Item: {
-          ...storyKey("fx-lenny", 1),
+          ...devKeys.story("fx-lenny", 1),
           id: "fx-lenny",
           n: 1,
           senderId: lenny.senderId,
@@ -764,7 +760,7 @@ describe("API on dev", () => {
           names: ["OpenAI"],
           vector: vectorBytes(vector),
           dims: vector.length,
-          gsi1pk: "STORIES",
+          gsi1pk: devKeys.partition.stories,
           gsi1sk: `${lenny.receivedAt as string}#${storyRef("fx-lenny", 1)}`,
         },
       }),
@@ -796,7 +792,7 @@ describe("API on dev", () => {
       await call("PATCH", `/senders/${TLDR}`, { body: { muted: false } });
     } finally {
       await ddb.send(
-        new DeleteCommand({ TableName: stack.tableName, Key: storyKey("fx-lenny", 1) }),
+        new DeleteCommand({ TableName: stack.tableName, Key: devKeys.story("fx-lenny", 1) }),
       );
     }
   });
@@ -830,7 +826,7 @@ describe("API on dev", () => {
         new PutCommand({
           TableName: stack.tableName,
           Item: {
-            ...storyKey(id, 1),
+            ...devKeys.story(id, 1),
             id,
             n: 1,
             senderId: issue.senderId,
@@ -841,7 +837,7 @@ describe("API on dev", () => {
             eventId: eventId ?? storyRef(id, 1),
             vector: vectorBytes(vector),
             dims: vector.length,
-            gsi1pk: "STORIES",
+            gsi1pk: devKeys.partition.stories,
             gsi1sk: `${issue.receivedAt as string}#${storyRef(id, 1)}`,
           },
         }),
@@ -874,7 +870,7 @@ describe("API on dev", () => {
     } finally {
       await Promise.all([
         ...steps.map(([id]) =>
-          ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: storyKey(id, 1) })),
+          ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: devKeys.story(id, 1) })),
         ),
         ddb.send(
           new DeleteCommand({
@@ -995,7 +991,7 @@ describe("API on dev", () => {
         new PutCommand({
           TableName: stack.tableName,
           Item: {
-            ...storyKey("fx-tldr", n),
+            ...devKeys.story("fx-tldr", n),
             n,
             headline,
             summary: `What story ${n} says.`,
@@ -1037,7 +1033,7 @@ describe("API on dev", () => {
         new PutCommand({
           TableName: stack.tableName,
           Item: {
-            ...storyKey(id, n),
+            ...devKeys.story(id, n),
             id,
             n,
             receivedAt,
@@ -1049,7 +1045,7 @@ describe("API on dev", () => {
             shelf,
             shelfSetBy: "jev",
             learning,
-            ...storyIndexAttributes({ issueId: id, n, receivedAt, shelf }).set,
+            ...devKeys.indexed(storyIndexAttributes({ issueId: id, n, receivedAt, shelf }).set),
           },
         }),
       );
@@ -1059,7 +1055,7 @@ describe("API on dev", () => {
         .send(
           new GetCommand({
             TableName: stack.tableName,
-            Key: storyKey(id, n),
+            Key: devKeys.story(id, n),
             ConsistentRead: true,
           }),
         )
@@ -1067,7 +1063,11 @@ describe("API on dev", () => {
     const shelves = async () => {
       const [a, b, issue] = await Promise.all([story(1), story(2), getItem(id)]);
       return {
-        stories: [a, b].map((s) => [s.shelf, s.shelfSetBy, s.gsi2pk ?? "-"]),
+        stories: [a, b].map((s) => [
+          s.shelf,
+          s.shelfSetBy,
+          s.gsi2pk === devKeys.partition.learning ? "LEARNING" : (s.gsi2pk ?? "-"),
+        ]),
         issue: [issue!.shelf, issue!.shelfSetBy],
       };
     };
@@ -1115,7 +1115,7 @@ describe("API on dev", () => {
 
     await Promise.all(
       [1, 2].map((n) =>
-        ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: storyKey(id, n) })),
+        ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: devKeys.story(id, n) })),
       ),
     );
   });
@@ -1128,7 +1128,7 @@ describe("API on dev", () => {
         new PutCommand({
           TableName: stack.tableName,
           Item: {
-            ...storyKey(id, n),
+            ...devKeys.story(id, n),
             id,
             n,
             senderId: (await getItem(id))!.senderId,
@@ -1141,11 +1141,13 @@ describe("API on dev", () => {
             shelf,
             shelfSetBy: "jev",
             learning: shelf === "learning" ? 0.8 : 0.2,
-            gsi1pk: "STORIES",
+            gsi1pk: devKeys.partition.stories,
             gsi1sk: `${receivedAt}#${storyRef(id, n)}`,
             ...(state ? { state } : {}),
-            ...storyIndexAttributes({ issueId: id, n, receivedAt, shelf, state: state as never })
-              .set,
+            ...devKeys.indexed(
+              storyIndexAttributes({ issueId: id, n, receivedAt, shelf, state: state as never })
+                .set,
+            ),
           },
         }),
       );
@@ -1153,7 +1155,9 @@ describe("API on dev", () => {
     // The stories test left two unshelved stories on fx-tldr.
     await Promise.all(
       [1, 2].map((n) =>
-        ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: storyKey("fx-tldr", n) })),
+        ddb.send(
+          new DeleteCommand({ TableName: stack.tableName, Key: devKeys.story("fx-tldr", n) }),
+        ),
       ),
     );
     // fx-tldr (AI) holds one craft story among news; fx-bytebytego (Engineering) is all craft.
@@ -1231,7 +1235,7 @@ describe("API on dev", () => {
         ddb.send(
           new DeleteCommand({
             TableName: stack.tableName,
-            Key: storyKey(id as string, n as number),
+            Key: devKeys.story(id as string, n as number),
           }),
         ),
       ),
@@ -1248,7 +1252,7 @@ describe("API on dev", () => {
         new PutCommand({
           TableName: stack.tableName,
           Item: {
-            ...storyKey("fx-tldr", n),
+            ...devKeys.story("fx-tldr", n),
             id: "fx-tldr",
             n,
             senderId: tldr.senderId,
@@ -1258,7 +1262,7 @@ describe("API on dev", () => {
             names,
             vector: vectorBytes(vector),
             dims: vector.length,
-            gsi1pk: "STORIES",
+            gsi1pk: devKeys.partition.stories,
             gsi1sk: `${tldr.receivedAt as string}#${storyRef("fx-tldr", n)}`,
           },
         }),
@@ -1301,7 +1305,9 @@ describe("API on dev", () => {
 
     await Promise.all(
       [31, 32].map((n) =>
-        ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: storyKey("fx-tldr", n) })),
+        ddb.send(
+          new DeleteCommand({ TableName: stack.tableName, Key: devKeys.story("fx-tldr", n) }),
+        ),
       ),
     );
   });
@@ -1322,7 +1328,7 @@ describe("API on dev", () => {
         new PutCommand({
           TableName: stack.tableName,
           Item: {
-            ...storyKey(id, n),
+            ...devKeys.story(id, n),
             id,
             n,
             senderId: issue.senderId,
@@ -1333,7 +1339,7 @@ describe("API on dev", () => {
             eventId,
             vector: vectorBytes(vector),
             dims: vector.length,
-            gsi1pk: "STORIES",
+            gsi1pk: devKeys.partition.stories,
             gsi1sk: `${issue.receivedAt as string}#${storyRef(id, n)}`,
           },
         }),
@@ -1380,7 +1386,7 @@ describe("API on dev", () => {
 
     await Promise.all([
       ...["fx-tldr", "fx-platformer", "fx-lenny"].map((id) =>
-        ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: storyKey(id, 41) })),
+        ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: devKeys.story(id, 41) })),
       ),
       ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: takesKey("int-ipo") })),
     ]);
@@ -1393,7 +1399,7 @@ describe("API on dev", () => {
         new PutCommand({
           TableName: stack.tableName,
           Item: {
-            ...storyKey("fx-tldr", n),
+            ...devKeys.story("fx-tldr", n),
             id: "fx-tldr",
             n,
             senderId: tldr.senderId,
@@ -1453,7 +1459,9 @@ describe("API on dev", () => {
 
     await Promise.all([
       ...[51, 52].map((n) =>
-        ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: storyKey("fx-tldr", n) })),
+        ddb.send(
+          new DeleteCommand({ TableName: stack.tableName, Key: devKeys.story("fx-tldr", n) }),
+        ),
       ),
       ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: sourceKey("fx-tldr", 51) })),
       ...[51, 52].map((n) =>
@@ -1466,7 +1474,7 @@ describe("API on dev", () => {
 
   it("predictions: listed open, settled, overruled, a newsletter's record, handed back (#140)", async () => {
     const tldr = (await getItem("fx-tldr"))!;
-    const key = predictionKey("fx-tldr", 1);
+    const key = devKeys.prediction("fx-tldr", 1);
     await ddb.send(
       new PutCommand({
         TableName: stack.tableName,
@@ -1545,7 +1553,7 @@ describe("API on dev", () => {
       new PutCommand({
         TableName: stack.tableName,
         Item: {
-          ...storyKey("fx-platformer", 1),
+          ...devKeys.story("fx-platformer", 1),
           id: "fx-platformer",
           n: 1,
           senderId: platformer.senderId,
@@ -1601,7 +1609,7 @@ describe("API on dev", () => {
       await ddb.send(
         new UpdateCommand({
           TableName: stack.tableName,
-          Key: followKey(eventId),
+          Key: devKeys.follow(eventId),
           UpdateExpression: "SET points = list_append(points, :p), movedAt = :m",
           ExpressionAttributeValues: { ":p": [move], ":m": move.at },
         }),
@@ -1619,9 +1627,9 @@ describe("API on dev", () => {
     } finally {
       await Promise.all([
         ddb.send(
-          new DeleteCommand({ TableName: stack.tableName, Key: storyKey("fx-platformer", 1) }),
+          new DeleteCommand({ TableName: stack.tableName, Key: devKeys.story("fx-platformer", 1) }),
         ),
-        ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: followKey(eventId) })),
+        ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: devKeys.follow(eventId) })),
       ]);
     }
   });
@@ -1651,10 +1659,10 @@ describe("API on dev", () => {
       { id: "int-aud-a1", at: ago(1) },
     ];
     const keys = [
-      ...senders.map((x) => senderItemKey(x.id)),
-      ...issues.map((i) => issueKey(i.id)),
-      ...stories.map((x) => storyKey(x.id, 1)),
-      ...opens.map((o, k) => eventKey(o.id, o.at, `audit${k}`)),
+      ...senders.map((x) => devKeys.senderItem(x.id)),
+      ...issues.map((i) => devKeys.issue(i.id)),
+      ...stories.map((x) => devKeys.story(x.id, 1)),
+      ...opens.map((o, k) => devKeys.event(o.id, o.at, `audit${k}`)),
     ];
     try {
       for (const x of senders) {
@@ -1662,7 +1670,7 @@ describe("API on dev", () => {
           new PutCommand({
             TableName: stack.tableName,
             Item: {
-              ...senderItemKey(x.id),
+              ...devKeys.senderItem(x.id),
               senderId: x.id,
               senderKey: `${x.publication.toLowerCase()}@audit.example.test`,
               publication: x.publication,
@@ -1673,7 +1681,7 @@ describe("API on dev", () => {
               issueCount: 4,
               lastSeenAt: ago(1),
               ...(x.unsub ? { unsubscribeUrl: x.unsub } : {}),
-              ...senderIndexAttributes(x.id, x.publication),
+              ...devKeys.senderIndex(x.id, x.publication),
             },
           }),
         );
@@ -1685,7 +1693,7 @@ describe("API on dev", () => {
           new PutCommand({
             TableName: stack.tableName,
             Item: {
-              ...issueKey(i.id),
+              ...devKeys.issue(i.id),
               id: i.id,
               senderId: i.senderId,
               publication: senders.find((x) => x.id === i.senderId)!.publication,
@@ -1693,7 +1701,7 @@ describe("API on dev", () => {
               receivedAt,
               state: "unread",
               ...rated,
-              ...issueIndexAttributes({
+              ...devKeys.issueIndex({
                 id: i.id,
                 senderId: i.senderId,
                 receivedAt,
@@ -1710,7 +1718,7 @@ describe("API on dev", () => {
           new PutCommand({
             TableName: stack.tableName,
             Item: {
-              ...storyKey(x.id, 1),
+              ...devKeys.story(x.id, 1),
               id: x.id,
               n: 1,
               senderId: x.senderId,
@@ -1719,7 +1727,7 @@ describe("API on dev", () => {
               summary: "",
               names: [],
               eventId: x.eventId,
-              gsi1pk: "STORIES",
+              gsi1pk: devKeys.partition.stories,
               gsi1sk: `${receivedAt}#${storyRef(x.id, 1)}`,
             },
           }),
@@ -1730,9 +1738,9 @@ describe("API on dev", () => {
           new PutCommand({
             TableName: stack.tableName,
             Item: {
-              ...eventKey(o.id, o.at, `audit${k}`),
+              ...devKeys.event(o.id, o.at, `audit${k}`),
               type: "open",
-              ...openIndexAttributes(o.id, o.at),
+              ...devKeys.openIndex(o.id, o.at),
             },
           }),
         );
@@ -1796,17 +1804,17 @@ describe("API on dev", () => {
     ];
     const proposal = `${alpha}.learning`;
     const keys = [
-      senderItemKey(alpha),
-      issueKey(id),
-      ...promos.map((p) => issueKey(p.id)),
-      ...ns.map((n) => storyKey(id, n)),
+      devKeys.senderItem(alpha),
+      devKeys.issue(id),
+      ...promos.map((p) => devKeys.issue(p.id)),
+      ...ns.map((n) => devKeys.story(id, n)),
     ];
     try {
       await ddb.send(
         new PutCommand({
           TableName: stack.tableName,
           Item: {
-            ...senderItemKey(alpha),
+            ...devKeys.senderItem(alpha),
             senderId: alpha,
             senderKey: "alpha@tuneup.example.test",
             publication,
@@ -1816,7 +1824,7 @@ describe("API on dev", () => {
             down: 0,
             issueCount: 3,
             lastSeenAt: receivedAt,
-            ...senderIndexAttributes(alpha, publication),
+            ...devKeys.senderIndex(alpha, publication),
           },
         }),
       );
@@ -1826,7 +1834,7 @@ describe("API on dev", () => {
           new PutCommand({
             TableName: stack.tableName,
             Item: {
-              ...issueKey(x.id),
+              ...devKeys.issue(x.id),
               id: x.id,
               senderId: alpha,
               publication,
@@ -1834,8 +1842,7 @@ describe("API on dev", () => {
               receivedAt,
               state: x.state,
               ...promo,
-              ...issueIndexAttributes({ id: x.id, senderId: alpha, receivedAt, state: x.state })
-                .set,
+              ...devKeys.issueIndex({ id: x.id, senderId: alpha, receivedAt, state: x.state }).set,
             },
           }),
         );
@@ -1846,7 +1853,7 @@ describe("API on dev", () => {
           new PutCommand({
             TableName: stack.tableName,
             Item: {
-              ...storyKey(id, n),
+              ...devKeys.story(id, n),
               id,
               n,
               senderId: alpha,
@@ -1857,9 +1864,9 @@ describe("API on dev", () => {
               shelf,
               shelfSetBy: "jev",
               learning: learning(n),
-              gsi1pk: "STORIES",
+              gsi1pk: devKeys.partition.stories,
               gsi1sk: `${receivedAt}#${storyRef(id, n)}`,
-              ...storyIndexAttributes({ issueId: id, n, receivedAt, shelf }).set,
+              ...devKeys.indexed(storyIndexAttributes({ issueId: id, n, receivedAt, shelf }).set),
             },
           }),
         );
@@ -1921,7 +1928,7 @@ describe("API on dev", () => {
         .send(
           new UpdateCommand({
             TableName: stack.tableName,
-            Key: TUNEUP_KEY,
+            Key: devKeys.tuneup,
             UpdateExpression: "REMOVE dismissed.#id",
             ConditionExpression: "attribute_exists(dismissed)",
             ExpressionAttributeNames: { "#id": proposal },
@@ -2007,5 +2014,71 @@ describe("API on dev", () => {
     } finally {
       await Promise.all(made.map((id) => call("DELETE", `/highlights/${id}`)));
     }
+  });
+});
+
+describe("two readers on dev (#198)", () => {
+  /** A second reader: signed in, with nothing of their own. */
+  const other = { sub: "int-test-other" };
+  const theirs = "fx-bytebytego";
+
+  it("a second reader's library is empty: lists, senders, counts, history, highlights", async () => {
+    for (const view of ["unread", "all", "archived", "saved"]) {
+      const r = await call<IssueListResponse>("GET", "/issues", { ...other, query: { view } });
+      expect(r.status).toBe(200);
+      expect(r.body.items).toEqual([]);
+    }
+    expect((await call<{ items: unknown[] }>("GET", "/learning", other)).body.items).toEqual([]);
+    expect((await call<SenderListResponse>("GET", "/senders", other)).body.items).toEqual([]);
+    const counts = (await call<UnreadCountsResponse>("GET", "/unread-counts", other)).body;
+    expect(JSON.stringify(counts)).not.toMatch(/[1-9]/);
+    expect((await call<HistoryResponse>("GET", "/history", other)).body.items).toEqual([]);
+    expect((await call<{ items: unknown[] }>("GET", "/highlights", other)).body.items).toEqual([]);
+    expect((await call<NowReadingResponse>("GET", "/now-reading", other)).body).toEqual({});
+    expect((await call<{ topics: unknown[] }>("GET", "/topics", other)).body.topics).toEqual([]);
+    // The first reader's library is still whole.
+    expect(
+      ids(await call<IssueListResponse>("GET", "/issues", { query: { view: "all" } })),
+    ).toContain(theirs);
+  });
+
+  it("cannot read or change the first reader's issue, sender or story by id", async () => {
+    expect((await call("GET", `/issues/${theirs}`, other)).status).toBe(404);
+    expect(
+      (await call("PATCH", `/issues/${theirs}`, { ...other, body: { state: "archived" } })).status,
+    ).toBe(404);
+    expect(
+      (await call("POST", `/issues/${theirs}/highlights`, { ...other, body: { exact: "AI" } }))
+        .status,
+    ).toBe(404);
+    const sender = senderIdentity("bytebytego@substack.com", "").senderId;
+    expect(
+      (await call("PATCH", `/senders/${sender}`, { ...other, body: { muted: true } })).status,
+    ).toBe(404);
+    const mine = await call<IssueDetailResponse>("GET", `/issues/${theirs}`);
+    expect(mine.status).toBe(200);
+    expect(mine.body.state).not.toBe("archived");
+    const senders = (await call<SenderListResponse>("GET", "/senders")).body.items;
+    expect(senders.find((s) => s.senderId === sender)?.muted).toBeFalsy();
+  });
+
+  it("searches only their own newsletters", async () => {
+    const q = { q: "Discord messages" };
+    expect(
+      (await call<SearchResponse>("GET", "/search", { query: q })).body.items.length,
+    ).toBeGreaterThan(0);
+    expect(
+      (await call<SearchResponse>("GET", "/search", { ...other, query: q })).body.items,
+    ).toEqual([]);
+  });
+
+  it("keeps settings apart", async () => {
+    await call("PATCH", "/settings", { ...other, body: { timeZone: "Europe/London" } });
+    expect((await call<ReaderSettings>("GET", "/settings", other)).body.timeZone).toBe(
+      "Europe/London",
+    );
+    expect((await call<ReaderSettings>("GET", "/settings")).body.timeZone).not.toBe(
+      "Europe/London",
+    );
   });
 });

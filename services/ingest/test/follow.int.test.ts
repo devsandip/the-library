@@ -5,15 +5,7 @@
  */
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
-import {
-  EMBED_DIMENSIONS,
-  followKey,
-  issueKey,
-  storyKey,
-  storyRef,
-  vectorBytes,
-  type StoredFollow,
-} from "@library/core";
+import { EMBED_DIMENSIONS, storyRef, vectorBytes, type StoredFollow } from "@library/core";
 import type { ModelPort, ToolRequest } from "../src/bedrock.js";
 import { checkFollows } from "../src/follow.js";
 import { Store } from "../src/store.js";
@@ -24,6 +16,8 @@ import {
   seedDev,
   wipeDevTable,
   type DevStack,
+  devKeys,
+  devStore,
 } from "../../../scripts/dev-stack.js";
 
 let stack: DevStack;
@@ -50,7 +44,7 @@ const axis = (i: number) => Array.from({ length: EMBED_DIMENSIONS }, (_, k) => (
 
 beforeAll(async () => {
   stack = await devStack();
-  store = new Store(stack.tableName, stack.contentBucket);
+  store = devStore(stack);
   await wipeDevTable(stack);
   await seedDev(stack);
 });
@@ -59,12 +53,12 @@ describe("following on dev", () => {
   it("adds a move to a follow, remembers what it read, and asks nothing twice", async () => {
     const [followed, close, far] = FIXTURE_NEWSLETTER_IDS as [string, string, string];
     const putStory = async (id: string, receivedAt: string, vector: number[], headline: string) => {
-      const issue = (await get(issueKey(id)))!;
+      const issue = (await get(devKeys.issue(id)))!;
       await ddb.send(
         new PutCommand({
           TableName: stack.tableName,
           Item: {
-            ...storyKey(id, 1),
+            ...devKeys.story(id, 1),
             id,
             n: 1,
             senderId: issue.senderId,
@@ -75,7 +69,7 @@ describe("following on dev", () => {
             eventId: storyRef(id, 1),
             vector: vectorBytes(vector),
             dims: vector.length,
-            gsi1pk: "STORIES",
+            gsi1pk: devKeys.partition.stories,
             gsi1sk: `${receivedAt}#${storyRef(id, 1)}`,
           },
         }),
@@ -110,7 +104,7 @@ describe("following on dev", () => {
       checked: [],
     };
     await ddb.send(
-      new PutCommand({ TableName: stack.tableName, Item: { ...followKey(eventId), ...f } }),
+      new PutCommand({ TableName: stack.tableName, Item: { ...devKeys.follow(eventId), ...f } }),
     );
 
     const now = Date.parse("2026-10-20T12:00:00.000Z");
@@ -139,7 +133,7 @@ describe("following on dev", () => {
     const stats = await checkFollows(store, model, { now });
     expect(stats).toMatchObject({ follows: 1, candidates: 1, moves: 1 });
     expect(calls[0]!.user).toContain(`${closeIssue.publication as string} | Musk lifts the cap.`);
-    const kept = (await get(followKey(eventId)))!;
+    const kept = (await get(devKeys.follow(eventId)))!;
     expect(kept.points).toEqual([
       ...f.points,
       {
@@ -161,6 +155,6 @@ describe("following on dev", () => {
 
     // A follow gone while the check ran is not written back.
     await store.addMoves("gone#01", [], ["x#01"]);
-    expect(await get(followKey("gone#01"))).toBeUndefined();
+    expect(await get(devKeys.follow("gone#01"))).toBeUndefined();
   });
 });

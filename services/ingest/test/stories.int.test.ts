@@ -4,7 +4,7 @@
  */
 import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
-import { issueKey, storyKey, storyText, toVector } from "@library/core";
+import { storyText, toVector } from "@library/core";
 import type { ModelPort } from "../src/bedrock.js";
 import { Store } from "../src/store.js";
 import { indexStories, relinkStories } from "../src/stories.js";
@@ -15,6 +15,8 @@ import {
   seedDev,
   wipeDevTable,
   type DevStack,
+  devKeys,
+  devStore,
 } from "../../../scripts/dev-stack.js";
 
 let stack: DevStack;
@@ -45,7 +47,7 @@ const model: ModelPort = {
 
 beforeAll(async () => {
   stack = await devStack();
-  store = new Store(stack.tableName, stack.contentBucket);
+  store = devStore(stack);
   await wipeDevTable(stack);
   await seedDev(stack);
 });
@@ -63,12 +65,12 @@ describe("story index on dev", () => {
     expect(stored[0]!.vector).toHaveLength(512);
 
     const id = FIXTURE_NEWSLETTER_IDS[0]!;
-    const item = await get(storyKey(id, 1));
+    const item = await get(devKeys.story(id, 1));
     const html = await store.getHtml(id);
     expect(item).toMatchObject({ headline: "Acme ships a thing", names: ["Acme"], n: 1 });
     expect(item?.link).toBe(html ? storyText(html).links[0] : undefined);
     expect(toVector(item!.vector as Uint8Array)[7]).toBe(1);
-    expect(await get(issueKey(id))).toMatchObject({ storyCount: 1 });
+    expect(await get(devKeys.issue(id))).toMatchObject({ storyCount: 1 });
 
     const again = await indexStories(store, model, { sinceIso: since });
     expect(again).toMatchObject({ checked: 0, storied: 0 });
@@ -78,8 +80,8 @@ describe("story index on dev", () => {
     const id = FIXTURE_NEWSLETTER_IDS[1]!;
     await store.putStoryError(id, "first");
     await store.putStoryError(id, "second");
-    expect(await get(issueKey(id))).toMatchObject({ storyAttempts: 2, storyError: "second" });
-    const meta = (await get(issueKey(id)))!;
+    expect(await get(devKeys.issue(id))).toMatchObject({ storyAttempts: 2, storyError: "second" });
+    const meta = (await get(devKeys.issue(id)))!;
     const issue = { id, senderId: meta.senderId as string, receivedAt: meta.receivedAt as string };
     const story = (n: number, headline: string) => ({
       n,
@@ -90,43 +92,43 @@ describe("story index on dev", () => {
       eventId: `${id}#0${n}`,
     });
     await store.putStories(issue, [story(1, "One"), story(2, "Two")]);
-    const after = (await get(issueKey(id)))!;
+    const after = (await get(devKeys.issue(id)))!;
     expect(after.storyAttempts).toBeUndefined();
     expect(after.storyError).toBeUndefined();
 
     // A redo with fewer stories drops the ones no longer there.
     await store.putStories(issue, [story(1, "Only")]);
-    expect(await get(storyKey(id, 2))).toBeUndefined();
-    expect(await get(storyKey(id, 1))).toMatchObject({ headline: "Only" });
-    expect(await get(issueKey(id))).toMatchObject({ storyCount: 1 });
+    expect(await get(devKeys.story(id, 2))).toBeUndefined();
+    expect(await get(devKeys.story(id, 1))).toMatchObject({ headline: "Only" });
+    expect(await get(devKeys.issue(id))).toMatchObject({ storyCount: 1 });
 
     // A redo keeps Sandip's move and the story's read state, by headline here (#98).
     await ddb.send(
       new UpdateCommand({
         TableName: stack.tableName,
-        Key: storyKey(id, 1),
+        Key: devKeys.story(id, 1),
         UpdateExpression: "SET shelf = :l, shelfSetBy = :sandip, #st = :read",
         ExpressionAttributeNames: { "#st": "state" },
         ExpressionAttributeValues: { ":l": "learning", ":sandip": "sandip", ":read": "read" },
       }),
     );
     await store.putStories(issue, [story(1, "New first"), story(2, "only")]);
-    expect(await get(storyKey(id, 2))).toMatchObject({
+    expect(await get(devKeys.story(id, 2))).toMatchObject({
       headline: "only",
       shelf: "learning",
       shelfSetBy: "sandip",
       state: "read",
     });
     // Read, so not in the unread Learning index; the other story carries nothing.
-    expect((await get(storyKey(id, 2)))?.gsi2pk).toBeUndefined();
-    expect((await get(storyKey(id, 1)))?.shelfSetBy).toBeUndefined();
+    expect((await get(devKeys.story(id, 2)))?.gsi2pk).toBeUndefined();
+    expect((await get(devKeys.story(id, 1)))?.shelfSetBy).toBeUndefined();
     // Back to one story, as the tests below expect.
     await store.putStories(issue, [story(1, "Only")]);
   });
 
   it("moves an issue's stories along when a sender rebuild re-keys the issue", async () => {
     const id = FIXTURE_NEWSLETTER_IDS[2]!;
-    const meta = (await get(issueKey(id)))!;
+    const meta = (await get(devKeys.issue(id)))!;
     const errors = await store.applySenderPlan({
       rekeys: [
         {
@@ -142,7 +144,7 @@ describe("story index on dev", () => {
       unchanged: 0,
     });
     expect(errors).toEqual([]);
-    expect(await get(storyKey(id, 1))).toMatchObject({ senderId: "s0000000000ff" });
+    expect(await get(devKeys.story(id, 1))).toMatchObject({ senderId: "s0000000000ff" });
   });
 
   it("reads stories with their text, and keeps one narrative", async () => {
