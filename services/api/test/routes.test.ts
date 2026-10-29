@@ -46,6 +46,7 @@ function setup(overrides: Partial<RepoPort> = {}) {
     listTopics: vi.fn(async () => [{ name: "AI", description: "Models and tools" }]),
     settings: vi.fn(async () => DEFAULT_SETTINGS),
     usage: vi.fn(async () => ({ days: [] })),
+    takeUse: vi.fn(async () => ({ ok: true, limit: 50 })),
     saveSettings: vi.fn(async (patch: Partial<ReaderSettings>) => ({
       ...DEFAULT_SETTINGS,
       ...patch,
@@ -253,6 +254,35 @@ describe("the reader (#179)", () => {
     }
     expect(servicesFor).not.toHaveBeenCalled();
     expect(repo.listIssues).not.toHaveBeenCalled();
+  });
+});
+
+describe("daily limits (#209)", () => {
+  it("counts a use before asking, and refuses past the day's limit with a plain message", async () => {
+    const { repo, svc, call } = setup();
+    expect((await call("POST", "/ask", { body: { q: "What moved in AI?" } })).status).toBe(200);
+    expect(repo.takeUse).toHaveBeenCalledWith("ask");
+    vi.mocked(repo.takeUse).mockResolvedValueOnce({ ok: false, limit: 50 });
+    const res = await call("POST", "/ask", { body: { q: "And now?" } });
+    expect(res).toMatchObject({
+      status: 429,
+      body: { error: "That's today's 50 questions. More tomorrow." },
+    });
+    expect(svc.ask.ask).toHaveBeenCalledTimes(1);
+  });
+
+  it("limits a new timeline, comparison and source check, never reading a kept one", async () => {
+    const { repo, call } = setup();
+    vi.mocked(repo.takeUse).mockResolvedValue({ ok: false, limit: 1 });
+    for (const kind of ["timeline", "takes", "source"]) {
+      expect((await call("POST", `/issues/abc/stories/1/${kind}`)).status).toBe(429);
+      expect((await call("GET", `/issues/abc/stories/1/${kind}`)).status).toBe(200);
+    }
+    expect(vi.mocked(repo.takeUse).mock.calls.map((c) => c[0])).toEqual([
+      "timeline",
+      "takes",
+      "source",
+    ]);
   });
 });
 

@@ -83,6 +83,32 @@ export interface Meter {
   record(feature: Feature, use: Omit<Use, "calls">): Promise<void>;
 }
 
+/** What the reader asks for that a daily limit counts (#209): one use per request. */
+export const LIMITED = ["ask", "takes", "timeline", "source"] as const;
+export type Limited = (typeof LIMITED)[number];
+
+/** Uses a day, for every reader for now (an operator can set a reader's own in their settings). */
+export const DAILY_LIMITS: Record<Limited, number> = {
+  ask: 50,
+  takes: 50,
+  timeline: 50,
+  source: 50,
+};
+
+const NOUNS: Record<Limited, string> = {
+  ask: "questions",
+  takes: "comparisons",
+  timeline: "timelines",
+  source: "source checks",
+};
+
+/** What a reader at the day's limit is told (#209). */
+export const limitMessage = (f: Limited, limit: number) =>
+  `That's today's ${limit} ${limit === 1 ? NOUNS[f].replace(/s$/, "") : NOUNS[f]}. More tomorrow.`;
+
+/** The day item's count of a feature's uses. */
+export const usesAttribute = (f: Limited) => `${f}_uses`;
+
 /** The usage list the API answers (`GET /usage`), the newest day first. */
 export interface UsageResponse {
   days: DayUsage[];

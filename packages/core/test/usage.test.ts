@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { claudeUse, dayUsageOf, titanUse, useAttribute } from "../src/usage.js";
+import {
+  claudeUse,
+  dayUsageOf,
+  limitMessage,
+  titanUse,
+  useAttribute,
+  usesAttribute,
+} from "../src/usage.js";
 
 describe("usage (#208)", () => {
   it("prices Claude at $1 and $5 a million tokens, Titan at $0.02, unrounded", () => {
@@ -26,5 +33,11 @@ describe("usage (#208)", () => {
       ask: { calls: 2, inputTokens: 4000, outputTokens: 600, cents: 0.7 },
       search: { calls: 3, inputTokens: 30, outputTokens: 0, cents: 0.00006 },
     });
+  });
+
+  it("tells a reader at the limit plainly, in the singular for one (#209)", () => {
+    expect(limitMessage("ask", 50)).toBe("That's today's 50 questions. More tomorrow.");
+    expect(limitMessage("source", 1)).toBe("That's today's 1 source check. More tomorrow.");
+    expect(usesAttribute("takes")).toBe("takes_uses");
   });
 });

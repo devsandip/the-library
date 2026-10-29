@@ -23,6 +23,11 @@ export interface ReaderSettings {
   about: string;
   /** What Learning means to the reader (#187): what Jev asks a story to be, to shelve it there. */
   learning: string;
+  /**
+   * The reader's own daily limits, where an operator set them (#209); the defaults otherwise. Not
+   * a reader's to change: `PATCH /settings` refuses it.
+   */
+  limits?: Record<string, number>;
 }
 
 /**
