@@ -20,6 +20,10 @@ A private, single-user web reader that ingests my newsletters daily, ranks them 
 
 **Success looks like:** I open it most days, and the top 5 items are things I'd thumbs-up at least 3 times out of 5 after two weeks of use.
 
+## Who it is for (updated 2026-10-29)
+
+Nutgraf is for anyone. It runs for one reader, Sandip, while the app is tested; at a broader launch anyone can sign up. The single-user lines in this brief describe that testing phase, not the product. Features are designed for any reader, on their own devices and tools: a reader's personal setup (an Obsidian vault, one Gmail account) is never the product. What was built for one reader: `docs/reports/2026-10-29-single-reader-audit.md`. The plan to open it: `docs/features/multi-reader.md`.
+
 ## Name and tone
 
 - Product name: **The Library**
@@ -31,18 +35,20 @@ A private, single-user web reader that ingests my newsletters daily, ranks them 
 ## Non-goals (v1)
 
 - Podcast / audio (possible Phase 3, see below)
-- Multiple users, sharing, social features
+- Sharing and social features (several readers, each with their own library, are planned: see Who it is for)
 - Native mobile apps (responsive web only)
 - Replying to or managing email in Gmail
 - RSS or non-email sources
 
 ## User and context
 
-- One user: me (dev.sandip@gmail.com)
-- Interests to seed the ranking: **tech industry, startups, AI, product management, system design**, plus some general business news
+- One reader while testing: me (dev.sandip@gmail.com); anyone who signs up after launch
+- Interests to seed my ranking (each reader picks their own after launch): **tech industry, startups, AI, product management, system design**, plus some general business news
 - Devices: iPhone, Mac, occasionally other browsers
 
 ## Sources
+
+My sources while testing; after launch, each reader's newsletters arrive at their own address.
 
 - Gmail labels: `Newsletters` (id `Label_244609042207730416`) and `Meco_97675919-0d09-4077-a165-9d5569fa1957` (id `Label_18`)
 - Also include these senders, which currently land in the inbox unlabeled: ByteByteGo (`bytebytego@substack.com`), The Pragmatic Engineer (`pragmaticengineer@substack.com`, `pragmaticengineer+deepdives@substack.com`), Lenny's Newsletter (`lenny*@substack.com`)
