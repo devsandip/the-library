@@ -39,6 +39,7 @@ export type Screen =
   | { name: "search"; q: string; sort: SearchSort }
   | { name: "ask"; q: string }
   | { name: "following" }
+  | { name: "highlights" }
   | { name: "predictions"; view: PredictionView }
   | { name: "history"; day?: string }
   | { name: "newsletters" }
@@ -175,6 +176,8 @@ export const searchHref = (q = "", sort: SearchSort = "best") =>
 export const askHref = (q = "") => `${BASE}/library/ask${queryString([["q", q]])}`;
 /** Followed stories (#22). */
 export const followingHref = () => `${BASE}/library/following`;
+/** Highlights (#168): every passage kept, with the Markdown export. */
+export const highlightsHref = () => `${BASE}/library/highlights`;
 /** Who called it (#24): open predictions by due date, or settled ones. */
 export const predictionsHref = (view: PredictionView = "open") =>
   `${BASE}/library/predictions${view === "open" ? "" : "/settled"}`;
@@ -211,6 +214,7 @@ export function parse(path: string, q: Query): Screen {
       if (a === "search") return { name: "search", q: q.q ?? "", sort: sortOf(q.sort) };
       if (a === "ask") return { name: "ask", q: q.q ?? "" };
       if (a === "following") return { name: "following" };
+      if (a === "highlights") return { name: "highlights" };
       if (a === "history") return { name: "history", day: q.day || undefined };
       if (a === "newsletters") return b ? { name: "newsletter", slug: b } : { name: "newsletters" };
       if (a === "audit") return { name: "audit" };

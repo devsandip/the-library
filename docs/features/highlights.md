@@ -20,8 +20,18 @@ Milestone 10 builds it in four pieces: the API (#166), highlighting in the reade
 - **A highlight's sheet:** tap or click a mark for its passage, a note (kept on Done) and Remove, which Undo puts back with its note. On the Mac the sheet is a card in the middle of the window.
 - **Not found:** a highlight whose passage the page no longer holds is listed under the issue ("Highlights the page no longer shows"), and opens the same sheet.
 - **Open at a highlight:** `/nutgraf/issue/<id>?hl=<highlight id>` (on the Mac, the console's URL with `?hl=`) scrolls the passage to the middle of the screen instead of putting the reader back at its place.
-- **Mock mode:** the first issue starts with two highlights, one with a note and one its page no longer holds.
+- **Mock mode:** the first issue starts with two highlights, one with a note and one its page no longer holds; a few more on other issues, over two weeks, fill the Highlights page.
 
+## The Highlights page (#168)
+
+- **Where:** Library › Highlights (with how many there are), and ⌘K on the Mac: `/nutgraf/library/highlights` (`web/src/pages/highlights.tsx`, `web/src/highlights.ts`).
+- **The list:** grouped by issue, the issue highlighted last first. Under each issue's title, its newsletter and date, then its passages in the order they were made, each with its note. A passage opens the issue at it (`?hl=`), in the reader on the phone and in the console on the Mac.
+- **Filter:** a newsletter (most highlights first), and a day to start from (the reader's day in India), or everything.
+- **Export:** **Copy Markdown** or **Download .md** (`nutgraf-highlights-<day>.md`) for what is shown, built with the same `highlightsMarkdown` the Obsidian script will use; the header says since when. Its links point at the app's own address.
+- **Empty:** says how to highlight and what the page is for.
+- The page reads every highlight, 200 at a time, each time it opens; Library reads them once for its count, and ⌘K shows what has been read.
+
+## Decisions
 
 - **A quote, not offsets.** Offsets into the HTML break when the sanitizer or the frame's styles change, and the stored HTML expires after 365 days (raw mail after 30). The passage with its context is found again in whatever renders, and the passage itself outlives the HTML.
 - **Under the issue, listed by date.** Highlights are `ISSUE#<id>` / `HL#<key>` items, so the issue's detail reads them with the issue; each sits in `gsi1` under `HIGHLIGHTS` too, by when it was made, for the page and the export. A highlight's id is `<issueId>.<key>`, the key 12 characters that sort by time (the milliseconds in base 36, then 4 random ones).

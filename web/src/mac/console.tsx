@@ -13,6 +13,7 @@ import {
   tuneupHref,
   DEFAULT_QUEUE,
   followingHref,
+  highlightsHref,
   predictionsHref,
   historyHref,
   newslettersHref,
@@ -26,6 +27,7 @@ import {
   type Screen,
 } from "../paths.js";
 import { followingState, toggleFollow, useFollow, useFollowing } from "../following.js";
+import { highlightCount, useHighlights } from "../highlights.js";
 import { usePredictions } from "../predictions.js";
 import { dropCount, useAudit } from "../audit.js";
 import { useTuneup, waitingCount } from "../tuneup.js";
@@ -110,6 +112,7 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
   const s = lib.status.data;
   const h = health(s);
   const followed = useFollowing().state;
+  const kept = highlightCount(useHighlights("never").state);
   const following = { unseen: followed.status === "ok" ? followed.data.unseen : 0 };
   const predicted = usePredictions("open", false).state;
   const due = predicted.status === "ok" ? predicted.data.due : 0;
@@ -418,6 +421,11 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
             label: "Following",
             hint: following.unseen ? `${following.unseen} new` : "Stories you follow",
             href: followingHref(),
+          },
+          {
+            label: "Highlights",
+            hint: kept ? `${kept} kept` : "Passages you kept",
+            href: highlightsHref(),
           },
           {
             label: "Predictions",
