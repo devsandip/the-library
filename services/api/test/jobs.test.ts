@@ -20,7 +20,17 @@ function setup() {
   const settler = { settleDue: vi.fn(async () => stats) };
   const workFor = vi.fn((_reader?: Reader) => ({ checker, settler }));
   const owner = vi.fn(async (): Promise<Reader | undefined> => ({ id: "owner-1" }));
-  return { checker, settler, workFor, owner, handler: createJobHandler(workFor, owner) };
+  const zones: Record<string, string> = { ny: "America/New_York", in: "Asia/Kolkata" };
+  const readers = vi.fn(async (): Promise<(Reader | undefined)[]> => [{ id: "ny" }, { id: "in" }]);
+  const timeZoneOf = vi.fn(async (r?: Reader) => (r ? zones[r.id]! : "Asia/Kolkata"));
+  return {
+    checker,
+    settler,
+    workFor,
+    owner,
+    readers,
+    handler: createJobHandler(workFor, { owner, readers, timeZoneOf }),
+  };
 }
 
 describe("jobs", () => {
@@ -63,5 +73,23 @@ describe("jobs", () => {
     const { handler } = setup();
     vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(handler({ kind: "backstory" } as never)).rejects.toThrow("unknown job backstory");
+  });
+
+  it("settles each reader whose clock reads 07:xx in the hourly round, and no one else (#211)", async () => {
+    const { workFor, readers, handler } = setup();
+    // 11:30 UTC is 07:30 in New York (summer time) and 17:00 in India.
+    expect(await handler({ kind: "daily", at: "2026-10-29T11:30:00.000Z" })).toEqual({
+      at: "2026-10-29T11:30:00.000Z",
+      settled: [{ reader: "ny", stats }],
+    });
+    expect(workFor).toHaveBeenLastCalledWith({ id: "ny" });
+    // 02:00 UTC is 07:30 in India.
+    const india = await handler({ kind: "daily", at: "2026-10-29T02:00:00.000Z" });
+    expect(india).toMatchObject({ settled: [{ reader: "in" }] });
+    // The one library on today's keys: no reader, India's 07:00 as before.
+    readers.mockResolvedValueOnce([undefined]);
+    expect(await handler({ kind: "daily", at: "2026-10-29T02:00:00.000Z" })).toMatchObject({
+      settled: [{ stats }],
+    });
   });
 });

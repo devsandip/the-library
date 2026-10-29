@@ -23,6 +23,7 @@ export interface DevStack {
   contentBucket: string;
   ingestFunction: string;
   apiFunction?: string;
+  jobsFunction?: string;
 }
 
 export async function devStack(): Promise<DevStack> {
@@ -40,7 +41,13 @@ export async function devStack(): Promise<DevStack> {
   if (!tableName || !contentBucket || !ingestFunction) {
     throw new Error(`${DEV_STACK} is missing outputs`);
   }
-  return { tableName, contentBucket, ingestFunction, apiFunction: out("ApiFunction") };
+  return {
+    tableName,
+    contentBucket,
+    ingestFunction,
+    apiFunction: out("ApiFunction"),
+    jobsFunction: out("JobsFunction"),
+  };
 }
 
 /**

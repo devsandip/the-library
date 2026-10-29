@@ -110,6 +110,8 @@ Done when: two readers on dev see only their own data in every screen, search an
 
 **The list of readers** (#210): saving settings puts a reader in `READERS` in `gsi1` (the deployment's own list, under no reader's prefix); `readers()` lists the owner first, then every reader with settings, for the scheduled work. `pnpm readers` is the operator's view: each reader's time zone and today's model use.
 
+**Daily work at each reader's 07:00** (#211): the daily 07:30 IST settle is now an hourly round (`{ kind: "daily" }` to the jobs Lambda, every hour on the hour UTC): it settles predictions for each reader whose clock reads 07:xx, so a reader in India still settles at 07:30. On reader keys the round goes over every reader (the owner first); on today's keys there is one library, the owner's or none named, as before. The day in brief stays with ingest until mail in. `pnpm settle` still settles the owner's at once.
+
 1. The daily jobs (the day in brief, the top 5, settling predictions, follow checks, archiving old News, tune-up, audit) run per reader at the reader's local time, from an hourly schedule through a queue.
 2. Every Claude, Titan and Jev call recorded per reader with its cost.
 3. Daily limits on Ask, Takes, Timeline and Source, with a plain message when one is reached; a throttle per reader.

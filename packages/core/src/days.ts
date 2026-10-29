@@ -79,3 +79,10 @@ export function readerDayBounds(
   const to = dayStart(addDays(day, 1), timeZone) - 1;
   return { from: new Date(from).toISOString(), to: new Date(to).toISOString() };
 }
+
+/** The hour, 0 to 23, on the clock of a time zone at an instant. */
+export function localHour(at: number, timeZone: string): number {
+  return Number(
+    new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", hourCycle: "h23" }).format(at),
+  );
+}

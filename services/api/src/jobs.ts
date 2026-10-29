@@ -6,9 +6,12 @@
  */
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { S3Client } from "@aws-sdk/client-s3";
-import { CLAUDE_MODEL } from "@library/core";
+import { CLAUDE_MODEL, localHour } from "@library/core";
 import { readerOf, type Reader } from "@library/core/reader";
 import type { SettleStats } from "@library/core/types";
+
+/** The hour of a reader's day their predictions are settled (#139, #211). */
+const DAILY_HOUR = 7;
 import { BedrockClaude } from "./claude.js";
 import { CorpusCache } from "./corpus.js";
 import { meteredClaude, meteredEmbedder } from "./meter.js";
@@ -17,25 +20,48 @@ import { DynamoRepo } from "./repo.js";
 import { Settler } from "./settle.js";
 import { SourceChecker } from "./source.js";
 
+/** What the hourly round did (#211): the readers whose 07:00 it was, and their settling. */
+export interface DailyStats {
+  at: string;
+  settled: { reader?: string; stats: SettleStats }[];
+}
+
 /**
- * The jobs Lambda's handler. A source check runs for the reader who asked for it (#179); settling
- * runs for the owner (#180), until the daily jobs run per reader.
+ * The jobs Lambda's handler. A source check runs for the reader who asked for it (#179); `settle`
+ * runs for the owner (#180); the hourly round (#211) settles each reader whose clock reads 07:xx.
  */
 export function createJobHandler(
   workFor: (reader: Reader | undefined) => {
     checker: Pick<SourceChecker, "check">;
     settler: Pick<Settler, "settleDue">;
   },
-  owner: () => Promise<Reader | undefined>,
+  deps: {
+    owner: () => Promise<Reader | undefined>;
+    /** The readers the round serves; one undefined reader is the one library. */
+    readers: () => Promise<(Reader | undefined)[]>;
+    timeZoneOf: (reader: Reader | undefined) => Promise<string>;
+  },
 ) {
-  return async (job: Job): Promise<SettleStats | void> => {
+  return async (job: Job): Promise<SettleStats | DailyStats | void> => {
     const started = Date.now();
     try {
       if (job.kind === "source") {
         await workFor(readerOf(job.reader)).checker.check(job.id, job.n);
         return;
       }
-      if (job.kind === "settle") return await workFor(await owner()).settler.settleDue(job.limit);
+      if (job.kind === "settle") {
+        return await workFor(await deps.owner()).settler.settleDue(job.limit);
+      }
+      if (job.kind === "daily") {
+        const at = job.at ? Date.parse(job.at) : Date.now();
+        const settled: DailyStats["settled"] = [];
+        for (const reader of await deps.readers()) {
+          if (localHour(at, await deps.timeZoneOf(reader)) !== DAILY_HOUR) continue;
+          const stats = await workFor(reader).settler.settleDue();
+          settled.push({ ...(reader ? { reader: reader.id } : {}), stats });
+        }
+        return { at: new Date(at).toISOString(), settled };
+      }
       throw new Error(`unknown job ${String((job as { kind: unknown }).kind)}`);
     } catch (err) {
       // A source check's run is marked failed already; thrown so the Lambda counts the error.
@@ -87,5 +113,15 @@ export const handler = createJobHandler(
       ),
     };
   },
-  () => repoFor(undefined).owner(),
+  {
+    owner: () => repoFor(undefined).owner(),
+    // On reader keys, every reader; on today's keys there is one library, the owner's.
+    readers: async () => {
+      const base = repoFor(undefined);
+      if (READER_KEYS !== "1") return [await base.owner()];
+      const all = await base.readers();
+      return all.length ? all : [undefined];
+    },
+    timeZoneOf: async (reader) => (await repoFor(reader).settings()).timeZone,
+  },
 );
