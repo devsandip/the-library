@@ -647,3 +647,32 @@ Sandip said Nutgraf is for any reader, not only Sandip ("the obsidian is just so
 - Settings live under `READER#<id>`; a reader without them gets today's values, so every step is a no-op for Sandip until the data moves.
 - "reader" instead of "sandip" in stored moves rides with the data move (13), not a separate rewrite.
 - Topics proposed on their own move to milestone 14, with the per-reader jobs.
+
+## 2026-10-29, evening — milestone 13 built (prod move pending), milestone 14 closed
+
+Sandip said "Start milestone 13", then asked for reminders to run the prod move on Saturday and Tuesday (interview prep) and for anything not blocked by it to be built meanwhile.
+
+**Did:**
+
+- Milestone 13, every item has an owner: keys bound to a reader behind `READER_KEYS` (PR 201), the API's repository (PR 202) and ingest's store (PR 203) on them, dev on reader keys with two readers kept apart (PR 204), "reader" instead of "sandip" (PR 205), the move, `pnpm move-to-reader`, tried end to end on dev (PR 206). PR 207 (prod on reader keys) is a draft.
+- TickTick reminders (Reminders list, 9:00 Los Angeles time) on Saturday 31 October and Tuesday 3 November, with every step; memory `prod-move-pending`.
+- Milestone 14 closed: the meter (PR 213), daily limits (PR 214), the list of readers and `pnpm readers` (PR 215), the hourly round (PR 216), topics on their own (PR 217).
+- `docs/status/2026-10-29-milestone-14.md`.
+
+**State now:**
+
+- Prod runs PR 217's code on today's keys; no owner is named on prod yet.
+- Dev runs on reader keys; every Deploy's integration tests cover the keyed path, two readers, the move, the meter, limits, the round and topics.
+- Open: PR 207 (waits on Sandip's move), PR 173 (vault script, on hold).
+
+**Next:**
+
+- Sandip: `AWS_PROFILE=admin pnpm name-owner`, `pnpm move-to-reader` (dry run), `--apply`; then merge PR 207, follow its Deploy, ask Sandip for `--apply` and `--check` again; close milestone 13 with its report. Runbook: `docs/features/multi-reader.md`.
+- Milestone 15 (sign-up by email code) needs SES's DKIM records in `sandip.dev`'s DNS and SES production access (Sandip's). Unblocked meanwhile: export and delete account, the operator group, onboarding's screens, highlights back for every reader.
+
+**Decisions:**
+
+- One table, `R#<readerId>#` before every partition key and index partition; sort keys, ids and S3 keys unchanged; `CONFIG/OWNER` and `READER#<id>` exempt.
+- A switch per stage instead of a cut-over, and a move that copies (never overwrites) so it can run twice around the flip.
+- Limits count uses with one conditional update; a reader's own limits are an operator's to set.
+- The load test waits for mail in.
