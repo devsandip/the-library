@@ -261,6 +261,21 @@ describe("auth and API (prod)", () => {
     });
   });
 
+  it("mail through SES from sandip.dev (#222)", () => {
+    t.hasResourceProperties("AWS::Cognito::UserPool", {
+      EmailConfiguration: {
+        EmailSendingAccount: "DEVELOPER",
+        From: "Nutgraf <no-reply@sandip.dev>",
+        SourceArn: {
+          "Fn::Join": [
+            "",
+            ["arn:", { Ref: "AWS::Partition" }, ":ses:us-east-1:111111111111:identity/sandip.dev"],
+          ],
+        },
+      },
+    });
+  });
+
   it("an operators group (#224)", () => {
     t.hasResourceProperties("AWS::Cognito::UserPoolGroup", { GroupName: "operators" });
   });

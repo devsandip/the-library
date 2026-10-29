@@ -15,6 +15,14 @@ export const COGNITO_DOMAIN = `https://${COGNITO_DOMAIN_PREFIX}.auth.${REGION}.a
 export const PUBLIC_ORIGIN = "https://sandip.dev";
 
 /**
+ * Cognito's mail (#222): sent through SES from the domain, verified in SES with DKIM outside this
+ * repo, in an account out of SES's sandbox. Sign-in codes need it.
+ */
+export const MAIL_DOMAIN = "sandip.dev";
+export const MAIL_FROM = `no-reply@${MAIL_DOMAIN}`;
+export const MAIL_FROM_NAME = "Nutgraf";
+
+/**
  * srcdoc iframes inherit this policy, so it must allow newsletter images and inline styles.
  * Scripts stay locked to the app's own files. Fonts too: the app uses system fonts, and a
  * newsletter's own web font falls back to its font stack (none of 150 issues had one, #83).

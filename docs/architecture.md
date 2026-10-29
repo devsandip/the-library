@@ -271,7 +271,7 @@ HTTP API, one route `ANY /nutgraf/api/{proxy+}` behind the Cognito JWT authorize
 
 ## 7. Auth
 
-- **User pool:** Cognito Essentials feature plan (1 MAU costs at most a few cents), self-signup off, sign-in by email, TOTP MFA required (no SMS), password minimum 12.
+- **User pool:** Cognito Essentials feature plan (1 MAU costs at most a few cents), self-signup off, sign-in by email, TOTP MFA required (no SMS), password minimum 12. Its mail (invitations, codes) goes through SES as `Nutgraf <no-reply@sandip.dev>` (#222): `sandip.dev` is verified in SES with DKIM, outside this repo, and the account is out of SES's sandbox. Cognito sends with its service-linked role for SES, made the first time the setting deployed.
 - **Login UI:** managed login (version 2) on the prefix domain `thelibrary-sandip.auth.us-east-1.amazoncognito.com`, with a `CfnManagedLoginBranding` resource using Cognito's default style. Without a branding resource, a CloudFormation-created client's managed login page errors.
 - **App client:** public (no secret), authorization code + PKCE, scopes `openid email`. Callback and sign-out URLs: `https://sandip.dev/thelibrary/auth/callback` and `https://sandip.dev/thelibrary/`, plus the app distribution domain (for testing before the proxy rule) and `http://localhost:5173/thelibrary/...` (local dev). Access/ID tokens 60 min, refresh 30 days, token revocation on, refresh-token rotation if the token endpoint supports it (checked at R6).
 - **Tokens in the browser:** access/ID in memory; refresh token in `localStorage` so phone and laptop stay signed in. Sign-out calls `/oauth2/revoke` and clears storage. See the shared-origin invariant in section 4.

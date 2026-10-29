@@ -124,13 +124,15 @@ Done when: the 50 readers' jobs run on time within their limits, and the cost pe
 
 ### 15. Sign-up by email (6)
 
-[Milestone 15](https://github.com/devsandip/the-library/milestone/15): issues 219 to 225. Started 2026-10-29 with the parts that need no mail setup; SES (#222) and the email code (#223) wait on Sandip's DNS and SES production access, and highlights (#225) on Sandip's call.
+[Milestone 15](https://github.com/devsandip/the-library/milestone/15): issues 219 to 225. Started 2026-10-29 with the parts that need no mail setup. On 2026-10-30 SES turned out to be ready already (`sandip.dev` verified with DKIM, the account out of the sandbox), so SES (#222) and the email code (#223) went ahead; highlights (#225) wait on Sandip's call.
 
 **Export** (#219): `GET /export` answers everything Nutgraf keeps for the reader as one JSON file, newsletters' own text left out; Settings has Download my data (`nutgraf-export-<day>.json`).
 
 **Delete account** (#220): `DELETE /account` answers 202 and the jobs Lambda deletes every item under the reader's keys (a scan of their prefix), their settings and interests, their issues' stored mail, then their sign-in (`ListUsers` by `sub`, `AdminDeleteUser`; prod only). Refused (409) on today's keys, where there is one library, and for the owner. Settings has Delete my account, enabled once "delete" is typed; the app signs out after.
 
 **Onboarding** (#221): `GET /settings` says `onboarded`: false only for a new reader on reader keys (no settings item, not the owner), so on today's keys no one sees it. The app shows onboarding before the library (`web/src/pages/onboarding.tsx`): the time zone (the device's, to confirm), interests to pick from twelve suggestions (`SUGGESTED_INTERESTS`) or add their own, and a word that getting newsletters in is coming. Finishing saves settings with a reader line made from the interests (`aboutFrom`) and the plain meaning of Learning (`PLAIN_LEARNING`). `VITE_MOCK=1 VITE_ONBOARDING=1` starts the mock as a new reader.
+
+**Mail through SES** (#222): the user pool sends as `Nutgraf <no-reply@sandip.dev>` through SES (`MAIL_FROM` in `infra/lib/config.ts`), not Cognito's own mail and its 50 a day. Nothing to add in DNS or the console: the domain and production access were in place.
 
 **The operator group** (#224): the prod user pool has a group `operators`. An operator is in it, or is the owner; on today's keys, with one library, every reader is. Status (`GET /status`) answers `operator`, and only an operator gets the mail runs' workings (counts, errors, Claude's sorting, stories, shelves); anyone else gets their ranking and their own last check. Checking the mail now (`POST /ingest`) is an operator's only (403). The app hides the runs and Check Gmail now from a reader who is not one, says getting newsletters in is coming, and their pull to refresh reloads the lists without asking for a check. `VITE_MOCK=1 VITE_OPERATOR=0` starts the mock as such a reader. Adding someone to the group is in the README's runbook.
 
@@ -172,7 +174,7 @@ Done when: a launch checklist is green and sign-up opens with one switch.
 ## Only Sandip can do
 
 - **Milestone 13:** run the prod move (a prod data job, from the laptop like `pnpm reprocess`).
-- **Milestone 15:** add SES's DKIM records to `sandip.dev`'s DNS, and ask AWS for SES production access in the console (it usually takes a day).
+- **Milestone 15:** ~~SES's DKIM records and production access~~ (already in place, found 2026-10-30); try a sign-in code on prod once #223 is live, since Claude cannot read the mail it sends.
 - **Mail in:** an MX record for the subdomain, or the Google Cloud setup and verification for Gmail; and the Gmail filter or connection for Sandip's own mail.
 - **Google sign-in:** the OAuth client in Google Cloud.
 - **Launch:** approve the privacy policy, terms and about.
