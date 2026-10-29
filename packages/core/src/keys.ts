@@ -18,6 +18,11 @@ export const TUNEUP_KEY = { pk: "STATE", sk: "TUNEUP" } as const;
 export const TOPICS_KEY = { pk: "CONFIG", sk: "TOPICS" } as const;
 /** The five interests, embedded once by enrichment; they seed the ranking's taste profile. */
 export const INTERESTS_KEY = { pk: "CONFIG", sk: "INTERESTS" } as const;
+/**
+ * The owner (#180): the reader whose Gmail the poller reads and whom the scheduled jobs serve. A
+ * setting of the deployment that names a reader, not one of the reader's own items.
+ */
+export const OWNER_KEY = { pk: "CONFIG", sk: "OWNER" } as const;
 /** The Summary's top 5 as first shown on a day (#5): `ids`, `at`. */
 export const digestKey = (day: string) => ({ pk: `DIGEST#${day}`, sk: "META" });
 /** Titan embedding of an issue, kept out of the META item so it never lands in an index. */

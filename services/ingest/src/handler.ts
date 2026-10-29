@@ -18,7 +18,8 @@ const { TABLE_NAME, BUCKET_NAME, GMAIL_PARAM, JEV_PARAM, STAGE } = process.env;
 
 let gmail: Gmail | undefined;
 let jev: Jev | undefined;
-const store = new Store(TABLE_NAME!, BUCKET_NAME!);
+/** The table and bucket; each run works for the owner (#180), read when it starts. */
+const library = new Store(TABLE_NAME!, BUCKET_NAME!);
 const bedrock = new Bedrock();
 const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
 
@@ -105,6 +106,8 @@ export interface IngestEvent {
 
 export async function handler(event: IngestEvent = {}) {
   const started = Date.now();
+  const owner = await library.owner();
+  const store = owner ? library.forReader(owner) : library;
   if (event.enrich) {
     const stats = await enrich(store, bedrock, {
       sinceIso: daysAgo(event.enrich.days ?? 30),

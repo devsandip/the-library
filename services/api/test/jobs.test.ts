@@ -19,7 +19,8 @@ function setup() {
   const checker = { check: vi.fn(async () => ({})) };
   const settler = { settleDue: vi.fn(async () => stats) };
   const workFor = vi.fn((_reader?: Reader) => ({ checker, settler }));
-  return { checker, settler, workFor, handler: createJobHandler(workFor) };
+  const owner = vi.fn(async (): Promise<Reader | undefined> => ({ id: "owner-1" }));
+  return { checker, settler, workFor, owner, handler: createJobHandler(workFor, owner) };
 }
 
 describe("jobs", () => {
@@ -39,6 +40,15 @@ describe("jobs", () => {
     checker.check.mockRejectedValueOnce(new Error("bedrock down"));
     vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(handler({ kind: "source", id: "tldr", n: 2 })).rejects.toThrow("bedrock down");
+  });
+
+  it("settles for the owner (#180), or for the one library while none is named", async () => {
+    const { workFor, owner, handler } = setup();
+    await handler({ kind: "settle" });
+    expect(workFor).toHaveBeenLastCalledWith({ id: "owner-1" });
+    owner.mockResolvedValueOnce(undefined);
+    await handler({ kind: "settle" });
+    expect(workFor).toHaveBeenLastCalledWith(undefined);
   });
 
   it("settles the day's due predictions and answers what it did (#139)", async () => {

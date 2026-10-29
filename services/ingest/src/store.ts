@@ -25,6 +25,7 @@ import {
   INDEX,
   INGEST_STATE_KEY,
   INTERESTS_KEY,
+  OWNER_KEY,
   NARRATIVE_KEY,
   openIndexAttributes,
   predictionKey,
@@ -58,6 +59,7 @@ import type {
   StoryStats,
   Topic,
 } from "@library/core/types";
+import { readerOf, type Reader } from "@library/core/reader";
 import { MODELS } from "./bedrock.js";
 import type { Classification, EnrichCandidate } from "./enrich.js";
 import type { RecentStory } from "./follow.js";
@@ -77,15 +79,45 @@ export class Store {
   /** Tail of each sender's write queue (see serializeBySender). */
   private readonly senderQueues = new Map<string, Promise<unknown>>();
 
+  /**
+   * Whose library this store writes (#180): the owner, for ingest and the jobs it runs. Keys use
+   * it from milestone 13 of `docs/features/multi-reader.md`; until then there is one library.
+   */
+  readonly reader?: Reader;
+  private readonly clients: { ddb: DynamoDBClient; s3: S3Client };
+
   constructor(
     private readonly table: string,
     private readonly bucket: string,
-    clients: { ddb?: DynamoDBClient; s3?: S3Client } = {},
+    opts: { ddb?: DynamoDBClient; s3?: S3Client; reader?: Reader } = {},
   ) {
-    this.ddb = DynamoDBDocumentClient.from(clients.ddb ?? new DynamoDBClient({}), {
+    this.clients = { ddb: opts.ddb ?? new DynamoDBClient({}), s3: opts.s3 ?? new S3Client({}) };
+    this.ddb = DynamoDBDocumentClient.from(this.clients.ddb, {
       marshallOptions: { removeUndefinedValues: true },
     });
-    this.s3 = clients.s3 ?? new S3Client({});
+    this.s3 = this.clients.s3;
+    this.reader = opts.reader;
+  }
+
+  /** The same table and bucket, for a reader. */
+  forReader(reader: Reader): Store {
+    return new Store(this.table, this.bucket, { ...this.clients, reader });
+  }
+
+  /** The owner (`CONFIG/OWNER`), or undefined until `pnpm name-owner` names one. */
+  async owner(): Promise<Reader | undefined> {
+    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: OWNER_KEY }));
+    return readerOf(res.Item?.readerId);
+  }
+
+  /** Names the owner; `email` is kept to show which account it is. */
+  async setOwner(reader: Reader, email?: string): Promise<void> {
+    await this.ddb.send(
+      new PutCommand({
+        TableName: this.table,
+        Item: { ...OWNER_KEY, readerId: reader.id, email, setAt: new Date().toISOString() },
+      }),
+    );
   }
 
   /** Message IDs already stored, as a newsletter or as a filtered marker. */
