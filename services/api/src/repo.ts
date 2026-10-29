@@ -49,6 +49,8 @@ import {
   byReader,
   READER_MOVE,
   addDays,
+  readerIndexAttributes,
+  READERS_PARTITION,
 } from "@library/core";
 import type {
   DigestStats,
@@ -460,11 +462,32 @@ export class DynamoRepo
     await this.ddb.send(
       new PutCommand({
         TableName: this.table,
-        Item: { ...settingsKey(this.reader.id), ...next, updatedAt: new Date().toISOString() },
+        Item: {
+          ...settingsKey(this.reader.id),
+          ...readerIndexAttributes(this.reader.id),
+          ...next,
+          updatedAt: new Date().toISOString(),
+        },
       }),
     );
     this.settingsRead = { at: Date.now(), value: Promise.resolve(next) };
     return next;
+  }
+
+  /**
+   * Every reader, for the scheduled work and the operator (#210): the owner first, then every
+   * reader with settings. A deployment-wide read, whatever this repository's own reader.
+   */
+  async readers(): Promise<Reader[]> {
+    const owner = await this.owner();
+    const listed = await this.queryAll({
+      IndexName: INDEX.list,
+      KeyConditionExpression: "gsi1pk = :p",
+      ExpressionAttributeValues: { ":p": READERS_PARTITION },
+      ProjectionExpression: "gsi1sk",
+    });
+    const ids = listed.map((i) => i.gsi1sk as string).filter((id) => id !== owner?.id);
+    return [...(owner ? [owner] : []), ...ids.flatMap((id) => readerOf(id) ?? [])];
   }
 
   /** A story's index attributes on this repository's keys. */
