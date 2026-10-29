@@ -72,6 +72,9 @@ export class LibraryStack extends Stack {
     const auth = new Auth(this, "Auth", {
       origins: [PUBLIC_ORIGIN, distributionOrigin, LOCAL_ORIGIN],
     });
+    // Deleting an account deletes its sign-in too, found by the reader's sub (#220).
+    api.jobsFn.addEnvironment("USER_POOL_ID", auth.userPool.userPoolId);
+    auth.userPool.grant(api.jobsFn, "cognito-idp:ListUsers", "cognito-idp:AdminDeleteUser");
     api.addRoutes(
       new HttpJwtAuthorizer("Cognito", auth.issuer, {
         jwtAudience: [auth.client.userPoolClientId],

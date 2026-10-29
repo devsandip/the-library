@@ -4,6 +4,7 @@ import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { S3Client } from "@aws-sdk/client-s3";
 import { readerOf, type Reader } from "@library/core/reader";
 import type { Feature } from "@library/core/usage";
+import { Accounts } from "./account.js";
 import { Asks } from "./ask.js";
 import { Audits } from "./audit.js";
 import { HttpError, unauthorized } from "./errors.js";
@@ -149,6 +150,7 @@ function servicesOf(reader: Reader): Services {
     audit: new Audits(repo),
     tuneup: new Tuneups(repo),
     settings: new Settings(repo, meteredEmbedder("interests", meter)),
+    account: new Accounts(repo, reader, (job) => invokeAsync(JOBS_FUNCTION!, job)),
     startIngest: () => invokeAsync(INGEST_FUNCTION!, {}),
   };
 }

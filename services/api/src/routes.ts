@@ -459,6 +459,12 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     },
   },
   {
+    // Deletes everything the reader has, then their sign-in, in the jobs Lambda (#220).
+    method: "DELETE",
+    pattern: /^\/account$/,
+    handler: async (svc) => ({ status: 202, body: await svc.account.delete() }),
+  },
+  {
     // Everything Nutgraf keeps for the reader, as one file (#219).
     method: "GET",
     pattern: /^\/export$/,

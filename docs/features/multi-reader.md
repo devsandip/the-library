@@ -128,6 +128,8 @@ Done when: the 50 readers' jobs run on time within their limits, and the cost pe
 
 **Export** (#219): `GET /export` answers everything Nutgraf keeps for the reader as one JSON file, newsletters' own text left out; Settings has Download my data (`nutgraf-export-<day>.json`).
 
+**Delete account** (#220): `DELETE /account` answers 202 and the jobs Lambda deletes every item under the reader's keys (a scan of their prefix), their settings and interests, their issues' stored mail, then their sign-in (`ListUsers` by `sub`, `AdminDeleteUser`; prod only). Refused (409) on today's keys, where there is one library, and for the owner. Settings has Delete my account, enabled once "delete" is typed; the app signs out after.
+
 1. **Mail from `sandip.dev` through SES.** The domain verified in SES (DKIM records in `sandip.dev`'s DNS); Cognito sends its mail through SES, which sign-in codes need; SES production access, so codes reach any address.
 2. **Sign-up and sign-in by email code.** Cognito's passwordless sign-in with a one-time code by email (the pool already has the Essentials plan it needs), in the managed login. Email codes do not work while MFA is required, so the pool's MFA moves to optional. Sandip keeps password and authenticator: Cognito does not offer the email code to an account with MFA on.
 3. **The operator group**, for Status and the ops pages; readers see only their own.

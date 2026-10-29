@@ -1259,6 +1259,15 @@ dialog {
   font: 600 13px/1 var(--font-text);
 }
 
+.settings-confirm {
+  margin-top: 12px;
+}
+
+.settings-danger:not(:disabled) {
+  color: var(--irr);
+  border-color: var(--irr);
+}
+
 .settings-tools {
   display: flex;
   flex-wrap: wrap;

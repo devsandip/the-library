@@ -4,8 +4,18 @@
  * Run with `pnpm test:int`.
  */
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
-import { DeleteCommand, GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  DeleteCommand,
+  GetCommand,
+  PutCommand,
+  ScanCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
+import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import * as fixtures from "../../../packages/core/test/fixtures.js";
+import { Store } from "../../ingest/src/store.js";
+
 import {
   readerDay,
   senderIdentity,
@@ -14,6 +24,8 @@ import {
   storyRef,
   vectorBytes,
   settingsKey,
+  keysFor,
+  processMessage,
 } from "@library/core";
 import type { ReaderExport } from "@library/core/export";
 import type { ReaderSettings } from "@library/core/settings";
@@ -2159,5 +2171,54 @@ describe("two readers on dev (#198)", () => {
     expect(theirs.issues).toEqual([]);
     expect(theirs.newsletters).toEqual([]);
     expect(theirs.settings.timeZone).toBe("Europe/London");
+  });
+
+  it("deletes a reader's account, leaving nothing of theirs and everyone else's whole (#220)", async () => {
+    const gone = { id: "int-test-gone" };
+    const raw = fixtures.substackByteByteGo;
+    const store = new Store(stack.tableName, stack.contentBucket, { reader: gone, keyed: true });
+    const p = await processMessage({
+      id: "fx-gone-1",
+      raw,
+      labelIds: [fixtures.LABEL_NEWSLETTERS],
+      internalDate: String(Date.now()),
+    });
+    if (p.kind !== "newsletter") throw new Error("fixture should be a newsletter");
+    await store.putNewsletter(p, raw);
+    await call("PATCH", "/settings", { sub: gone.id, body: { timeZone: "UTC" } });
+    expect(ids(await call("GET", "/issues", { sub: gone.id, query: { view: "all" } }))).toEqual([
+      "fx-gone-1",
+    ]);
+
+    expect((await call("DELETE", "/account", { sub: gone.id })).status).toBe(202);
+    // The jobs Lambda deletes; wait for it.
+    const prefix = keysFor(gone.id).prefix;
+    const left = async () => {
+      const items = await ddb.send(
+        new ScanCommand({
+          TableName: stack.tableName,
+          FilterExpression: "begins_with(pk, :p) OR pk = :reader",
+          ExpressionAttributeValues: { ":p": prefix, ":reader": `READER#${gone.id}` },
+          Select: "COUNT",
+        }),
+      );
+      return items.Count ?? 0;
+    };
+    let n = await left();
+    for (let i = 0; i < 30 && n > 0; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      n = await left();
+    }
+    expect(n).toBe(0);
+    await expect(
+      new S3Client({ region: "us-east-1" }).send(
+        new HeadObjectCommand({ Bucket: stack.contentBucket, Key: "raw/fx-gone-1.eml" }),
+      ),
+    ).rejects.toThrow();
+    // Everyone else's library is whole, and the owner's account is not the API's to delete.
+    expect(
+      ids(await call<IssueListResponse>("GET", "/issues", { query: { view: "all" } })),
+    ).toContain("fx-tldr");
+    expect((await call("DELETE", "/account")).status).toBe(409);
   });
 });

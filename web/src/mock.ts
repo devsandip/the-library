@@ -1136,6 +1136,10 @@ export class MockLibraryApi implements LibraryApi {
     await delay();
     return structuredClone(mockSettings);
   }
+  async deleteAccount(): Promise<{ deleting: true }> {
+    await delay();
+    throw new Error("The mock keeps its one library.");
+  }
   async exportData(): Promise<ReaderExport> {
     await delay();
     const { limits: _limits, ...settings } = mockSettings;

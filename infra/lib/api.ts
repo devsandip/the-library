@@ -54,6 +54,8 @@ export class Api extends Construct {
     });
     props.table.grantReadWriteData(this.jobsFn);
     props.content.grantRead(this.jobsFn);
+    // Deleting an account deletes its stored mail (#220).
+    props.content.grantDelete(this.jobsFn);
     this.jobsFn.addToRolePolicy(bedrockModels(this));
 
     this.fn = nodeFunction(this, "Fn", {

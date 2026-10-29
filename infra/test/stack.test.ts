@@ -141,6 +141,24 @@ describe("data and ingest", () => {
     expect(Object.keys(t.findOutputs("JobsFunction"))).toHaveLength(1);
   });
 
+  it("on prod the jobs Lambda may delete a reader's sign-in and stored mail (#220)", () => {
+    const t = synth("prod");
+    t.hasResourceProperties("AWS::Lambda::Function", {
+      Timeout: 120,
+      Environment: { Variables: Match.objectLike({ USER_POOL_ID: Match.anyValue() }) },
+    });
+    const statements = Object.values(t.findResources("AWS::IAM::Policy")).flatMap(
+      (p) => p.Properties.PolicyDocument.Statement as { Action: unknown }[],
+    );
+    const actions = JSON.stringify(statements.map((s) => s.Action));
+    expect(actions).toContain("cognito-idp:AdminDeleteUser");
+    expect(actions).toContain("cognito-idp:ListUsers");
+    expect(actions).toContain("s3:DeleteObject");
+    // Dev has no user pool.
+    const dev = synth("dev").findResources("AWS::Lambda::Function");
+    expect(JSON.stringify(dev)).not.toContain("USER_POOL_ID");
+  });
+
   it("prod settles due predictions in an hourly round, each reader at their 07:00 (#139, #211)", () => {
     synth("prod").hasResourceProperties("AWS::Scheduler::Schedule", {
       ScheduleExpression: "cron(0 * * * ? *)",

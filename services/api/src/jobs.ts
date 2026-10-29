@@ -12,6 +12,7 @@ import type { SettleStats } from "@library/core/types";
 
 /** The hour of a reader's day their predictions are settled (#139, #211). */
 const DAILY_HOUR = 7;
+import { deleteSignIn } from "./account.js";
 import { BedrockClaude } from "./claude.js";
 import { CorpusCache } from "./corpus.js";
 import { meteredClaude, meteredEmbedder } from "./meter.js";
@@ -36,13 +37,15 @@ export function createJobHandler(
     settler: Pick<Settler, "settleDue">;
   },
   deps: {
+    /** Deletes everything a reader has, then their sign-in (#220). */
+    deleteAccount?: (reader: Reader) => Promise<unknown>;
     owner: () => Promise<Reader | undefined>;
     /** The readers the round serves; one undefined reader is the one library. */
     readers: () => Promise<(Reader | undefined)[]>;
     timeZoneOf: (reader: Reader | undefined) => Promise<string>;
   },
 ) {
-  return async (job: Job): Promise<SettleStats | DailyStats | void> => {
+  return async (job: Job): Promise<SettleStats | DailyStats | unknown> => {
     const started = Date.now();
     try {
       if (job.kind === "source") {
@@ -51,6 +54,11 @@ export function createJobHandler(
       }
       if (job.kind === "settle") {
         return await workFor(await deps.owner()).settler.settleDue(job.limit);
+      }
+      if (job.kind === "delete-account") {
+        const reader = readerOf(job.reader);
+        if (!reader || !deps.deleteAccount) throw new Error("no reader to delete");
+        return await deps.deleteAccount(reader);
       }
       if (job.kind === "daily") {
         const at = job.at ? Date.parse(job.at) : Date.now();
@@ -81,7 +89,7 @@ export function createJobHandler(
   };
 }
 
-const { TABLE_NAME, BUCKET_NAME, STAGE, READER_KEYS } = process.env;
+const { TABLE_NAME, BUCKET_NAME, STAGE, READER_KEYS, USER_POOL_ID } = process.env;
 const ddb = new DynamoDBClient({});
 const s3 = new S3Client({});
 const claude = new BedrockClaude();
@@ -114,6 +122,13 @@ export const handler = createJobHandler(
     };
   },
   {
+    deleteAccount: async (reader) => {
+      const repo = repoFor(reader);
+      if ((await repo.deletable()) !== "yes") throw new Error("not deletable");
+      const deleted = await repo.deleteEverything();
+      const signIn = await deleteSignIn(reader, USER_POOL_ID);
+      return { ...deleted, signIn };
+    },
     owner: () => repoFor(undefined).owner(),
     // On reader keys, every reader; on today's keys there is one library, the owner's.
     readers: async () => {
