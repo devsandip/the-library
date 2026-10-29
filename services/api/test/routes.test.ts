@@ -192,6 +192,10 @@ function setup(overrides: Partial<RepoPort> = {}) {
       tuneup: vi.fn(async () => tuneupBody),
       dismiss: vi.fn(async () => ({ ...tuneupBody, dismissed: 1 })),
     },
+    settings: {
+      get: vi.fn(async () => DEFAULT_SETTINGS),
+      save: vi.fn(async (patch: Partial<ReaderSettings>) => ({ ...DEFAULT_SETTINGS, ...patch })),
+    },
     startIngest: vi.fn(async () => undefined),
   };
   const servicesFor = vi.fn((_reader: Reader) => svc);
@@ -261,7 +265,7 @@ describe("settings (#184)", () => {
   });
 
   it("saves a time zone, interests and the reader line, cleaned", async () => {
-    const { repo, call } = setup();
+    const { svc, call } = setup();
     const res = await call("PATCH", "/settings", {
       body: {
         timeZone: "America/New_York",
@@ -270,7 +274,7 @@ describe("settings (#184)", () => {
       },
     });
     expect(res.status).toBe(200);
-    expect(repo.saveSettings).toHaveBeenCalledWith({
+    expect(svc.settings.save).toHaveBeenCalledWith({
       timeZone: "America/New_York",
       interests: [{ name: "climate", text: "Climate: energy and policy." }],
       about: "The reader follows climate and energy.",
@@ -279,7 +283,7 @@ describe("settings (#184)", () => {
   });
 
   it("refuses an unknown zone, empty or too many interests, unknown fields and nothing", async () => {
-    const { repo, call } = setup();
+    const { svc, call } = setup();
     const bad = [
       { timeZone: "Mars/Olympus" },
       { timeZone: "+05:30" },
@@ -292,7 +296,7 @@ describe("settings (#184)", () => {
       [],
     ];
     for (const body of bad) expect((await call("PATCH", "/settings", { body })).status).toBe(400);
-    expect(repo.saveSettings).not.toHaveBeenCalled();
+    expect(svc.settings.save).not.toHaveBeenCalled();
   });
 });
 

@@ -32,6 +32,7 @@ import {
   INTERESTS_KEY,
   OWNER_KEY,
   settingsKey,
+  interestsKey,
   NARRATIVE_KEY,
   NOW_READING_KEY,
   openIndexAttributes,
@@ -64,6 +65,7 @@ import {
   timelineKey,
   TOPICS_KEY,
   toVector,
+  EMBED_MODEL,
   EMBED_DIMENSIONS,
   type InterestVector,
   type RelatedMatch,
@@ -114,6 +116,7 @@ import { badRequest, conflict, notFound } from "./errors.js";
 import type { ListOptions, RepoPort } from "./port.js";
 import type { AuditStore } from "./audit.js";
 import type { TuneupStore } from "./tuneup.js";
+import type { EmbeddedInterest, SettingsStore } from "./settings.js";
 import type { CorpusIssue, CorpusSource, CorpusStory } from "./corpus.js";
 import type { OwnStory, RelatedSource } from "./related.js";
 import type { FollowStore } from "./following.js";
@@ -350,6 +353,7 @@ function settingsOf(item: Record<string, unknown> | undefined): ReaderSettings {
       ? (item.interests as ReaderSettings["interests"])
       : DEFAULT_SETTINGS.interests,
     about: typeof item.about === "string" ? item.about : DEFAULT_SETTINGS.about,
+    learning: typeof item.learning === "string" ? item.learning : DEFAULT_SETTINGS.learning,
   };
 }
 
@@ -383,6 +387,7 @@ function decodePhase(cursor: string | undefined): { phase: 1 | 2; cursor?: strin
 export class DynamoRepo
   implements
     RepoPort,
+    SettingsStore,
     CorpusSource,
     SearchSource,
     RelatedSource,
@@ -2518,10 +2523,39 @@ export class DynamoRepo
   }
 
   /** The five interests' embeddings, written by enrichment; empty until the first run. */
+  /** The reader's own interests once they set some (#187), today's (`CONFIG/INTERESTS`) before. */
   private async interestVectors(): Promise<InterestVector[]> {
-    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: INTERESTS_KEY }));
-    const list = (res.Item?.interests as { name: string; vector: Uint8Array }[] | undefined) ?? [];
+    const own = this.reader
+      ? (
+          await this.ddb.send(
+            new GetCommand({ TableName: this.table, Key: interestsKey(this.reader.id) }),
+          )
+        ).Item
+      : undefined;
+    const item =
+      own ??
+      (await this.ddb.send(new GetCommand({ TableName: this.table, Key: INTERESTS_KEY }))).Item;
+    const list = (item?.interests as { name: string; vector: Uint8Array }[] | undefined) ?? [];
     return list.map((i) => ({ name: i.name, vector: toVector(i.vector) }));
+  }
+
+  async putInterestVectors(interests: EmbeddedInterest[]): Promise<void> {
+    if (!this.reader) throw badRequest("no reader");
+    await this.ddb.send(
+      new PutCommand({
+        TableName: this.table,
+        Item: {
+          ...interestsKey(this.reader.id),
+          interests: interests.map((i) => ({
+            name: i.name,
+            text: i.text,
+            vector: new Uint8Array(new Float32Array(i.vector).buffer),
+          })),
+          model: EMBED_MODEL,
+          at: new Date().toISOString(),
+        },
+      }),
+    );
   }
 
   /** The most recent ratings (the taste profile fades them over 60 days anyway). */

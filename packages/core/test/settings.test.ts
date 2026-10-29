@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { checkSettingsPatch, DEFAULT_SETTINGS, isTimeZone } from "../src/settings.js";
+import {
+  checkSettingsPatch,
+  CRAFT,
+  DEFAULT_SETTINGS,
+  isTimeZone,
+  PLAIN_LEARNING,
+} from "../src/settings.js";
 
 describe("settings (#184)", () => {
   it("defaults to today's values: India, the five interests, the reader line", () => {
@@ -25,5 +31,16 @@ describe("settings (#184)", () => {
       error: "each interest needs a name (40) and a text (300)",
     });
     expect(checkSettingsPatch({ colour: "red" })).toEqual({ error: "unknown setting: colour" });
+  });
+
+  it("keeps what Learning means to the reader, Sandip's craft by default (#187)", () => {
+    expect(DEFAULT_SETTINGS.learning).toBe(CRAFT);
+    expect(checkSettingsPatch({ learning: "  Teaches  cooking. " })).toEqual({
+      patch: { learning: "Teaches cooking." },
+    });
+    expect(checkSettingsPatch({ learning: "" })).toEqual({
+      error: "learning must be 1 to 600 characters",
+    });
+    expect(PLAIN_LEARNING).not.toMatch(/product management/);
   });
 });
