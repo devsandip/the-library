@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { HighlightQuote, IssueListItem, SenderListItem } from "@library/core/types";
 import { conflict, notFound } from "../src/errors.js";
 import type { Reader } from "@library/core/reader";
+import { DEFAULT_SETTINGS, type ReaderSettings } from "@library/core/settings";
 import { createHandler } from "../src/handler.js";
 import type { RepoPort, Services } from "../src/port.js";
 
@@ -43,6 +44,11 @@ function setup(overrides: Partial<RepoPort> = {}) {
       savedAt: saved ? "2026-10-10T10:00:00.000Z" : undefined,
     })),
     listTopics: vi.fn(async () => [{ name: "AI", description: "Models and tools" }]),
+    settings: vi.fn(async () => DEFAULT_SETTINGS),
+    saveSettings: vi.fn(async (patch: Partial<ReaderSettings>) => ({
+      ...DEFAULT_SETTINGS,
+      ...patch,
+    })),
     setRating: vi.fn(async (_id, value) => ({ ...issue, rating: value === 0 ? undefined : value })),
     logOpen: vi.fn(async () => undefined),
     logPeek: vi.fn(async () => undefined),
@@ -242,6 +248,51 @@ describe("the reader (#179)", () => {
     }
     expect(servicesFor).not.toHaveBeenCalled();
     expect(repo.listIssues).not.toHaveBeenCalled();
+  });
+});
+
+describe("settings (#184)", () => {
+  it("answers the reader's settings", async () => {
+    const { call } = setup();
+    const res = await call("GET", "/settings");
+    expect(res.status).toBe(200);
+    expect(res.body.timeZone).toBe("Asia/Kolkata");
+    expect(res.body.interests).toHaveLength(5);
+  });
+
+  it("saves a time zone, interests and the reader line, cleaned", async () => {
+    const { repo, call } = setup();
+    const res = await call("PATCH", "/settings", {
+      body: {
+        timeZone: "America/New_York",
+        interests: [{ name: " climate ", text: "Climate:  energy and policy." }],
+        about: "The reader follows climate and energy.",
+      },
+    });
+    expect(res.status).toBe(200);
+    expect(repo.saveSettings).toHaveBeenCalledWith({
+      timeZone: "America/New_York",
+      interests: [{ name: "climate", text: "Climate: energy and policy." }],
+      about: "The reader follows climate and energy.",
+    });
+    expect(res.body.timeZone).toBe("America/New_York");
+  });
+
+  it("refuses an unknown zone, empty or too many interests, unknown fields and nothing", async () => {
+    const { repo, call } = setup();
+    const bad = [
+      { timeZone: "Mars/Olympus" },
+      { timeZone: "+05:30" },
+      { interests: [] },
+      { interests: Array.from({ length: 11 }, () => ({ name: "a", text: "b" })) },
+      { interests: [{ name: "a" }] },
+      { about: "" },
+      { theme: "dark" },
+      {},
+      [],
+    ];
+    for (const body of bad) expect((await call("PATCH", "/settings", { body })).status).toBe(400);
+    expect(repo.saveSettings).not.toHaveBeenCalled();
   });
 });
 

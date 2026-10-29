@@ -32,6 +32,7 @@ import {
   TUNEUP_KEY,
   vectorBytes,
 } from "@library/core";
+import type { ReaderSettings } from "@library/core/settings";
 import type {
   AuditResponse,
   Prediction,
@@ -353,6 +354,22 @@ describe("API on dev", () => {
       (await call<SenderDetailResponse>("GET", `/senders/${LENNY}`)).body.shelf,
     ).toBeUndefined();
     await call("PATCH", `/senders/${PRAG}`, { body: { shelf: null } });
+  });
+
+  it("settings: kept for the reader, answered whole, a bad zone refused (#184)", async () => {
+    const before = await call<ReaderSettings>("GET", "/settings");
+    expect(before.status).toBe(200);
+    expect(before.body.interests.length).toBeGreaterThan(0);
+    const changed = await call<ReaderSettings>("PATCH", "/settings", {
+      body: { timeZone: "America/New_York" },
+    });
+    expect(changed.status).toBe(200);
+    expect(changed.body).toEqual({ ...before.body, timeZone: "America/New_York" });
+    expect((await call<ReaderSettings>("GET", "/settings")).body.timeZone).toBe("America/New_York");
+    expect((await call("PATCH", "/settings", { body: { timeZone: "Mars/Olympus" } })).status).toBe(
+      400,
+    );
+    await call("PATCH", "/settings", { body: { timeZone: before.body.timeZone } });
   });
 
   it("serves the topic list Claude proposed", async () => {

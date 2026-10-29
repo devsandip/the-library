@@ -31,6 +31,7 @@ import {
   INGEST_STATE_KEY,
   INTERESTS_KEY,
   OWNER_KEY,
+  settingsKey,
   NARRATIVE_KEY,
   NOW_READING_KEY,
   openIndexAttributes,
@@ -108,6 +109,7 @@ import type {
   View,
 } from "@library/core/types";
 import { readerOf, type Reader } from "@library/core/reader";
+import { DEFAULT_SETTINGS, type ReaderSettings } from "@library/core/settings";
 import { badRequest, conflict, notFound } from "./errors.js";
 import type { ListOptions, RepoPort } from "./port.js";
 import type { AuditStore } from "./audit.js";
@@ -336,6 +338,21 @@ function inFilter(attr: string, prefix: string, values: string[], negate = false
   return { expr, names, values: vals };
 }
 
+/** How long a warm Lambda trusts the settings it read: another Lambda may have saved since. */
+const SETTINGS_TTL_MS = 60_000;
+
+/** A settings item read back over today's values, so a field added later has its default. */
+function settingsOf(item: Record<string, unknown> | undefined): ReaderSettings {
+  if (!item) return DEFAULT_SETTINGS;
+  return {
+    timeZone: typeof item.timeZone === "string" ? item.timeZone : DEFAULT_SETTINGS.timeZone,
+    interests: Array.isArray(item.interests)
+      ? (item.interests as ReaderSettings["interests"])
+      : DEFAULT_SETTINGS.interests,
+    about: typeof item.about === "string" ? item.about : DEFAULT_SETTINGS.about,
+  };
+}
+
 /** Unread cursors: which stream (1 Must Read, 2 everything else), plus that stream's cursor. */
 function encodePhase(phase: 1 | 2, cursor?: string): string {
   return Buffer.from(JSON.stringify(cursor ? { p: phase, c: cursor } : { p: phase })).toString(
@@ -414,6 +431,35 @@ export class DynamoRepo
   async owner(): Promise<Reader | undefined> {
     const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: OWNER_KEY }));
     return readerOf(res.Item?.readerId);
+  }
+
+  /** Settings read in the last minute; a save here updates them at once. */
+  private settingsRead?: { at: number; value: Promise<ReaderSettings> };
+
+  async settings(): Promise<ReaderSettings> {
+    const reader = this.reader;
+    if (!reader) return DEFAULT_SETTINGS;
+    if (!this.settingsRead || Date.now() - this.settingsRead.at > SETTINGS_TTL_MS) {
+      const value = this.ddb
+        .send(new GetCommand({ TableName: this.table, Key: settingsKey(reader.id) }))
+        .then((res) => settingsOf(res.Item));
+      value.catch(() => (this.settingsRead = undefined));
+      this.settingsRead = { at: Date.now(), value };
+    }
+    return this.settingsRead.value;
+  }
+
+  async saveSettings(patch: Partial<ReaderSettings>): Promise<ReaderSettings> {
+    if (!this.reader) throw badRequest("no reader");
+    const next = { ...(await this.settings()), ...patch };
+    await this.ddb.send(
+      new PutCommand({
+        TableName: this.table,
+        Item: { ...settingsKey(this.reader.id), ...next, updatedAt: new Date().toISOString() },
+      }),
+    );
+    this.settingsRead = { at: Date.now(), value: Promise.resolve(next) };
+    return next;
   }
 
   // ---------- issues ----------

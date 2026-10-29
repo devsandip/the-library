@@ -1,3 +1,4 @@
+import type { ReaderSettings } from "@library/core/settings";
 import type {
   AskResponse,
   AuditResponse,
@@ -80,6 +81,10 @@ export interface RepoPort {
   getSender(senderId: string): Promise<SenderDetailResponse>;
   updateSender(senderId: string, patch: SenderPatch): Promise<SenderListItem>;
   listTopics(): Promise<Topic[]>;
+  /** The reader's settings (#184), today's values when they have none. */
+  settings(): Promise<ReaderSettings>;
+  /** Changes the reader's settings and answers them whole. */
+  saveSettings(patch: Partial<ReaderSettings>): Promise<ReaderSettings>;
   unreadCounts(): Promise<UnreadCountsResponse>;
   /** The most relevant unread News, best first. */
   summary(): Promise<SummaryResponse>;

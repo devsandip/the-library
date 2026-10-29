@@ -23,6 +23,8 @@ export const INTERESTS_KEY = { pk: "CONFIG", sk: "INTERESTS" } as const;
  * setting of the deployment that names a reader, not one of the reader's own items.
  */
 export const OWNER_KEY = { pk: "CONFIG", sk: "OWNER" } as const;
+/** A reader's settings (#184): time zone, interests, the line prompts use. */
+export const settingsKey = (readerId: string) => ({ pk: `READER#${readerId}`, sk: "SETTINGS" });
 /** The Summary's top 5 as first shown on a day (#5): `ids`, `at`. */
 export const digestKey = (day: string) => ({ pk: `DIGEST#${day}`, sk: "META" });
 /** Titan embedding of an issue, kept out of the META item so it never lands in an index. */

@@ -11,6 +11,7 @@
     "./highlights": "./src/highlights.ts",
     "./predictions": "./src/predictions.ts",
     "./reader": "./src/reader.ts",
+    "./settings": "./src/settings.ts",
     "./search": "./src/search.ts",
     "./stories": "./src/stories.ts",
     "./tuneup": "./src/tuneup.ts",
