@@ -4,7 +4,10 @@
  * GET finds it. Source checks (#23) start that way; the day's settling of predictions (#139) on a
  * schedule, or by hand with `pnpm settle`.
  */
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { S3Client } from "@aws-sdk/client-s3";
 import { CLAUDE_MODEL } from "@library/core";
+import { readerOf, type Reader } from "@library/core/reader";
 import type { SettleStats } from "@library/core/types";
 import { BedrockClaude } from "./claude.js";
 import { CorpusCache } from "./corpus.js";
@@ -14,18 +17,24 @@ import { DynamoRepo } from "./repo.js";
 import { Settler } from "./settle.js";
 import { SourceChecker } from "./source.js";
 
-export function createJobHandler(work: {
-  checker: Pick<SourceChecker, "check">;
-  settler: Pick<Settler, "settleDue">;
-}) {
+/**
+ * The jobs Lambda's handler. A source check runs for the reader who asked for it (#179); settling
+ * runs for no particular reader until the owner is named (#180).
+ */
+export function createJobHandler(
+  workFor: (reader: Reader | undefined) => {
+    checker: Pick<SourceChecker, "check">;
+    settler: Pick<Settler, "settleDue">;
+  },
+) {
   return async (job: Job): Promise<SettleStats | void> => {
     const started = Date.now();
     try {
       if (job.kind === "source") {
-        await work.checker.check(job.id, job.n);
+        await workFor(readerOf(job.reader)).checker.check(job.id, job.n);
         return;
       }
-      if (job.kind === "settle") return await work.settler.settleDue(job.limit);
+      if (job.kind === "settle") return await workFor(undefined).settler.settleDue(job.limit);
       throw new Error(`unknown job ${String((job as { kind: unknown }).kind)}`);
     } catch (err) {
       // A source check's run is marked failed already; thrown so the Lambda counts the error.
@@ -46,14 +55,21 @@ export function createJobHandler(work: {
 }
 
 const { TABLE_NAME, BUCKET_NAME, STAGE } = process.env;
-const repo = new DynamoRepo({
-  table: TABLE_NAME!,
-  bucket: BUCKET_NAME!,
-  stage: STAGE ?? "unknown",
-});
+const ddb = new DynamoDBClient({});
+const s3 = new S3Client({});
 const claude = new BedrockClaude();
 
-export const handler = createJobHandler({
-  checker: new SourceChecker(repo, claude),
-  settler: new Settler(repo, new CorpusCache(repo), new TitanEmbedder(), claude, CLAUDE_MODEL),
+export const handler = createJobHandler((reader) => {
+  const repo = new DynamoRepo({
+    table: TABLE_NAME!,
+    bucket: BUCKET_NAME!,
+    stage: STAGE ?? "unknown",
+    reader,
+    ddb,
+    s3,
+  });
+  return {
+    checker: new SourceChecker(repo, claude),
+    settler: new Settler(repo, new CorpusCache(repo), new TitanEmbedder(), claude, CLAUDE_MODEL),
+  };
 });

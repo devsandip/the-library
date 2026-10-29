@@ -11,7 +11,7 @@ Sandip, 2026-10-29: build it for Sandip for now, to test the app before a broade
 
 ## In one minute
 
-- **Now:** about 27 pull requests in 5 milestones (11 to 15 below): the reader on every request, settings per reader, an owner for every item, daily work per reader with a meter, and sign-up by email.
+- **Now:** about 26 pull requests in 5 milestones (11 to 15 below): the reader on every request, settings per reader, an owner for every item, daily work per reader with a meter, and sign-up by email.
 - **Later:** about 12 more for mail in, Google sign-in and launch. About 39 in all, some 40% of the 96 pull requests merged so far.
 - **The risk** is in milestone 13, where the keys of everything stored change and Sandip's prod data moves.
 - **Mail in gates the launch.** A reader who signs up before it is built has nothing to read, so sign-up merges switched off and opens only once mail in is built.
@@ -47,16 +47,15 @@ The table stays one DynamoDB table with the reader in the keys (the usual pooled
 
 Each becomes a GitHub milestone with one issue per pull request when it is next; until then it is this section. Sizes are pull requests.
 
-### 11. Every request knows its reader (4)
+### 11. Every request knows its reader (3)
 
-Nothing changes for Sandip; the code stops assuming Sandip.
+[Milestone 11](https://github.com/devsandip/the-library/milestone/11). Nothing changes for Sandip; the code stops assuming Sandip.
 
-1. The API reads the reader from the token and passes a `Reader` through routes, services and the repository (43 routes, 51 repository methods).
-2. Ingest and the scripts take the reader explicitly; Sandip's id comes from one place.
-3. The stored `"sandip"` in `setBy` and `shelfSetBy` becomes "the reader", kept readable for old items.
-4. The integration tests sign in as a second test reader on dev (a second Cognito user on dev only).
+1. **The API reads the reader** (#179). The handler reads the token's `sub` into a `Reader` (`packages/core/src/reader.ts`) and refuses a request that names none with 401. Each reader's services (repository, corpus, deep dives) are built on their first request and kept while the Lambda is warm, 20 readers at most. A source check carries its reader to the jobs Lambda.
+2. **The owner** (#180): `CONFIG/OWNER` names the reader whose Gmail the poller reads and whom the daily jobs serve; ingest, the jobs and the scripts build their store for that reader.
+3. **"reader", not "sandip"** (#181): the stored `"sandip"` in `setBy` and `shelfSetBy` becomes `"reader"`, old items read the same.
 
-Done when: no route, job or script reads data without a reader, and the Deploy's tests pass unchanged.
+Done when: no route, job or script reads data without a reader, and the Deploy's tests pass unchanged. A second test reader in the integration tests waits for milestone 13, where it can check that two readers are kept apart.
 
 ### 12. Settings instead of Sandip (5)
 

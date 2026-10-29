@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { HighlightQuote, IssueListItem, SenderListItem } from "@library/core/types";
 import { conflict, notFound } from "../src/errors.js";
+import type { Reader } from "@library/core/reader";
 import { createHandler } from "../src/handler.js";
 import type { RepoPort, Services } from "../src/port.js";
 
@@ -187,11 +188,12 @@ function setup(overrides: Partial<RepoPort> = {}) {
     },
     startIngest: vi.fn(async () => undefined),
   };
-  const handler = createHandler(svc);
+  const servicesFor = vi.fn((_reader: Reader) => svc);
+  const handler = createHandler(servicesFor);
   const call = async (
     method: string,
     path: string,
-    opts: { query?: Record<string, string>; body?: unknown } = {},
+    opts: { query?: Record<string, string>; body?: unknown; sub?: unknown } = {},
   ) => {
     const res = (await handler({
       rawPath: `/nutgraf/api${path}`,
@@ -203,7 +205,10 @@ function setup(overrides: Partial<RepoPort> = {}) {
             ? opts.body
             : JSON.stringify(opts.body),
       isBase64Encoded: false,
-      requestContext: { http: { method } },
+      requestContext: {
+        http: { method },
+        authorizer: { jwt: { claims: "sub" in opts ? { sub: opts.sub } : { sub: "reader-1" } } },
+      },
     } as never)) as { statusCode: number; body: string; headers: Record<string, string> };
     return {
       status: res.statusCode,
@@ -211,7 +216,7 @@ function setup(overrides: Partial<RepoPort> = {}) {
       headers: res.headers,
     };
   };
-  return { repo, svc, call };
+  return { repo, svc, servicesFor, call };
 }
 
 const tuneupBody = {
@@ -220,6 +225,25 @@ const tuneupBody = {
   newsletters: [],
   totals: { stories: 0, moved: 0, toLearning: 0, toNews: 0, unsure: 0, promos: 0, pulledBack: 0 },
 };
+
+describe("the reader (#179)", () => {
+  it("runs each request with the services of the reader its token names", async () => {
+    const { servicesFor, call } = setup();
+    await call("GET", "/issues", { sub: "0f6c2b1e-1d2a-4c3b-9e8f-7a6b5c4d3e2f" });
+    expect(servicesFor).toHaveBeenLastCalledWith({ id: "0f6c2b1e-1d2a-4c3b-9e8f-7a6b5c4d3e2f" });
+  });
+
+  it("refuses a request whose token names no reader, before any route runs", async () => {
+    const { repo, servicesFor, call } = setup();
+    for (const sub of [undefined, "", "a b", 42, "x".repeat(65)]) {
+      const res = await call("GET", "/issues", { sub });
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual({ error: "no reader" });
+    }
+    expect(servicesFor).not.toHaveBeenCalled();
+    expect(repo.listIssues).not.toHaveBeenCalled();
+  });
+});
 
 describe("routing and validation", () => {
   it("lists unread by default with a 30-item page", async () => {

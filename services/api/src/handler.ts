@@ -1,8 +1,11 @@
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
+import { S3Client } from "@aws-sdk/client-s3";
+import { readerOf, type Reader } from "@library/core/reader";
 import { Asks } from "./ask.js";
 import { Audits } from "./audit.js";
-import { HttpError } from "./errors.js";
+import { HttpError, unauthorized } from "./errors.js";
 import { Following } from "./following.js";
 import { Highlights } from "./highlights.js";
 import { Predictions } from "./predictions.js";
@@ -40,13 +43,19 @@ function toRequest(event: Event): Request {
   };
 }
 
-export function createHandler(svc: Services) {
+/**
+ * The API's handler. Each request runs with the services of the reader its token names (#179);
+ * a token that names no reader is refused before any route runs.
+ */
+export function createHandler(servicesFor: (reader: Reader) => Services) {
   return async (event: Event): Promise<APIGatewayProxyResultV2> => {
     const started = Date.now();
     const req = toRequest(event);
     let status = 500;
     try {
-      const res = await route(svc, req);
+      const reader = readerOf(event.requestContext.authorizer?.jwt?.claims?.sub);
+      if (!reader) throw unauthorized();
+      const res = await route(servicesFor(reader), req);
       status = res.status;
       return {
         statusCode: res.status,
@@ -103,30 +112,50 @@ async function invokeAsync(functionName: string, payload: unknown): Promise<void
   );
 }
 
-const repo = new DynamoRepo({
-  table: TABLE_NAME!,
-  bucket: BUCKET_NAME!,
-  stage: STAGE ?? "unknown",
-});
-
-// Kept between requests while the Lambda is warm: the corpus, and recent query embeddings.
-// Dev reads the corpus every time: integration tests rewrite it between calls.
-const corpus = new CorpusCache(repo, STAGE === "prod" ? {} : { ttlMs: 0 });
-
+const ddb = new DynamoDBClient({});
+const s3 = new S3Client({});
 const claude = new BedrockClaude();
 
-export const handler = createHandler({
-  repo,
-  search: new Search(repo, new TitanEmbedder(), corpus),
-  related: new Related(repo, corpus),
-  timelines: new Timelines(repo, corpus, claude),
-  takes: new Takes(repo, corpus, claude),
-  sources: new Sources(repo, (job) => invokeAsync(JOBS_FUNCTION!, job)),
-  ask: new Asks(repo, corpus, new TitanEmbedder(), claude),
-  following: new Following(repo),
-  highlights: new Highlights(repo),
-  predictions: new Predictions(repo),
-  audit: new Audits(repo),
-  tuneup: new Tuneups(repo),
-  startIngest: () => invokeAsync(INGEST_FUNCTION!, {}),
+/** A reader's services, with the caches they keep while the Lambda is warm. */
+function servicesOf(reader: Reader): Services {
+  const repo = new DynamoRepo({
+    table: TABLE_NAME!,
+    bucket: BUCKET_NAME!,
+    stage: STAGE ?? "unknown",
+    reader,
+    ddb,
+    s3,
+  });
+  // Kept between requests: the corpus, and recent query embeddings. Dev reads the corpus every
+  // time: integration tests rewrite it between calls.
+  const corpus = new CorpusCache(repo, STAGE === "prod" ? {} : { ttlMs: 0 });
+  return {
+    repo,
+    search: new Search(repo, new TitanEmbedder(), corpus),
+    related: new Related(repo, corpus),
+    timelines: new Timelines(repo, corpus, claude),
+    takes: new Takes(repo, corpus, claude),
+    sources: new Sources(repo, (job) => invokeAsync(JOBS_FUNCTION!, { ...job, reader: reader.id })),
+    ask: new Asks(repo, corpus, new TitanEmbedder(), claude),
+    following: new Following(repo),
+    highlights: new Highlights(repo),
+    predictions: new Predictions(repo),
+    audit: new Audits(repo),
+    tuneup: new Tuneups(repo),
+    startIngest: () => invokeAsync(INGEST_FUNCTION!, {}),
+  };
+}
+
+/** Readers whose services a warm Lambda keeps; past this, the one kept longest goes. */
+const READERS_KEPT = 20;
+const kept = new Map<string, Services>();
+
+export const handler = createHandler((reader) => {
+  let services = kept.get(reader.id);
+  if (!services) {
+    services = servicesOf(reader);
+    kept.set(reader.id, services);
+    if (kept.size > READERS_KEPT) kept.delete(kept.keys().next().value!);
+  }
+  return services;
 });

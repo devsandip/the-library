@@ -10,6 +10,7 @@
     "./follow": "./src/follow.ts",
     "./highlights": "./src/highlights.ts",
     "./predictions": "./src/predictions.ts",
+    "./reader": "./src/reader.ts",
     "./search": "./src/search.ts",
     "./stories": "./src/stories.ts",
     "./tuneup": "./src/tuneup.ts",
