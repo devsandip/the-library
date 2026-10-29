@@ -5,7 +5,7 @@ import type {
   PredictionView,
   TrackRecord,
 } from "@library/core/types";
-import { readerDay } from "@library/core/days";
+import { today as todayInZone } from "../zone.js";
 import { useApp } from "../context.js";
 import { shortDate } from "../format.js";
 import { issueHref, predictionsHref, queueHref } from "../paths.js";
@@ -42,7 +42,7 @@ export function Predictions({ view, wide }: { view: PredictionView; wide: boolea
   const { api } = useApp();
   const toast = useToast();
   const { state, reload } = usePredictions(view);
-  const today = readerDay(Date.now());
+  const today = todayInZone();
   const href = (id: string, n?: number) =>
     wide ? queueHref("news", undefined, id, n) : issueHref(id, n);
   const set = (p: Prediction, verdict: Exclude<PredictionStatus, "open"> | null) =>

@@ -1,4 +1,4 @@
-import { readerDay } from "@library/core/days";
+import { today as todayInZone } from "../zone.js";
 import type { StatusResponse } from "@library/core/types";
 import { useApp } from "../context.js";
 import { clock } from "../format.js";
@@ -49,7 +49,7 @@ export function LibraryHome() {
   const { api } = useApp();
   const { senders, status } = useLibrary();
   const { pref } = useTheme();
-  const today = readerDay(Date.now());
+  const today = todayInZone();
   const followed = useFollowing().state;
   const following =
     followed.status === "ok"

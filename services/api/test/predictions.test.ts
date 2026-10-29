@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from "@library/core/settings";
 import { describe, expect, it, vi } from "vitest";
 import { HttpError } from "../src/errors.js";
 import {
@@ -56,6 +57,7 @@ describe("predictionView", () => {
 describe("Predictions", () => {
   it("sets Sandip's verdict, hands one back with null, and 404s an unknown one", async () => {
     const store: PredictionStore = {
+      settings: vi.fn(async () => DEFAULT_SETTINGS),
       listPredictions: vi.fn(async () => []),
       setPredictionVerdict: vi.fn(async (id: string, verdict: Verdict) =>
         id === "a.1"

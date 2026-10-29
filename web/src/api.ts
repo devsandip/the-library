@@ -1,3 +1,4 @@
+import type { ReaderSettings } from "@library/core/settings";
 import type {
   AskResponse,
   AuditResponse,
@@ -76,6 +77,9 @@ export interface LibraryApi {
   /** Save an issue for later, or take it off the Saved list (#43). */
   setSaved(id: string, saved: boolean): Promise<IssueListItem>;
   listTopics(): Promise<TopicListResponse>;
+  /** The reader's settings (#184): time zone, interests, the line prompts use. */
+  settings(): Promise<ReaderSettings>;
+  saveSettings(patch: Partial<ReaderSettings>): Promise<ReaderSettings>;
   unreadCounts(): Promise<UnreadCountsResponse>;
   /** The most relevant unread News, best first. */
   summary(): Promise<SummaryResponse>;
@@ -228,6 +232,12 @@ export class HttpLibraryApi implements LibraryApi {
   }
   listTopics() {
     return this.request<TopicListResponse>("GET", "/topics");
+  }
+  settings() {
+    return this.request<ReaderSettings>("GET", "/settings");
+  }
+  saveSettings(patch: Partial<ReaderSettings>) {
+    return this.request<ReaderSettings>("PATCH", "/settings", patch);
   }
   unreadCounts() {
     return this.request<UnreadCountsResponse>("GET", "/unread-counts");

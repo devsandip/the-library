@@ -15,6 +15,8 @@ import {
   newHighlightKey,
   sameQuote,
 } from "@library/core/highlights";
+import { readerZone } from "./zone.js";
+import { DEFAULT_SETTINGS, type ReaderSettings } from "@library/core/settings";
 import type {
   AskResponse,
   AuditCard,
@@ -72,6 +74,11 @@ import type {
 } from "@library/core/types";
 import type { LibraryApi, ListIssuesOptions, ListLearningOptions } from "./api.js";
 
+/** The reader's settings (#184): VITE_ZONE starts the mock in another time zone. */
+let mockSettings: ReaderSettings = {
+  ...DEFAULT_SETTINGS,
+  timeZone: import.meta.env.VITE_ZONE ?? DEFAULT_SETTINGS.timeZone,
+};
 const HOUR = 3_600_000;
 const now = Date.now();
 
@@ -588,7 +595,7 @@ function digestStats(): DigestStats {
  * days ago, so previous and next skip the empty day between. Opens after now are not shown yet.
  */
 function mockHistory(day: string): HistoryResponse {
-  const days = [0, 1, 3].map((k) => readerDay(now - k * 24 * HOUR));
+  const days = [0, 1, 3].map((k) => readerDay(now - k * 24 * HOUR, readerZone()));
   const opens = days
     .flatMap((d, k) =>
       issues.slice(k * 4, k * 4 + 4).map((issue, n) => ({
@@ -1124,6 +1131,15 @@ export class MockLibraryApi implements LibraryApi {
     await delay();
     return { topics };
   }
+  async settings(): Promise<ReaderSettings> {
+    await delay();
+    return structuredClone(mockSettings);
+  }
+  async saveSettings(patch: Partial<ReaderSettings>): Promise<ReaderSettings> {
+    await delay();
+    mockSettings = { ...mockSettings, ...structuredClone(patch) };
+    return structuredClone(mockSettings);
+  }
   async unreadCounts(): Promise<UnreadCountsResponse> {
     await delay();
     const tally = new Map<string, UnreadCount>();
@@ -1306,7 +1322,7 @@ export class MockLibraryApi implements LibraryApi {
   async predictions(view: PredictionView): Promise<PredictionsResponse> {
     await delay();
     seedPredictions();
-    const today = readerDay(Date.now());
+    const today = readerDay(Date.now(), readerZone());
     const all = [...predictions.values()];
     const open = all.filter((p) => p.status === "open");
     const items =
@@ -1670,7 +1686,7 @@ export class MockLibraryApi implements LibraryApi {
   }
   async history(day?: string): Promise<HistoryResponse> {
     await delay();
-    return mockHistory(day ?? readerDay(now));
+    return mockHistory(day ?? readerDay(now, readerZone()));
   }
   async rate(id: string, value: Rating | 0) {
     await delay(80);

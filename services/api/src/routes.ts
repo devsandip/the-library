@@ -462,7 +462,7 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     method: "GET",
     pattern: /^\/history$/,
     handler: async (svc, req) => {
-      const day = req.query.day ?? readerDay(Date.now());
+      const day = req.query.day ?? readerDay(Date.now(), (await svc.repo.settings()).timeZone);
       if (!isReaderDay(day)) throw badRequest("day must be a date like 2026-10-10");
       return ok(await svc.repo.history(day));
     },

@@ -26,6 +26,7 @@ import {
   INGEST_STATE_KEY,
   INTERESTS_KEY,
   OWNER_KEY,
+  settingsKey,
   NARRATIVE_KEY,
   openIndexAttributes,
   predictionKey,
@@ -60,6 +61,7 @@ import type {
   Topic,
 } from "@library/core/types";
 import { readerOf, type Reader } from "@library/core/reader";
+import { DEFAULT_SETTINGS, type ReaderSettings } from "@library/core/settings";
 import { MODELS } from "./bedrock.js";
 import type { Classification, EnrichCandidate } from "./enrich.js";
 import type { RecentStory } from "./follow.js";
@@ -108,6 +110,21 @@ export class Store {
   async owner(): Promise<Reader | undefined> {
     const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: OWNER_KEY }));
     return readerOf(res.Item?.readerId);
+  }
+
+  /** The settings of the reader this store writes for (#185), today's values without them. */
+  async settings(): Promise<ReaderSettings> {
+    if (!this.reader) return DEFAULT_SETTINGS;
+    const res = await this.ddb.send(
+      new GetCommand({ TableName: this.table, Key: settingsKey(this.reader.id) }),
+    );
+    const item = res.Item;
+    if (!item) return DEFAULT_SETTINGS;
+    return {
+      timeZone: typeof item.timeZone === "string" ? item.timeZone : DEFAULT_SETTINGS.timeZone,
+      interests: Array.isArray(item.interests) ? item.interests : DEFAULT_SETTINGS.interests,
+      about: typeof item.about === "string" ? item.about : DEFAULT_SETTINGS.about,
+    };
   }
 
   /** Names the owner; `email` is kept to show which account it is. */

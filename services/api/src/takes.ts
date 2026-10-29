@@ -12,6 +12,7 @@ import {
   claudeCents,
   closestStories,
   READER,
+  READER_TIME_ZONE,
   readerDay,
   storyRef,
 } from "@library/core";
@@ -41,7 +42,10 @@ export const onlyOne = (publication: string) =>
   `Only ${publication} carried this in your newsletters.`;
 
 /** Where takes read from and are kept. DynamoRepo implements it; tests use a fake. */
-export interface TakesStore extends Pick<TimelineStore, "timelineStory" | "listSenders"> {
+export interface TakesStore extends Pick<
+  TimelineStore,
+  "timelineStory" | "listSenders" | "settings"
+> {
   getTakes(eventId: string): Promise<TakesResult | undefined>;
   putTakes(eventId: string, takes: StoredTakes): Promise<void>;
 }
@@ -136,7 +140,7 @@ export function takesItems(
     .map((i, k) => ({ id: String(k + 1), ...i }));
 }
 
-export function takesRequest(items: TakesItem[]): ToolRequest {
+export function takesRequest(items: TakesItem[], timeZone = READER_TIME_ZONE): ToolRequest {
   return {
     system: [
       `You compare how one reader's newsletters covered the same news. ${READER}`,
@@ -161,7 +165,7 @@ export function takesRequest(items: TakesItem[]): ToolRequest {
       .map((i) =>
         [
           i.id,
-          readerDay(Date.parse(i.receivedAt)),
+          readerDay(Date.parse(i.receivedAt), timeZone),
           i.publication,
           `${i.headline}. ${i.summary}`,
           i.names.join(", ") || "-",
@@ -284,7 +288,9 @@ export class Takes implements TakesPort {
     const items = takesItems(story, corpus, eligible);
     if (items.length < 2) return { none: onlyOne(story.publication) };
 
-    const res = await this.claude.callTool(takesRequest(items));
+    const res = await this.claude.callTool(
+      takesRequest(items, (await this.store.settings()).timeZone),
+    );
     const parsed = parseTakes(res.input, items);
     if (!parsed) return { none: onlyOne(story.publication) };
     const takes: TakesResult = {

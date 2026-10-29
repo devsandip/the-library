@@ -2,6 +2,7 @@
  * Predictions (#24, #140): open ones by due date, settled ones latest first, and Sandip's own
  * verdicts. Settling is the jobs Lambda's (`./settle.ts`); this only lists and overrules.
  */
+import type { ReaderSettings } from "@library/core/settings";
 import { readerDay } from "@library/core";
 import type {
   Prediction,
@@ -18,6 +19,8 @@ export type Verdict = Exclude<PredictionStatus, "open"> | null;
 
 /** Where predictions are read and overruled. DynamoRepo implements it; tests use a fake. */
 export interface PredictionStore {
+  /** The reader's settings: what is due is by their day (#185). */
+  settings(): Promise<ReaderSettings>;
   listPredictions(): Promise<StoredPrediction[]>;
   /** Sets Sandip's verdict, or hands it back; undefined when there is no such prediction. */
   setPredictionVerdict(
@@ -59,7 +62,11 @@ export class Predictions implements PredictionsPort {
   ) {}
 
   async list(view: PredictionView): Promise<PredictionsResponse> {
-    return predictionView(await this.store.listPredictions(), view, readerDay(this.now()));
+    return predictionView(
+      await this.store.listPredictions(),
+      view,
+      readerDay(this.now(), (await this.store.settings()).timeZone),
+    );
   }
 
   async set(id: string, verdict: Verdict): Promise<Prediction> {

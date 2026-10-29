@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import { useLocation } from "preact-iso";
-import { readerDay } from "@library/core/days";
+import { today } from "../zone.js";
 import type { IssueListItem, Narrative, SummaryResponse } from "@library/core/types";
 import { useIssueActions, type IssueActions, type IssueChange } from "../actions.js";
 import { useApp } from "../context.js";
@@ -23,7 +23,7 @@ const FOLD_KEY = "library.brief.folded";
 
 function foldedToday(): boolean {
   try {
-    return localStorage.getItem(FOLD_KEY) === readerDay(Date.now());
+    return localStorage.getItem(FOLD_KEY) === today();
   } catch {
     return false;
   }
@@ -31,7 +31,7 @@ function foldedToday(): boolean {
 
 function setFolded(on: boolean) {
   try {
-    if (on) localStorage.setItem(FOLD_KEY, readerDay(Date.now()));
+    if (on) localStorage.setItem(FOLD_KEY, today());
     else localStorage.removeItem(FOLD_KEY);
   } catch {
     // Blocked storage: the fold lasts until the page reloads.

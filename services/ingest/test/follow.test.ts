@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from "@library/core/settings";
 import { describe, expect, it, vi } from "vitest";
 import type { StoredFollow } from "@library/core";
 import type { ModelPort, ToolRequest } from "../src/bedrock.js";
@@ -227,6 +228,7 @@ describe("parseMoves", () => {
 describe("checkFollows", () => {
   function setup(follows: StoredFollow[], recent: RecentStory[], answer: unknown) {
     const store = {
+      settings: vi.fn(async () => DEFAULT_SETTINGS),
       follows: vi.fn(async () => follows),
       recentStories: vi.fn(async () => recent),
       senderSettings: vi.fn(

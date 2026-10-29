@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from "@library/core/settings";
 import { describe, expect, it, vi } from "vitest";
 import type { SenderListItem, Timeline } from "@library/core/types";
 import type { ClaudePort, ToolRequest } from "../src/claude.js";
@@ -68,6 +69,7 @@ function setup(answer: unknown, extra: { issues?: CorpusIssue[]; stories?: Corpu
   const allStories = [...stories, ...(extra.stories ?? [])];
   const kept = new Map<string, Timeline>();
   const store: TimelineStore = {
+    settings: vi.fn(async () => DEFAULT_SETTINGS),
     timelineStory: vi.fn(async (id: string, n: number): Promise<TimelineStory | undefined> => {
       const s = allStories.find((x) => x.id === id && x.n === n);
       const i = allIssues.find((x) => x.id === id);

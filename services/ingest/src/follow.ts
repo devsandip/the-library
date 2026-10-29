@@ -10,6 +10,7 @@ import {
   followStories,
   isQuiet,
   READER,
+  READER_TIME_ZONE,
   readerDay,
   STORY_RELATED_CUTOFF,
   type StoredFollow,
@@ -101,7 +102,7 @@ export interface MoveItem {
 /** What a candidate is to its followed story; only a move's stories make a point. */
 const KINDS = ["move", "repeat", "other"] as const;
 
-export function movesRequest(items: MoveItem[]): ToolRequest {
+export function movesRequest(items: MoveItem[], timeZone = READER_TIME_ZONE): ToolRequest {
   return {
     system: [
       `You keep one reader up to date on the stories they follow, from their own newsletters. ${READER}`,
@@ -129,12 +130,12 @@ export function movesRequest(items: MoveItem[]): ToolRequest {
       .map((i) =>
         [
           `${i.id}: ${i.follow.headline}`,
-          ...i.follow.points.map((p) => `  ${readerDay(Date.parse(p.at))} | ${p.text}`),
+          ...i.follow.points.map((p) => `  ${readerDay(Date.parse(p.at), timeZone)} | ${p.text}`),
           "  New stories:",
           ...i.stories.map((s) =>
             [
               `  ${s.id}`,
-              readerDay(Date.parse(s.story.receivedAt)),
+              readerDay(Date.parse(s.story.receivedAt), timeZone),
               s.publication,
               `${s.story.headline}. ${s.story.summary}`,
               s.story.names.join(", ") || "-",
@@ -252,7 +253,13 @@ export function parseMoves(
 export async function checkFollows(
   store: Pick<
     Store,
-    "follows" | "recentStories" | "senderSettings" | "storyVectors" | "issueBriefs" | "addMoves"
+    | "follows"
+    | "recentStories"
+    | "senderSettings"
+    | "storyVectors"
+    | "issueBriefs"
+    | "addMoves"
+    | "settings"
   >,
   model: ModelPort,
   opts: { now?: number } = {},
@@ -302,7 +309,7 @@ export async function checkFollows(
   }));
   stats.candidates = k;
 
-  const res = await model.callTool(movesRequest(items));
+  const res = await model.callTool(movesRequest(items, (await store.settings()).timeZone));
   stats.inputTokens = res.inputTokens;
   stats.outputTokens = res.outputTokens;
   const moves = parseMoves(res.input, items, new Date(now).toISOString());

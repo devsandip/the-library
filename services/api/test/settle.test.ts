@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from "@library/core/settings";
 import { describe, expect, it, vi } from "vitest";
 import type { ClaudePort, ToolRequest } from "../src/claude.js";
 import { CorpusCache, type CorpusIssue, type CorpusStory } from "../src/corpus.js";
@@ -141,6 +142,7 @@ describe("Settler", () => {
   function setup(list: StoredPrediction[], answer: unknown) {
     const settled = new Map<string, Settlement>();
     const store: SettleStore = {
+      settings: vi.fn(async () => DEFAULT_SETTINGS),
       listPredictions: vi.fn(async () => list),
       settlePrediction: vi.fn(async (id: string, s: Settlement) => void settled.set(id, s)),
       listSenders: vi.fn(async () => [

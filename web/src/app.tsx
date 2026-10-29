@@ -24,6 +24,7 @@ import { Audit } from "./pages/audit.js";
 import { Tuneup } from "./pages/tuneup.js";
 import { Following } from "./pages/following.js";
 import { HIGHLIGHTS } from "./features.js";
+import { setReaderZone } from "./zone.js";
 import { Highlights } from "./pages/highlights.js";
 import { Predictions } from "./pages/predictions.js";
 import { Search } from "./pages/search.js";
@@ -46,7 +47,7 @@ async function boot(): Promise<AppContext> {
   // switch a production build into mock mode.
   if (import.meta.env.VITE_MOCK === "1" && cfg.mock) {
     const { MockLibraryApi } = await import("./mock.js");
-    return { cfg, api: new MockLibraryApi() };
+    return started({ cfg, api: new MockLibraryApi() });
   }
   const auth = new Auth(cfg);
   if (location.pathname === `${BASE}/auth/callback`) {
@@ -55,7 +56,16 @@ async function boot(): Promise<AppContext> {
   } else if (!(await auth.accessToken())) {
     await auth.signIn();
   }
-  return { cfg, auth, api: new HttpLibraryApi(cfg, auth) };
+  return started({ cfg, auth, api: new HttpLibraryApi(cfg, auth) });
+}
+
+/** The reader's time zone before the first screen, so no date shows in another zone first (#185). */
+async function started(ctx: AppContext): Promise<AppContext> {
+  await ctx.api.settings().then(
+    (s) => setReaderZone(s.timeZone),
+    () => undefined,
+  );
+  return ctx;
 }
 
 /** Library's pages are the same on both devices. */

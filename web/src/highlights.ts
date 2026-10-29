@@ -5,6 +5,7 @@
  */
 import { useEffect, useState } from "preact/hooks";
 import { isReaderDay, readerDay, readerDayBounds } from "@library/core/days";
+import { readerZone } from "./zone.js";
 import { byIssue, highlightsMarkdown } from "@library/core/highlights";
 import type { Highlight, HighlightListItem, IssueListItem } from "@library/core/types";
 import type { LibraryApi } from "./api.js";
@@ -100,7 +101,7 @@ export function pick(
   return items.filter(
     (h) =>
       (!opts.newsletter || h.issue.publication === opts.newsletter) &&
-      (!opts.since || readerDay(Date.parse(h.createdAt)) >= opts.since),
+      (!opts.since || readerDay(Date.parse(h.createdAt), readerZone()) >= opts.since),
   );
 }
 
@@ -127,11 +128,13 @@ export function exportFile(
 ): { name: string; markdown: string } {
   const exportedAt = new Date(opts.now).toISOString();
   return {
-    name: `nutgraf-highlights-${readerDay(opts.now)}.md`,
+    name: `nutgraf-highlights-${readerDay(opts.now, readerZone())}.md`,
     markdown: highlightsMarkdown(items, {
       appUrl: opts.appUrl,
       exportedAt,
-      ...(opts.since && isReaderDay(opts.since) ? { since: readerDayBounds(opts.since).from } : {}),
+      ...(opts.since && isReaderDay(opts.since)
+        ? { since: readerDayBounds(opts.since, readerZone()).from }
+        : {}),
     }),
   };
 }

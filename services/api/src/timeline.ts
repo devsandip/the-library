@@ -8,11 +8,13 @@
  * asks, and kept for the story's event, so the same news reached from another newsletter opens
  * free.
  */
+import type { ReaderSettings } from "@library/core/settings";
 import {
   CLAUDE_MODEL,
   claudeCents,
   closestStories,
   READER,
+  READER_TIME_ZONE,
   readerDay,
   storyRef,
   type StoryCandidate,
@@ -65,6 +67,8 @@ export interface StoredTimeline extends Timeline {
 
 /** Where timelines read from and are kept. DynamoRepo implements it; tests use a fake. */
 export interface TimelineStore {
+  /** The reader's settings: the dates Claude reads are their days (#185). */
+  settings(): Promise<ReaderSettings>;
   /** One story of an issue, read now; undefined when the issue has no such story. */
   timelineStory(id: string, n: number): Promise<TimelineStory | undefined>;
   getTimeline(eventId: string): Promise<Timeline | undefined>;
@@ -128,7 +132,7 @@ export function timelineItems(
     .map((i, k) => ({ id: String(k + 1), ...i }));
 }
 
-export function timelineRequest(items: TimelineItem[]): ToolRequest {
+export function timelineRequest(items: TimelineItem[], timeZone = READER_TIME_ZONE): ToolRequest {
   return {
     system: [
       `You tell one reader how a story developed, from the stories in their own newsletters. ${READER}`,
@@ -152,7 +156,7 @@ export function timelineRequest(items: TimelineItem[]): ToolRequest {
       .map((i) =>
         [
           i.id,
-          readerDay(Date.parse(i.receivedAt)),
+          readerDay(Date.parse(i.receivedAt), timeZone),
           i.publication,
           `${i.headline}. ${i.summary}`,
           i.names.join(", ") || "-",
@@ -283,7 +287,9 @@ export class Timelines implements TimelinePort {
     if (!matches.length) return { none: NOTHING_CLOSE };
 
     const items = timelineItems(story, matches, corpus);
-    const res = await this.claude.callTool(timelineRequest(items));
+    const res = await this.claude.callTool(
+      timelineRequest(items, (await this.store.settings()).timeZone),
+    );
     const { gist, points } = parseTimeline(res.input, items);
     if (points.length < 2) return { none: NOTHING_MOVES };
     const timeline: Timeline = {
