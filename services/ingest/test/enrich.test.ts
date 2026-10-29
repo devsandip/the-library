@@ -12,6 +12,7 @@ import {
   parseClassification,
   parseTopics,
   proposeTopics,
+  setUpTopics,
   type EnrichCandidate,
 } from "../src/enrich.js";
 import type { Store } from "../src/store.js";
@@ -331,5 +332,31 @@ describe("proposeTopics", () => {
       replace: true,
     });
     expect(replaced.applied).toBe(true);
+  });
+});
+
+describe("setUpTopics (#212)", () => {
+  const proposal = { topics };
+
+  it("proposes and applies a first topic list once a library has enough issues", async () => {
+    const f = fakes({ candidates: Array.from({ length: 20 }, (_, k) => candidate(`i${k}`)) });
+    f.model.callTool = vi.fn(async () => ({ input: proposal, inputTokens: 1, outputTokens: 1 }));
+    expect(await setUpTopics(f.store, f.model, { sinceIso: "x" })).toMatchObject({ applied: true });
+    expect(f.stored()).toEqual(topics);
+  });
+
+  it("waits for more issues, and leaves a library with topics alone", async () => {
+    const few = fakes({ candidates: [candidate("a"), candidate("b")] });
+    few.model.callTool = vi.fn();
+    expect(await setUpTopics(few.store, few.model, { sinceIso: "x" })).toBeUndefined();
+    expect(few.model.callTool).not.toHaveBeenCalled();
+
+    const sorted = fakes({
+      candidates: Array.from({ length: 30 }, (_, k) => candidate(`i${k}`)),
+      topics,
+    });
+    sorted.model.callTool = vi.fn();
+    expect(await setUpTopics(sorted.store, sorted.model, { sinceIso: "x" })).toBeUndefined();
+    expect(sorted.model.callTool).not.toHaveBeenCalled();
   });
 });

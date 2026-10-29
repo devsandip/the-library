@@ -378,3 +378,22 @@ export async function proposeTopics(
   if (apply) await store.putTopics(topics);
   return { issues: issues.length, topics, applied: apply, existing };
 }
+
+/** How many issues a library has before its topics are set up on their own (#212). */
+export const TOPICS_FROM = 20;
+
+/**
+ * A library's first topics, set up on their own (#212): a reader with no topic list and at least
+ * `least` issues since `sinceIso` gets one proposed and applied, so their issues are sorted
+ * without anyone running `pnpm topics --apply`. A library with topics is left alone.
+ */
+export async function setUpTopics(
+  store: Store,
+  model: ModelPort,
+  opts: { sinceIso: string; least?: number },
+): Promise<TopicProposal | undefined> {
+  if ((await store.getTopics())?.length) return undefined;
+  const issues = await store.enrichCandidates(opts.sinceIso);
+  if (issues.length < (opts.least ?? TOPICS_FROM)) return undefined;
+  return proposeTopics(store, model, { sinceIso: opts.sinceIso, apply: true });
+}

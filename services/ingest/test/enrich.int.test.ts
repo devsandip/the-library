@@ -15,7 +15,13 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { senderIdentity, storyIndexAttributes } from "@library/core";
 import type { Topic } from "@library/core/types";
 import { Bedrock, MODELS } from "../src/bedrock.js";
-import { archiveOldNews, classifyRequest, enrich, parseClassification } from "../src/enrich.js";
+import {
+  archiveOldNews,
+  classifyRequest,
+  enrich,
+  parseClassification,
+  setUpTopics,
+} from "../src/enrich.js";
 import { Store } from "../src/store.js";
 import {
   docClient,
@@ -85,6 +91,16 @@ describe("enrichment on dev", () => {
     expect(emb?.dims).toBe(512);
     expect((emb?.vector as Uint8Array).byteLength).toBe(512 * 4);
     expect((await get(devKeys.issue("fx-bytebytego")))?.embeddedAt).toBeDefined();
+  });
+
+  it("sets up a library's first topics on its own once it has enough issues (#212)", async (ctx) => {
+    if (!haiku) ctx.skip();
+    expect(await setUpTopics(store, bedrock, { sinceIso: since, least: 7 })).toBeUndefined();
+    const made = await setUpTopics(store, bedrock, { sinceIso: since, least: 3 });
+    expect(made?.applied).toBe(true);
+    expect((await store.getTopics())?.length).toBeGreaterThan(0);
+    // A library with topics is left alone.
+    expect(await setUpTopics(store, bedrock, { sinceIso: since, least: 3 })).toBeUndefined();
   });
 
   it("with topics, Claude sorts every newsletter within the schema", async (ctx) => {

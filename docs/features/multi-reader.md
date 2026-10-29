@@ -112,6 +112,8 @@ Done when: two readers on dev see only their own data in every screen, search an
 
 **Daily work at each reader's 07:00** (#211): the daily 07:30 IST settle is now an hourly round (`{ kind: "daily" }` to the jobs Lambda, every hour on the hour UTC): it settles predictions for each reader whose clock reads 07:xx, so a reader in India still settles at 07:30. On reader keys the round goes over every reader (the owner first); on today's keys there is one library, the owner's or none named, as before. The day in brief stays with ingest until mail in. `pnpm settle` still settles the owner's at once.
 
+**Topics set themselves up** (#212): each ingest run, before enrichment, a library with no topic list and at least 20 issues from the last 30 days (`TOPICS_FROM`) gets one proposed and applied (`setUpTopics`), so its issues are sorted in the same run; a library with topics is left alone, and a failure is logged without stopping the run. `pnpm topics` still proposes a list by hand, and `--replace` still changes one.
+
 1. The daily jobs (the day in brief, the top 5, settling predictions, follow checks, archiving old News, tune-up, audit) run per reader at the reader's local time, from an hourly schedule through a queue.
 2. Every Claude, Titan and Jev call recorded per reader with its cost.
 3. Daily limits on Ask, Takes, Timeline and Source, with a plain message when one is reached; a throttle per reader.
