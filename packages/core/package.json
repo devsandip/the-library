@@ -7,6 +7,7 @@
     ".": "./src/index.ts",
     "./audit": "./src/audit.ts",
     "./days": "./src/days.ts",
+    "./export": "./src/export.ts",
     "./follow": "./src/follow.ts",
     "./highlights": "./src/highlights.ts",
     "./predictions": "./src/predictions.ts",

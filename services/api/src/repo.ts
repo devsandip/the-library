@@ -92,6 +92,7 @@ import type {
   View,
 } from "@library/core/types";
 import { readerOf, type Reader } from "@library/core/reader";
+import { EXPORT_ABOUT, type ReaderExport } from "@library/core/export";
 import { DEFAULT_SETTINGS, type ReaderSettings } from "@library/core/settings";
 import {
   DAILY_LIMITS,
@@ -2638,6 +2639,66 @@ export class DynamoRepo
       if (isConditionFailure(err)) return { ok: false, limit };
       throw err;
     }
+  }
+
+  /** Everything Nutgraf keeps for the reader (#219), newsletters' own text left out. */
+  async exportData(): Promise<ReaderExport> {
+    const [settings, issues, newsletters, predictions, following, history, usage] =
+      await Promise.all([
+        this.settings(),
+        this.everyIssue(),
+        this.listSenders(),
+        this.listPredictions(),
+        this.listFollows(),
+        this.opensBetween("0", "9"),
+        this.usage(366),
+      ]);
+    const highlights: Highlight[] = [];
+    let before: string | undefined;
+    do {
+      const page = await this.listHighlights(200, before);
+      highlights.push(...page.items);
+      before = page.next;
+    } while (before);
+    const { limits: _limits, ...own } = settings;
+    const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    return {
+      about: EXPORT_ABOUT,
+      exportedAt: new Date().toISOString(),
+      ...(this.reader ? { reader: this.reader.id } : {}),
+      settings: own,
+      newsletters: newsletters.map((s) => ({
+        senderId: s.senderId,
+        publication: s.publication,
+        ...(s.muted ? { muted: true } : {}),
+        ...(s.mustRead ? { mustRead: true } : {}),
+        ...(s.shelf ? { shelf: s.shelf } : {}),
+        up: s.up,
+        down: s.down,
+        issueCount: s.issueCount,
+      })),
+      issues: issues
+        .map((i) => ({
+          id: i.id as string,
+          publication: i.publication as string,
+          subject: i.subject as string,
+          receivedAt: i.receivedAt as string,
+          state: i.state as string,
+          ...(typeof i.rating === "number" ? { rating: i.rating } : {}),
+          ...(str(i.ratedAt) ? { ratedAt: str(i.ratedAt) } : {}),
+          ...(str(i.savedAt) ? { savedAt: str(i.savedAt) } : {}),
+          ...(str(i.summary) ? { summary: str(i.summary) } : {}),
+          ...(str(i.topic) ? { topic: str(i.topic) } : {}),
+          ...(str(i.shelf) ? { shelf: str(i.shelf) } : {}),
+          ...(str(i.viewOnlineUrl) ? { viewOnlineUrl: str(i.viewOnlineUrl) } : {}),
+        }))
+        .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt)),
+      highlights,
+      predictions,
+      following,
+      history: history.sort((a, b) => b.at.localeCompare(a.at)),
+      usage: usage.days,
+    };
   }
 
   /** The reader's usage for their last `days` days, newest first (#208). */

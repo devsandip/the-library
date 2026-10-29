@@ -459,6 +459,12 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     },
   },
   {
+    // Everything Nutgraf keeps for the reader, as one file (#219).
+    method: "GET",
+    pattern: /^\/export$/,
+    handler: async (svc) => ok(await svc.repo.exportData()),
+  },
+  {
     // The reader's model use by day and feature (#208).
     method: "GET",
     pattern: /^\/usage$/,

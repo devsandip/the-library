@@ -16,6 +16,7 @@ import {
   sameQuote,
 } from "@library/core/highlights";
 import { readerZone } from "./zone.js";
+import { EXPORT_ABOUT, type ReaderExport } from "@library/core/export";
 import { DEFAULT_SETTINGS, type ReaderSettings } from "@library/core/settings";
 import type {
   AskResponse,
@@ -1134,6 +1135,28 @@ export class MockLibraryApi implements LibraryApi {
   async settings(): Promise<ReaderSettings> {
     await delay();
     return structuredClone(mockSettings);
+  }
+  async exportData(): Promise<ReaderExport> {
+    await delay();
+    const { limits: _limits, ...settings } = mockSettings;
+    return {
+      about: EXPORT_ABOUT,
+      exportedAt: new Date().toISOString(),
+      settings,
+      newsletters: [],
+      issues: issues.map((i) => ({
+        id: i.id,
+        publication: i.publication,
+        subject: i.subject,
+        receivedAt: i.receivedAt,
+        state: i.state,
+      })),
+      highlights: [...highlights.values()],
+      predictions: [],
+      following: [],
+      history: [],
+      usage: [],
+    };
   }
   async saveSettings(patch: Partial<ReaderSettings>): Promise<ReaderSettings> {
     await delay();

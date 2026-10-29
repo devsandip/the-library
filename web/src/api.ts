@@ -1,3 +1,4 @@
+import type { ReaderExport } from "@library/core/export";
 import type { ReaderSettings } from "@library/core/settings";
 import type {
   AskResponse,
@@ -80,6 +81,8 @@ export interface LibraryApi {
   /** The reader's settings (#184): time zone, interests, the line prompts use. */
   settings(): Promise<ReaderSettings>;
   saveSettings(patch: Partial<ReaderSettings>): Promise<ReaderSettings>;
+  /** Everything Nutgraf keeps for the reader, as one file (#219). */
+  exportData(): Promise<ReaderExport>;
   unreadCounts(): Promise<UnreadCountsResponse>;
   /** The most relevant unread News, best first. */
   summary(): Promise<SummaryResponse>;
@@ -238,6 +241,9 @@ export class HttpLibraryApi implements LibraryApi {
   }
   saveSettings(patch: Partial<ReaderSettings>) {
     return this.request<ReaderSettings>("PATCH", "/settings", patch);
+  }
+  exportData() {
+    return this.request<ReaderExport>("GET", "/export");
   }
   unreadCounts() {
     return this.request<UnreadCountsResponse>("GET", "/unread-counts");
