@@ -1,6 +1,8 @@
 import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
+import type { Feature } from "@library/core/usage";
 import type { EnrichStats, PredictionStats, ShelfStats, StoryStats } from "@library/core/types";
 import { Bedrock } from "./bedrock.js";
+import { meteredJev, meteredModel } from "./meter.js";
 import { archiveOldNews, enrich, proposeTopics } from "./enrich.js";
 import { checkFollows } from "./follow.js";
 import { Gmail, type GmailCredentials } from "./gmail.js";
@@ -113,8 +115,12 @@ export async function handler(event: IngestEvent = {}) {
   // On reader keys, a run without an owner would write items no reader can see.
   if (library.keyed && !owner) throw new Error("READER_KEYS is on but no owner is named");
   const store = owner ? library.forReader(owner) : library;
+  // Every model call this run makes is recorded against the owner, by step (#208).
+  const meter = { record: store.recordUsage.bind(store) };
+  const model = (f: Feature) => meteredModel(bedrock, f, meter);
+  const jev = () => getJev().then((j) => meteredJev(j, meter));
   if (event.enrich) {
-    const stats = await enrich(store, bedrock, {
+    const stats = await enrich(store, model("enrich"), {
       sinceIso: daysAgo(event.enrich.days ?? 30),
       force: event.enrich.force === true,
       deadline: started + 9 * 60_000,
@@ -129,7 +135,7 @@ export async function handler(event: IngestEvent = {}) {
       console.log(JSON.stringify({ level: "info", msg: "relink done", ...report }));
       return report;
     }
-    const stats = await indexStories(store, bedrock, {
+    const stats = await indexStories(store, model("stories"), {
       sinceIso: daysAgo(event.stories.days ?? 30),
       force: event.stories.force === true,
       deadline: started + 8.5 * 60_000,
@@ -143,7 +149,7 @@ export async function handler(event: IngestEvent = {}) {
     return stats;
   }
   if (event.shelves) {
-    const stats = await shelveStories(store, getJev, {
+    const stats = await shelveStories(store, jev, {
       sinceIso: daysAgo(event.shelves.days ?? 30),
       force: event.shelves.force === true,
       concurrency: 8,
@@ -153,7 +159,7 @@ export async function handler(event: IngestEvent = {}) {
     return stats;
   }
   if (event.predictions) {
-    const stats = await spotPredictions(store, bedrock, {
+    const stats = await spotPredictions(store, model("predictions"), {
       sinceIso: daysAgo(event.predictions.days ?? 30),
       force: event.predictions.force === true,
       deadline: started + 8.5 * 60_000,
@@ -167,12 +173,14 @@ export async function handler(event: IngestEvent = {}) {
     return { indexed };
   }
   if (event.narrative) {
-    const stats = await writeNarrative(store, bedrock, { force: event.narrative.force === true });
+    const stats = await writeNarrative(store, model("narrative"), {
+      force: event.narrative.force === true,
+    });
     console.log(JSON.stringify({ level: "info", msg: "narrative done", ...stats }));
     return stats;
   }
   if (event.proposeTopics) {
-    const proposal = await proposeTopics(store, bedrock, {
+    const proposal = await proposeTopics(store, model("topics"), {
       sinceIso: daysAgo(event.proposeTopics.days ?? 30),
       apply: event.proposeTopics.apply === true,
       replace: event.proposeTopics.replace === true,
@@ -205,7 +213,7 @@ export async function handler(event: IngestEvent = {}) {
   // New issues, plus any from the last two weeks that failed before. Enrichment problems are
   // reported on /status but never fail the run: reading works without summaries.
   // Then the 7-day rule for unread news.
-  const enriched = await enrich(store, bedrock, {
+  const enriched = await enrich(store, model("enrich"), {
     sinceIso: daysAgo(14),
     deadline: started + 8 * 60_000,
   })
@@ -228,7 +236,7 @@ export async function handler(event: IngestEvent = {}) {
     }));
   console.log(JSON.stringify({ level: "info", msg: "enrich done", ...enriched }));
   // Then the story index (#15), which needs the promo flag. Like enrichment, it never fails the run.
-  const storied = await indexStories(store, bedrock, {
+  const storied = await indexStories(store, model("stories"), {
     sinceIso: daysAgo(14),
     deadline: started + 8.5 * 60_000,
   }).catch((err: Error): StoryStats => ({
@@ -246,14 +254,14 @@ export async function handler(event: IngestEvent = {}) {
   }));
   console.log(JSON.stringify({ level: "info", msg: "stories done", ...storied }));
   // Then Jev shelves the new stories and their issues follow (#81); it never fails the run.
-  const shelved = await shelveStories(store, getJev, {
+  const shelved = await shelveStories(store, jev, {
     sinceIso: daysAgo(14),
     deadline: started + 8.75 * 60_000,
   }).catch(shelfFailed);
   console.log(JSON.stringify({ level: "info", msg: "shelves done", ...shelved }));
   // Then predictions (#24), from the new issues' forward-looking sentences. Never fails the run.
   if (Date.now() < started + 8.8 * 60_000) {
-    await spotPredictions(store, bedrock, {
+    await spotPredictions(store, model("predictions"), {
       sinceIso: daysAgo(14),
       deadline: started + 8.8 * 60_000,
     })
@@ -269,7 +277,7 @@ export async function handler(event: IngestEvent = {}) {
   // Then followed stories (#22): a new story that moves one becomes a point. Like the steps
   // before it, it never fails the run.
   if (Date.now() < started + 8.9 * 60_000) {
-    await checkFollows(store, bedrock)
+    await checkFollows(store, model("follow"))
       .then((s) => console.log(JSON.stringify({ level: "info", msg: "follows done", ...s })))
       .catch((err: Error) =>
         console.error(
@@ -278,7 +286,7 @@ export async function handler(event: IngestEvent = {}) {
       );
   }
   // Then today's narrative (#18), when the day's News has moved on. It never fails the run either.
-  await writeNarrative(store, bedrock, { deadline: started + 9 * 60_000 })
+  await writeNarrative(store, model("narrative"), { deadline: started + 9 * 60_000 })
     .then((told) => console.log(JSON.stringify({ level: "info", msg: "narrative done", ...told })))
     .catch((err: Error) =>
       console.error(

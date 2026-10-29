@@ -444,6 +444,12 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     },
   },
   {
+    // The reader's model use by day and feature (#208).
+    method: "GET",
+    pattern: /^\/usage$/,
+    handler: async (svc) => ok(await svc.repo.usage()),
+  },
+  {
     method: "GET",
     pattern: /^\/topics$/,
     handler: async (svc) => ok({ topics: await svc.repo.listTopics() }),

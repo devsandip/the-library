@@ -33,6 +33,7 @@ import {
   type StoredFollow,
   keysFor,
   type Keys,
+  readerDay,
 } from "@library/core";
 import type {
   EnrichStats,
@@ -48,6 +49,7 @@ import type {
 } from "@library/core/types";
 import { readerOf, type Reader } from "@library/core/reader";
 import { DEFAULT_SETTINGS, type ReaderSettings } from "@library/core/settings";
+import { useAttribute, type Feature, type Use } from "@library/core/usage";
 import { MODELS } from "./bedrock.js";
 import type { Classification, EnrichCandidate } from "./enrich.js";
 import type { RecentStory } from "./follow.js";
@@ -120,8 +122,16 @@ export class Store {
     return readerOf(res.Item?.readerId);
   }
 
+  /** Settings read once per store: a store lives for one run. */
+  private settingsRead?: Promise<ReaderSettings>;
+
   /** The settings of the reader this store writes for (#185), today's values without them. */
-  async settings(): Promise<ReaderSettings> {
+  settings(): Promise<ReaderSettings> {
+    this.settingsRead ??= this.readSettings();
+    return this.settingsRead;
+  }
+
+  private async readSettings(): Promise<ReaderSettings> {
     if (!this.reader) return DEFAULT_SETTINGS;
     const res = await this.ddb.send(
       new GetCommand({ TableName: this.table, Key: settingsKey(this.reader.id) }),
@@ -134,6 +144,31 @@ export class Store {
       about: typeof item.about === "string" ? item.about : DEFAULT_SETTINGS.about,
       learning: typeof item.learning === "string" ? item.learning : DEFAULT_SETTINGS.learning,
     };
+  }
+
+  /** Adds a model call to the reader's usage for their day (#208). */
+  async recordUsage(feature: Feature, use: Omit<Use, "calls">, at = Date.now()): Promise<void> {
+    const { timeZone } = await this.settings();
+    const a = (c: keyof Use) => useAttribute(feature, c);
+    await this.ddb.send(
+      new UpdateCommand({
+        TableName: this.table,
+        Key: this.k.usage(readerDay(at, timeZone)),
+        UpdateExpression: "ADD #c :one, #i :in, #o :out, #ct :cents",
+        ExpressionAttributeNames: {
+          "#c": a("calls"),
+          "#i": a("inputTokens"),
+          "#o": a("outputTokens"),
+          "#ct": a("cents"),
+        },
+        ExpressionAttributeValues: {
+          ":one": 1,
+          ":in": use.inputTokens,
+          ":out": use.outputTokens,
+          ":cents": use.cents,
+        },
+      }),
+    );
   }
 
   /** Names the owner; `email` is kept to show which account it is. */

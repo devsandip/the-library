@@ -11,7 +11,7 @@ import { readerOf, type Reader } from "@library/core/reader";
 import type { SettleStats } from "@library/core/types";
 import { BedrockClaude } from "./claude.js";
 import { CorpusCache } from "./corpus.js";
-import { TitanEmbedder } from "./embed.js";
+import { meteredClaude, meteredEmbedder } from "./meter.js";
 import type { Job } from "./port.js";
 import { DynamoRepo } from "./repo.js";
 import { Settler } from "./settle.js";
@@ -74,9 +74,17 @@ const repoFor = (reader: Reader | undefined) =>
 export const handler = createJobHandler(
   (reader) => {
     const repo = repoFor(reader);
+    // Every model call is recorded against the reader the job runs for (#208).
+    const meter = { record: repo.recordUsage.bind(repo) };
     return {
-      checker: new SourceChecker(repo, claude),
-      settler: new Settler(repo, new CorpusCache(repo), new TitanEmbedder(), claude, CLAUDE_MODEL),
+      checker: new SourceChecker(repo, meteredClaude(claude, "source", meter)),
+      settler: new Settler(
+        repo,
+        new CorpusCache(repo),
+        meteredEmbedder("settle", meter),
+        meteredClaude(claude, "settle", meter),
+        CLAUDE_MODEL,
+      ),
     };
   },
   () => repoFor(undefined).owner(),
