@@ -44,6 +44,7 @@ pnpm install
 | `AWS_PROFILE=admin pnpm settle` | Settle the predictions that have come due, from later newsletters (`--limit 20`); prod does this daily at 07:30 IST (#139) |
 | `AWS_PROFILE=admin pnpm shelves` | Jev puts stored stories without a shelf on News or Learning (`--days 30`, `--force`); new ones are shelved after every ingest run (#81) |
 | `AWS_PROFILE=admin pnpm jev:score <labels.json>` | Score Jev's News or Learning call against labelled stories (#81); stores nothing |
+| `AWS_PROFILE=admin pnpm highlights-obsidian` | Write your highlights into the Obsidian vault, one note per issue, in `~/Documents/Obsidian/Highlights` (`--vault`, `--folder`, `--dry-run`, `--stage dev`); your own text in a note is kept (#169) |
 | `AWS_PROFILE=admin pnpm rebuild-senders` | Re-key issues after a sender-rule change (dry run; `--apply`) |
 | `AWS_PROFILE=admin pnpm reprocess` | Re-run the mail rules and cleaning on the last 30 days of raw mail after a change to `packages/core`; files as filtered what a new noise rule catches (`--days`) |
 
@@ -138,5 +139,5 @@ services/api/      reader API: routes, DynamoDB repository, Lambda handler
 web/               Preact app (base path /nutgraf/)
 infra/             CDK app: one stack per stage, and the role GitHub Actions deploys with
 .github/workflows/ ci (every pull request), deploy (every push to main)
-scripts/           amplify-proxy, check-hosting, create-user, gmail-auth, gmail-check, backfill, reprocess, rebuild-senders, seed-dev, sync-main, track, jev-score, shelves
+scripts/           amplify-proxy, check-hosting, create-user, gmail-auth, gmail-check, backfill, reprocess, rebuild-senders, highlights-obsidian, seed-dev, sync-main, track, jev-score, shelves
 ```
