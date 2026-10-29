@@ -27,6 +27,7 @@ import {
   type Screen,
 } from "../paths.js";
 import { followingState, toggleFollow, useFollow, useFollowing } from "../following.js";
+import { HIGHLIGHTS } from "../features.js";
 import { highlightCount, useHighlights } from "../highlights.js";
 import { usePredictions } from "../predictions.js";
 import { dropCount, useAudit } from "../audit.js";
@@ -422,11 +423,15 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
             hint: following.unseen ? `${following.unseen} new` : "Stories you follow",
             href: followingHref(),
           },
-          {
-            label: "Highlights",
-            hint: kept ? `${kept} kept` : "Passages you kept",
-            href: highlightsHref(),
-          },
+          ...(HIGHLIGHTS
+            ? [
+                {
+                  label: "Highlights",
+                  hint: kept ? `${kept} kept` : "Passages you kept",
+                  href: highlightsHref(),
+                },
+              ]
+            : []),
           {
             label: "Predictions",
             hint: due ? `${due} due` : "Who called it",

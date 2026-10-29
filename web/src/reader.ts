@@ -5,7 +5,8 @@ import { useApp } from "./context.js";
 import { useAsync } from "./hooks.js";
 import { useLibrary } from "./library.js";
 import { useReadingPlace } from "./components/now-reading.js";
-import { useHighlighting } from "./highlighting.js";
+import { HIGHLIGHTS } from "./features.js";
+import { useHighlighting, type Highlighting } from "./highlighting.js";
 
 /**
  * One open issue, on either device. Opening it marks it read and makes it the Continue item
@@ -13,8 +14,19 @@ import { useHighlighting } from "./highlighting.js";
  * back on the next visit. The actions change it here and tell the list beside it (`onChange`).
  * A visit that starts on one of its stories (`onStory`: from Learning, #81) reads that story, not
  * the issue, so the issue keeps its state. Its highlights are marked in the page (#167); `hl`
- * opens it at one of them instead of at its place.
+ * opens it at one of them instead of at its place. While highlights are switched off (`HIGHLIGHTS`)
+ * nothing is marked or kept and `hl` is ignored.
  */
+/** Highlighting switched off: nothing selected, kept, open or lost. */
+const OFF: Highlighting = {
+  selecting: false,
+  keep: () => false,
+  edit: () => undefined,
+  note: () => undefined,
+  remove: () => undefined,
+  lost: [],
+};
+
 export function useOpenIssue(
   id: string,
   onChange?: (id: string, change: Partial<IssueListItem>) => void,
@@ -48,7 +60,8 @@ export function useOpenIssue(
     }
   }, [issue.data]);
 
-  const { fit, jump, ...highlights } = useHighlighting(issue, hl);
+  const { fit, jump, ...highlighting } = useHighlighting(issue, hl);
+  const highlights = HIGHLIGHTS ? highlighting : OFF;
   const onPlace = useReadingPlace(
     id,
     issue.data?.position,
@@ -68,11 +81,11 @@ export function useOpenIssue(
         () => undefined,
       );
     },
-    jump,
+    HIGHLIGHTS ? jump : undefined,
   );
   // Marked first, so a highlight to open at is there to scroll to.
   const onFit = useCallback((frame: HTMLIFrameElement) => {
-    fit(frame);
+    if (HIGHLIGHTS) fit(frame);
     onPlace(frame);
   }, []);
 

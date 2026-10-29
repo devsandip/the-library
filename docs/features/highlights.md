@@ -2,6 +2,8 @@
 
 Select a passage while reading and keep it, with a note if I want one; see them all on a Highlights page; and have them in my Obsidian vault, one note per issue. From the newsletter-reader research (2026-10-11): highlighting and exporting to a notes app is core to Readwise Reader and Matter, and my research lives in Obsidian.
 
+**Switched off in the live app (2026-10-29).** Nutgraf is for any reader, and this feature was shaped around one reader's Obsidian vault. `HIGHLIGHTS` in `web/src/features.ts` hides it: no Highlight button or **H**, no marks in the page, no Highlights page, Library row or ⌘K entry, and a `?hl=` link opens the issue as any other. The API and the highlights already kept stay as they are. `VITE_HIGHLIGHTS=1` turns it on in a local build. The vault script (#169) is not merged.
+
 Milestone 10 builds it in four pieces: the API (#166), highlighting in the reader (#167), the Highlights page (#168) and the script that writes the vault's notes (#169). Highlights in ranking (#5, #69) and in Ask the Library (#21), and a Readwise-compatible CSV (if the app opens to other readers), are outside it.
 
 ## The API (#166)

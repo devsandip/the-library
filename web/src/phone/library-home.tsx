@@ -3,6 +3,7 @@ import type { StatusResponse } from "@library/core/types";
 import { useApp } from "../context.js";
 import { clock } from "../format.js";
 import { useFollowing } from "../following.js";
+import { HIGHLIGHTS } from "../features.js";
 import { highlightCount, useHighlights } from "../highlights.js";
 import { usePredictions } from "../predictions.js";
 import { dropCount, useAudit } from "../audit.js";
@@ -54,7 +55,7 @@ export function LibraryHome() {
     followed.status === "ok"
       ? { unseen: followed.data.unseen, count: followed.data.items.length }
       : { unseen: 0, count: 0 };
-  const kept = highlightCount(useHighlights("once").state);
+  const kept = highlightCount(useHighlights(HIGHLIGHTS ? "once" : "never").state);
   const predicted = usePredictions("open", false).state;
   const audited = useAudit("once").state;
   const drop = dropCount(audited);
@@ -94,15 +95,17 @@ export function LibraryHome() {
             ›
           </span>
         </a>
-        <a class="group-row" href={highlightsHref()}>
-          <span class="group-name">Highlights</span>
-          <span class="label">
-            {kept === undefined ? "Passages you kept" : kept ? `${kept} kept` : "None yet"}
-          </span>
-          <span class="chev" aria-hidden="true">
-            ›
-          </span>
-        </a>
+        {HIGHLIGHTS && (
+          <a class="group-row" href={highlightsHref()}>
+            <span class="group-name">Highlights</span>
+            <span class="label">
+              {kept === undefined ? "Passages you kept" : kept ? `${kept} kept` : "None yet"}
+            </span>
+            <span class="chev" aria-hidden="true">
+              ›
+            </span>
+          </a>
+        )}
         <a class="group-row" href={predictionsHref()}>
           <span class="group-name">Predictions</span>
           <span
