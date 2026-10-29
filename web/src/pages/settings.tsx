@@ -47,12 +47,27 @@ function zoneNames(current: string): string[] {
  */
 export function Settings({ wide }: { wide: boolean }) {
   const { pref } = useTheme();
-  const { api } = useApp();
+  const { api, auth } = useApp();
   const toast = useToast();
   const [settings, setSettings] = useState<ReaderSettings>();
   const [interests, setInterests] = useState<Interest[]>([]);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [confirm, setConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  /** Deletes the account (#220), then signs out: there is nothing left to show. */
+  const remove = async () => {
+    setDeleting(true);
+    try {
+      await api.deleteAccount();
+      toast.say("Your account is being deleted.");
+      await auth?.signOut();
+    } catch (err) {
+      toast.say((err as Error).message);
+      setDeleting(false);
+    }
+  };
 
   /** Everything Nutgraf keeps for the reader, saved as a JSON file (#219). */
   const download = async () => {
@@ -220,6 +235,30 @@ export function Settings({ wide }: { wide: boolean }) {
       <div class="settings-tools">
         <button type="button" class="btn line" disabled={exporting} onClick={() => void download()}>
           {exporting ? "Preparing…" : "Download my data"}
+        </button>
+      </div>
+
+      <p class="label section-label">Delete account</p>
+      <p class="settings-note">
+        Deletes everything Nutgraf keeps for you, then your sign-in. Download your data first if you
+        want it. This can't be undone.
+      </p>
+      <label class="field settings-confirm">
+        <input
+          aria-label="Type delete to confirm"
+          placeholder="Type delete to confirm"
+          value={confirm}
+          onInput={(e) => setConfirm(e.currentTarget.value)}
+        />
+      </label>
+      <div class="settings-tools">
+        <button
+          type="button"
+          class="btn line settings-danger"
+          disabled={confirm.trim().toLowerCase() !== "delete" || deleting}
+          onClick={() => void remove()}
+        >
+          {deleting ? "Deleting…" : "Delete my account"}
         </button>
       </div>
     </Page>

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { HighlightQuote, IssueListItem, SenderListItem } from "@library/core/types";
-import { conflict, notFound } from "../src/errors.js";
+import { conflict, HttpError, notFound } from "../src/errors.js";
 import type { Reader } from "@library/core/reader";
 import { DEFAULT_SETTINGS, type ReaderSettings } from "@library/core/settings";
 import { createHandler } from "../src/handler.js";
@@ -195,6 +195,7 @@ function setup(overrides: Partial<RepoPort> = {}) {
       tuneup: vi.fn(async () => tuneupBody),
       dismiss: vi.fn(async () => ({ ...tuneupBody, dismissed: 1 })),
     },
+    account: { delete: vi.fn(async () => ({ deleting: true as const })) },
     settings: {
       get: vi.fn(async () => DEFAULT_SETTINGS),
       save: vi.fn(async (patch: Partial<ReaderSettings>) => ({ ...DEFAULT_SETTINGS, ...patch })),
@@ -255,6 +256,18 @@ describe("the reader (#179)", () => {
     }
     expect(servicesFor).not.toHaveBeenCalled();
     expect(repo.listIssues).not.toHaveBeenCalled();
+  });
+});
+
+describe("delete account (#220)", () => {
+  it("starts deleting and answers 202, or passes a refusal on", async () => {
+    const { svc, call } = setup();
+    expect(await call("DELETE", "/account")).toMatchObject({
+      status: 202,
+      body: { deleting: true },
+    });
+    vi.mocked(svc.account.delete).mockRejectedValueOnce(new HttpError(409, "owner"));
+    expect((await call("DELETE", "/account")).status).toBe(409);
   });
 });
 

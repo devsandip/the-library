@@ -22,6 +22,7 @@ function setup() {
   const owner = vi.fn(async (): Promise<Reader | undefined> => ({ id: "owner-1" }));
   const zones: Record<string, string> = { ny: "America/New_York", in: "Asia/Kolkata" };
   const readers = vi.fn(async (): Promise<(Reader | undefined)[]> => [{ id: "ny" }, { id: "in" }]);
+  const deleteAccount = vi.fn(async (_r: Reader) => ({ items: 3 }));
   const timeZoneOf = vi.fn(async (r?: Reader) => (r ? zones[r.id]! : "Asia/Kolkata"));
   return {
     checker,
@@ -29,7 +30,8 @@ function setup() {
     workFor,
     owner,
     readers,
-    handler: createJobHandler(workFor, { owner, readers, timeZoneOf }),
+    deleteAccount,
+    handler: createJobHandler(workFor, { owner, readers, timeZoneOf, deleteAccount }),
   };
 }
 
@@ -91,5 +93,11 @@ describe("jobs", () => {
     expect(await handler({ kind: "daily", at: "2026-10-29T02:00:00.000Z" })).toMatchObject({
       settled: [{ stats }],
     });
+  });
+
+  it("deletes an account in the jobs Lambda, for the reader named (#220)", async () => {
+    const { deleteAccount, handler } = setup();
+    expect(await handler({ kind: "delete-account", reader: "r1" })).toEqual({ items: 3 });
+    expect(deleteAccount).toHaveBeenCalledWith({ id: "r1" });
   });
 });

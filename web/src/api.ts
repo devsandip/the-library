@@ -83,6 +83,8 @@ export interface LibraryApi {
   saveSettings(patch: Partial<ReaderSettings>): Promise<ReaderSettings>;
   /** Everything Nutgraf keeps for the reader, as one file (#219). */
   exportData(): Promise<ReaderExport>;
+  /** Starts deleting everything the reader has, then their sign-in (#220). */
+  deleteAccount(): Promise<{ deleting: true }>;
   unreadCounts(): Promise<UnreadCountsResponse>;
   /** The most relevant unread News, best first. */
   summary(): Promise<SummaryResponse>;
@@ -244,6 +246,9 @@ export class HttpLibraryApi implements LibraryApi {
   }
   exportData() {
     return this.request<ReaderExport>("GET", "/export");
+  }
+  deleteAccount() {
+    return this.request<{ deleting: true }>("DELETE", "/account");
   }
   unreadCounts() {
     return this.request<UnreadCountsResponse>("GET", "/unread-counts");

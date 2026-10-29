@@ -1,6 +1,7 @@
 import type { ReaderExport } from "@library/core/export";
 import type { ReaderSettings } from "@library/core/settings";
 import type { Limited, UsageResponse } from "@library/core/usage";
+import type { AccountPort } from "./account.js";
 import type { SettingsPort } from "./settings.js";
 import type {
   AskResponse,
@@ -145,7 +146,9 @@ export type Job =
   | { kind: "source"; id: string; n: number; reader?: string }
   | { kind: "settle"; limit?: number }
   /** The hourly round (#211): each reader whose clock reads 07:xx at `at` (now by default). */
-  | { kind: "daily"; at?: string };
+  | { kind: "daily"; at?: string }
+  /** Everything a reader has, deleted, then their sign-in (#220). */
+  | { kind: "delete-account"; reader: string };
 
 /** A question answered from the newsletters (#21). */
 export interface AskPort {
@@ -203,6 +206,8 @@ export interface Services {
   tuneup: TuneupPort;
   /** The reader's settings (#184); saving interests embeds them (#187). */
   settings: SettingsPort;
+  /** Deleting the reader's account (#220). */
+  account: AccountPort;
   /** Fire-and-forget ingest run ("refresh now"). */
   startIngest(): Promise<void>;
 }

@@ -13,8 +13,11 @@ import {
   type QueryCommandInput,
   type QueryCommandOutput,
   type TransactWriteCommandInput,
+  BatchWriteCommand,
+  ScanCommand,
+  type ScanCommandOutput,
 } from "@aws-sdk/lib-dynamodb";
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectsCommand, GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import {
   CANDIDATE_DAYS,
   DIGEST_DAYS,
@@ -2639,6 +2642,64 @@ export class DynamoRepo
       if (isConditionFailure(err)) return { ok: false, limit };
       throw err;
     }
+  }
+
+  /**
+   * Deletes everything the reader has (#220): every item under their keys, their settings and
+   * interests, and their issues' stored mail. Only on reader keys: on today's keys there is one
+   * library, and nothing here may delete it.
+   */
+  async deleteEverything(): Promise<{ items: number; objects: number }> {
+    if (!this.reader || !this.k.prefix) throw new Error("deleting needs a reader on reader keys");
+    const keys: { pk: string; sk: string }[] = [];
+    const objects: string[] = [];
+    let start: Item | undefined;
+    do {
+      const page: ScanCommandOutput = await this.ddb.send(
+        new ScanCommand({
+          TableName: this.table,
+          FilterExpression: "begins_with(pk, :own)",
+          ExpressionAttributeValues: { ":own": this.k.prefix },
+          ProjectionExpression: "pk, sk, s3Keys",
+          ExclusiveStartKey: start,
+        }),
+      );
+      for (const i of page.Items ?? []) {
+        keys.push({ pk: i.pk as string, sk: i.sk as string });
+        const s3 = i.s3Keys as Record<string, unknown> | undefined;
+        for (const v of Object.values(s3 ?? {})) if (typeof v === "string") objects.push(v);
+      }
+      start = page.LastEvaluatedKey;
+    } while (start);
+    keys.push(settingsKey(this.reader.id), interestsKey(this.reader.id));
+    for (let n = 0; n < keys.length; n += 25) {
+      let batch: Record<string, unknown>[] | undefined = keys
+        .slice(n, n + 25)
+        .map((Key) => ({ DeleteRequest: { Key } }));
+      for (let tries = 0; batch?.length && tries < 8; tries++) {
+        const res = await this.ddb.send(
+          new BatchWriteCommand({ RequestItems: { [this.table]: batch as never } }),
+        );
+        batch = res.UnprocessedItems?.[this.table] as Record<string, unknown>[] | undefined;
+        if (batch?.length) await new Promise((r) => setTimeout(r, 100 * 2 ** tries));
+      }
+      if (batch?.length) throw new Error(`${batch.length} items not deleted`);
+    }
+    for (let n = 0; n < objects.length; n += 1000) {
+      await this.s3.send(
+        new DeleteObjectsCommand({
+          Bucket: this.bucket,
+          Delete: { Objects: objects.slice(n, n + 1000).map((Key) => ({ Key })), Quiet: true },
+        }),
+      );
+    }
+    return { items: keys.length, objects: objects.length };
+  }
+
+  /** Whether this repository may delete its reader: on reader keys, and not the owner (#220). */
+  async deletable(): Promise<"yes" | "today's keys" | "owner"> {
+    if (!this.reader || !this.k.prefix) return "today's keys";
+    return (await this.owner())?.id === this.reader.id ? "owner" : "yes";
   }
 
   /** Everything Nutgraf keeps for the reader (#219), newsletters' own text left out. */
