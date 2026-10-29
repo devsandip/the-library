@@ -1,4 +1,5 @@
 import type { ReaderSettings } from "@library/core/settings";
+import type { SettingsPort } from "./settings.js";
 import type {
   AskResponse,
   AuditResponse,
@@ -189,6 +190,8 @@ export interface Services {
   predictions: PredictionsPort;
   audit: AuditPort;
   tuneup: TuneupPort;
+  /** The reader's settings (#184); saving interests embeds them (#187). */
+  settings: SettingsPort;
   /** Fire-and-forget ingest run ("refresh now"). */
   startIngest(): Promise<void>;
 }

@@ -4,6 +4,7 @@ import {
   JEV_URL,
   Jev,
   SHELF_QUESTIONS,
+  shelfQuestions,
   isUnsure,
   learningProbability,
   storyState,
@@ -111,5 +112,13 @@ describe("storyState", () => {
 describe("isUnsure", () => {
   it("covers 0.4 up to, not including, 0.6", () => {
     expect([0.39, 0.4, 0.5, 0.59, 0.6].map(isUnsure)).toEqual([false, true, true, true, false]);
+  });
+
+  it("asks with the reader's meaning of Learning, Sandip's craft by default (#187)", () => {
+    expect(shelfQuestions().craft.criteria).toEqual(SHELF_QUESTIONS.craft.criteria);
+    expect(shelfQuestions("Teaches cooking.").craft.criteria.true).toBe("Teaches cooking.");
+    expect(shelfQuestions("Teaches cooking.").craft.criteria.false).toBe(
+      SHELF_QUESTIONS.craft.criteria.false,
+    );
   });
 });

@@ -17,7 +17,7 @@ import type { EnrichCandidate } from "./enrich.js";
 import { mapLimit } from "./ingest.js";
 import {
   JEV_MODEL,
-  SHELF_QUESTIONS,
+  shelfQuestions,
   isUnsure,
   learningProbability,
   storyState,
@@ -92,11 +92,12 @@ export async function shelveStories(
 
   if (todo.length) {
     const publication = new Map(issues.map((i) => [i.id, i.publication]));
-    const [port, settings, { about }] = await Promise.all([
+    const [port, settings, { about, learning: meaning }] = await Promise.all([
       jev(),
       store.senderSettings(),
       store.settings(),
     ]);
+    const questions = shelfQuestions(meaning);
     const shelve = async (s: ShelfCandidate) => {
       const d = await port.decide(
         storyState(
@@ -107,7 +108,7 @@ export async function shelveStories(
           },
           about,
         ),
-        SHELF_QUESTIONS,
+        questions,
       );
       stats.inputTokens += d.inputTokens;
       const learning = learningProbability(d.answers.craft);

@@ -21,16 +21,41 @@ export interface ReaderSettings {
   interests: Interest[];
   /** Who the reader is, as every prompt tells Claude. */
   about: string;
+  /** What Learning means to the reader (#187): what Jev asks a story to be, to shelve it there. */
+  learning: string;
 }
+
+/**
+ * What Learning means to Sandip (2026-10-12): craft, not shelf life. How to use a tool, or how it
+ * works, is Learning; that it launched is News, even when it is a new kind of tool (2026-10-17).
+ * Rewordings scored no better; see docs/features/story-shelves.md.
+ */
+export const CRAFT =
+  "Builds the reader's craft: product management, system design, software engineering, " +
+  "how to build with AI, startup and business strategy. How-tos, explanations of how a system " +
+  "works, case studies of how a team built or decided something, frameworks, and interviews " +
+  "about doing the work.";
+
+/** What Learning means to a new reader until they say (#187): a skill or an understanding. */
+export const PLAIN_LEARNING =
+  "Teaches the reader a skill or how something works: how-tos, explanations, case studies of " +
+  "how something was built or decided, frameworks, and interviews about doing the work.";
 
 /** Today's values: a reader without settings gets these. */
 export const DEFAULT_SETTINGS: ReaderSettings = {
   timeZone: READER_TIME_ZONE,
   interests: INTERESTS.map((i) => ({ ...i })),
   about: READER,
+  learning: CRAFT,
 };
 
-export const SETTINGS_LIMITS = { interests: 10, name: 40, text: 300, about: 600 } as const;
+export const SETTINGS_LIMITS = {
+  interests: 10,
+  name: 40,
+  text: 300,
+  about: 600,
+  learning: 600,
+} as const;
 
 /** A time zone the runtime knows by name, such as "America/New_York" or "UTC". */
 export function isTimeZone(tz: unknown): tz is string {
@@ -59,7 +84,7 @@ export function checkSettingsPatch(
   const b = body as Record<string, unknown>;
   const patch: Partial<ReaderSettings> = {};
   for (const key of Object.keys(b)) {
-    if (key !== "timeZone" && key !== "interests" && key !== "about") {
+    if (key !== "timeZone" && key !== "interests" && key !== "about" && key !== "learning") {
       return { error: `unknown setting: ${key}` };
     }
   }
@@ -89,6 +114,11 @@ export function checkSettingsPatch(
     const about = text(b.about, SETTINGS_LIMITS.about);
     if (!about) return { error: `about must be 1 to ${SETTINGS_LIMITS.about} characters` };
     patch.about = about;
+  }
+  if ("learning" in b) {
+    const learning = text(b.learning, SETTINGS_LIMITS.learning);
+    if (!learning) return { error: `learning must be 1 to ${SETTINGS_LIMITS.learning} characters` };
+    patch.learning = learning;
   }
   if (!Object.keys(patch).length) return { error: "nothing to change" };
   return { patch };

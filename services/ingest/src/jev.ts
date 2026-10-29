@@ -4,6 +4,7 @@
  * (#81), where Learning means craft. Not on Bedrock: it runs on TypeSafe's API, with the key in
  * SSM. Behind a small port so tests can fake it.
  */
+import { CRAFT } from "@library/core/settings";
 import { READER } from "@library/core";
 
 export const JEV_PARAM = "/thelibrary/prod/jev/api-key";
@@ -80,16 +81,8 @@ export class Jev implements DecisionPort {
   }
 }
 
-/**
- * What Learning means (Sandip, 2026-10-12): craft, not shelf life. How to use a tool, or how it
- * works, is Learning; that it launched is News, even when it is a new kind of tool (2026-10-17).
- * Rewordings scored no better; see docs/features/story-shelves.md.
- */
-export const CRAFT =
-  "Builds the reader's craft: product management, system design, software engineering, " +
-  "how to build with AI, startup and business strategy. How-tos, explanations of how a system " +
-  "works, case studies of how a team built or decided something, frameworks, and interviews " +
-  "about doing the work.";
+/** What Learning means to Sandip; a reader's own is in their settings (#187). */
+export { CRAFT } from "@library/core/settings";
 
 export const NOT_CRAFT =
   "Reports or comments on what happened: news, launches, releases, funding and deals, markets, " +
@@ -100,13 +93,18 @@ export const NOT_CRAFT =
  * The one question every story gets. A choice between the two shelves scored worse against
  * Sandip's labels than this yes or no (#81).
  */
-export const SHELF_QUESTIONS: Record<"craft", Question> = {
-  craft: {
-    type: "noul",
-    question: "Does this story build the reader's craft?",
-    criteria: { true: CRAFT, false: NOT_CRAFT },
-  },
-};
+export function shelfQuestions(learning: string = CRAFT): Record<"craft", Question> {
+  return {
+    craft: {
+      type: "noul",
+      question: "Does this story build the reader's craft?",
+      criteria: { true: learning, false: NOT_CRAFT },
+    },
+  };
+}
+
+/** Sandip's question: the owner's while their settings keep today's meaning of Learning. */
+export const SHELF_QUESTIONS = shelfQuestions();
 
 // Unsure answers live in core now, so the tune-up (#158) counts them by the same band.
 export { UNSURE, isUnsure } from "@library/core";

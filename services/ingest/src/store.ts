@@ -124,6 +124,7 @@ export class Store {
       timeZone: typeof item.timeZone === "string" ? item.timeZone : DEFAULT_SETTINGS.timeZone,
       interests: Array.isArray(item.interests) ? item.interests : DEFAULT_SETTINGS.interests,
       about: typeof item.about === "string" ? item.about : DEFAULT_SETTINGS.about,
+      learning: typeof item.learning === "string" ? item.learning : DEFAULT_SETTINGS.learning,
     };
   }
 

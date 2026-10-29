@@ -431,7 +431,7 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
   {
     method: "GET",
     pattern: /^\/settings$/,
-    handler: async (svc) => ok(await svc.repo.settings()),
+    handler: async (svc) => ok(await svc.settings.get()),
   },
   {
     // Time zone, interests and the line prompts use (#184).
@@ -440,7 +440,7 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     handler: async (svc, req) => {
       const checked = checkSettingsPatch(json<unknown>(req));
       if ("error" in checked) throw badRequest(checked.error);
-      return ok(await svc.repo.saveSettings(checked.patch));
+      return ok(await svc.settings.save(checked.patch));
     },
   },
   {

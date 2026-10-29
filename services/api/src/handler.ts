@@ -18,6 +18,7 @@ import { API_PREFIX, route, type Request } from "./routes.js";
 import { CorpusCache } from "./corpus.js";
 import { Related } from "./related.js";
 import { Search } from "./search.js";
+import { Settings } from "./settings.js";
 import { Sources } from "./source.js";
 import { Takes } from "./takes.js";
 import { Timelines } from "./timeline.js";
@@ -142,6 +143,7 @@ function servicesOf(reader: Reader): Services {
     predictions: new Predictions(repo),
     audit: new Audits(repo),
     tuneup: new Tuneups(repo),
+    settings: new Settings(repo, new TitanEmbedder()),
     startIngest: () => invokeAsync(INGEST_FUNCTION!, {}),
   };
 }
