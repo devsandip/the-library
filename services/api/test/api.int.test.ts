@@ -11,12 +11,9 @@ import {
   senderIdentity,
   shelfFor,
   storyIndexAttributes,
-  sourceKey,
-  sourceRunKey,
   storyRef,
-  takesKey,
-  timelineKey,
   vectorBytes,
+  settingsKey,
 } from "@library/core";
 import type { ReaderSettings } from "@library/core/settings";
 import type { UsageResponse } from "@library/core/usage";
@@ -876,7 +873,7 @@ describe("API on dev", () => {
         ddb.send(
           new DeleteCommand({
             TableName: stack.tableName,
-            Key: timelineKey(storyRef("fx-tldr", 1)),
+            Key: devKeys.timeline(storyRef("fx-tldr", 1)),
           }),
         ),
       ]);
@@ -1389,7 +1386,7 @@ describe("API on dev", () => {
       ...["fx-tldr", "fx-platformer", "fx-lenny"].map((id) =>
         ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: devKeys.story(id, 41) })),
       ),
-      ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: takesKey("int-ipo") })),
+      ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: devKeys.takes("int-ipo") })),
     ]);
   });
 
@@ -1428,9 +1425,11 @@ describe("API on dev", () => {
 
     // Nothing left from an earlier run that failed before cleaning up.
     await Promise.all(
-      [sourceKey("fx-tldr", 51), sourceRunKey("fx-tldr", 51), sourceRunKey("fx-tldr", 52)].map(
-        (Key) => ddb.send(new DeleteCommand({ TableName: stack.tableName, Key })),
-      ),
+      [
+        devKeys.source("fx-tldr", 51),
+        devKeys.sourceRun("fx-tldr", 51),
+        devKeys.sourceRun("fx-tldr", 52),
+      ].map((Key) => ddb.send(new DeleteCommand({ TableName: stack.tableName, Key }))),
     );
     expect((await call<SourceResponse>("GET", "/issues/fx-tldr/stories/51/source")).body).toEqual(
       {},
@@ -1464,10 +1463,12 @@ describe("API on dev", () => {
           new DeleteCommand({ TableName: stack.tableName, Key: devKeys.story("fx-tldr", n) }),
         ),
       ),
-      ddb.send(new DeleteCommand({ TableName: stack.tableName, Key: sourceKey("fx-tldr", 51) })),
+      ddb.send(
+        new DeleteCommand({ TableName: stack.tableName, Key: devKeys.source("fx-tldr", 51) }),
+      ),
       ...[51, 52].map((n) =>
         ddb.send(
-          new DeleteCommand({ TableName: stack.tableName, Key: sourceRunKey("fx-tldr", n) }),
+          new DeleteCommand({ TableName: stack.tableName, Key: devKeys.sourceRun("fx-tldr", n) }),
         ),
       ),
     ]);
@@ -2094,5 +2095,26 @@ describe("two readers on dev (#198)", () => {
     for (const f of ["ask", "takes", "timeline", "source"] as const) {
       expect(theirs?.features[f]).toBeUndefined();
     }
+  });
+
+  it("stops a reader at the day's limit, with a plain message (#209)", async () => {
+    // A reader never seen before, so no warm Lambda holds their settings yet.
+    const limited = { sub: "int-test-limited" };
+    await ddb.send(
+      new PutCommand({
+        TableName: stack.tableName,
+        Item: { ...settingsKey("int-test-limited"), limits: { ask: 1 } },
+      }),
+    );
+    const first = await call("POST", "/ask", { ...limited, body: { q: "What happened with AI?" } });
+    expect(first.status).toBe(200);
+    const second = await call<{ error: string }>("POST", "/ask", {
+      ...limited,
+      body: { q: "What else happened?" },
+    });
+    expect(second.status).toBe(429);
+    expect(second.body.error).toBe("That's today's 1 question. More tomorrow.");
+    // Another reader's questions are their own.
+    expect((await call<UsageResponse>("GET", "/usage")).status).toBe(200);
   });
 });

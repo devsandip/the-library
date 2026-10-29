@@ -1,5 +1,5 @@
 import type { ReaderSettings } from "@library/core/settings";
-import type { UsageResponse } from "@library/core/usage";
+import type { Limited, UsageResponse } from "@library/core/usage";
 import type { SettingsPort } from "./settings.js";
 import type {
   AskResponse,
@@ -89,6 +89,8 @@ export interface RepoPort {
   saveSettings(patch: Partial<ReaderSettings>): Promise<ReaderSettings>;
   /** The reader's model use for their last days, newest first (#208). */
   usage(): Promise<UsageResponse>;
+  /** Counts a use of a limited feature unless the day's are used (#209). */
+  takeUse(feature: Limited): Promise<{ ok: boolean; limit: number }>;
   unreadCounts(): Promise<UnreadCountsResponse>;
   /** The most relevant unread News, best first. */
   summary(): Promise<SummaryResponse>;

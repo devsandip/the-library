@@ -1,5 +1,6 @@
 import { isReaderDay, readerDay } from "@library/core/days";
 import { checkSettingsPatch } from "@library/core/settings";
+import { limitMessage, type Limited } from "@library/core/usage";
 import { cleanNote, cleanQuote, HIGHLIGHT_MAX, NOTE_MAX } from "@library/core/highlights";
 import type {
   PredictionStatus,
@@ -13,7 +14,7 @@ import type {
   StoryState,
   View,
 } from "@library/core/types";
-import { badRequest, HttpError, notFound } from "./errors.js";
+import { badRequest, HttpError, notFound, tooMany } from "./errors.js";
 import type { Services } from "./port.js";
 
 export const API_PREFIX = "/nutgraf/api";
@@ -54,6 +55,12 @@ const HIGHLIGHT_ID = "([A-Za-z0-9_-]{1,64}\\.[0-9a-z]{12})";
 const HIGHLIGHT_CURSOR = /^\d{4}-\d{2}-\d{2}T[0-9:.]{8,12}Z#[A-Za-z0-9_-]{1,64}#[0-9a-z]{12}$/;
 
 const ok = (body: unknown): Response => ({ status: 200, body });
+
+/** One use of a limited feature, or 429 with a plain message once the day's are used (#209). */
+async function within(svc: Services, feature: Limited): Promise<void> {
+  const { ok: allowed, limit } = await svc.repo.takeUse(feature);
+  if (!allowed) throw tooMany(limitMessage(feature, limit));
+}
 
 function json<T>(req: Request): T {
   if (!req.body) throw badRequest("missing JSON body");
@@ -168,6 +175,7 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
       if (question.length < 3 || question.length > 300) {
         throw badRequest("q must be a question of 3 to 300 characters");
       }
+      await within(svc, "ask");
       return ok(await svc.ask.ask(question));
     },
   },
@@ -210,7 +218,10 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     // Never on its own: only when the reader asks (one Claude call, about half a cent).
     method: "POST",
     pattern: new RegExp(`^/issues/${ISSUE_ID}/stories/${STORY_N}/timeline$`),
-    handler: async (svc, _req, p) => ok(await svc.timelines.run(param(p, 0), Number(param(p, 1)))),
+    handler: async (svc, _req, p) => {
+      await within(svc, "timeline");
+      return ok(await svc.timelines.run(param(p, 0), Number(param(p, 1))));
+    },
   },
   {
     method: "GET",
@@ -221,7 +232,10 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     // Never on its own: only when the reader asks (one Claude call, about a cent).
     method: "POST",
     pattern: new RegExp(`^/issues/${ISSUE_ID}/stories/${STORY_N}/takes$`),
-    handler: async (svc, _req, p) => ok(await svc.takes.run(param(p, 0), Number(param(p, 1)))),
+    handler: async (svc, _req, p) => {
+      await within(svc, "takes");
+      return ok(await svc.takes.run(param(p, 0), Number(param(p, 1))));
+    },
   },
   {
     method: "GET",
@@ -234,6 +248,7 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     method: "POST",
     pattern: new RegExp(`^/issues/${ISSUE_ID}/stories/${STORY_N}/source$`),
     handler: async (svc, _req, p) => {
+      await within(svc, "source");
       const res = await svc.sources.run(param(p, 0), Number(param(p, 1)));
       return { status: res.running ? 202 : 200, body: res };
     },

@@ -92,9 +92,12 @@ import type {
 import { readerOf, type Reader } from "@library/core/reader";
 import { DEFAULT_SETTINGS, type ReaderSettings } from "@library/core/settings";
 import {
+  DAILY_LIMITS,
   dayUsageOf,
   useAttribute,
+  usesAttribute,
   type Feature,
+  type Limited,
   type Use,
   type UsageResponse,
 } from "@library/core/usage";
@@ -340,6 +343,9 @@ function settingsOf(item: Record<string, unknown> | undefined): ReaderSettings {
       : DEFAULT_SETTINGS.interests,
     about: typeof item.about === "string" ? item.about : DEFAULT_SETTINGS.about,
     learning: typeof item.learning === "string" ? item.learning : DEFAULT_SETTINGS.learning,
+    ...(item.limits && typeof item.limits === "object"
+      ? { limits: item.limits as Record<string, number> }
+      : {}),
   };
 }
 
@@ -2584,6 +2590,31 @@ export class DynamoRepo
         },
       }),
     );
+  }
+
+  /**
+   * Counts one use of a limited feature (#209), unless the reader has had the day's: true when
+   * counted. One conditional update, so two at once cannot both take the last one.
+   */
+  async takeUse(feature: Limited): Promise<{ ok: boolean; limit: number }> {
+    const { timeZone, limits } = await this.settings();
+    const limit = limits?.[feature] ?? DAILY_LIMITS[feature];
+    try {
+      await this.ddb.send(
+        new UpdateCommand({
+          TableName: this.table,
+          Key: this.k.usage(readerDay(Date.now(), timeZone)),
+          UpdateExpression: "ADD #u :one",
+          ConditionExpression: "attribute_not_exists(#u) OR #u < :limit",
+          ExpressionAttributeNames: { "#u": usesAttribute(feature) },
+          ExpressionAttributeValues: { ":one": 1, ":limit": limit },
+        }),
+      );
+      return { ok: true, limit };
+    } catch (err) {
+      if (isConditionFailure(err)) return { ok: false, limit };
+      throw err;
+    }
   }
 
   /** The reader's usage for their last `days` days, newest first (#208). */
