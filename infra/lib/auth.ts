@@ -10,9 +10,17 @@ import {
   UserPool,
   UserPoolClient,
   UserPoolClientIdentityProvider,
+  UserPoolEmail,
 } from "aws-cdk-lib/aws-cognito";
 import { Construct } from "constructs";
-import { BASE_PATH, COGNITO_DOMAIN_PREFIX } from "./config.js";
+import {
+  BASE_PATH,
+  COGNITO_DOMAIN_PREFIX,
+  MAIL_DOMAIN,
+  MAIL_FROM,
+  MAIL_FROM_NAME,
+  REGION,
+} from "./config.js";
 
 export interface AuthProps {
   /** Origins the app is served from; each gets a callback and sign-out URL. */
@@ -55,6 +63,14 @@ export class Auth extends Construct {
         emailBody:
           "Sign in at https://sandip.dev/nutgraf/ with {username} and the temporary password {####}. You will set your own password and add an authenticator app.",
       },
+      // Through SES (#222), not Cognito's own mail and its 50 a day. Cognito makes its
+      // service-linked role for SES the first time this deploys.
+      email: UserPoolEmail.withSES({
+        fromEmail: MAIL_FROM,
+        fromName: MAIL_FROM_NAME,
+        sesVerifiedDomain: MAIL_DOMAIN,
+        sesRegion: REGION,
+      }),
       deletionProtection: true,
       removalPolicy: RemovalPolicy.RETAIN,
     });
