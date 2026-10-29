@@ -50,11 +50,13 @@ export class Auth extends Construct {
       autoVerify: { email: true },
       // Optional (#223), so readers without an authenticator can sign in with an email code; an
       // account with one keeps it only if it is the account's preferred MFA, which accounts
-      // enrolled while MFA was required do not have: set it before this deploys (README,
-      // "MFA optional"). Email codes come in a later deploy: Cognito refuses them while MFA is
-      // still required, so the two cannot change in one update.
+      // enrolled while MFA was required do not have: set it before MFA went optional (README,
+      // "MFA optional"). Such an account is offered only its password, never an email code.
       mfa: Mfa.OPTIONAL,
       mfaSecondFactor: { otp: true, sms: false, email: false },
+      // Sign-in with a code by email (#223), offered in the managed login beside the password.
+      // A deploy after MFA went optional: Cognito refuses email codes while MFA is required.
+      signInPolicy: { allowedFirstAuthFactors: { password: true, emailOtp: true } },
       accountRecovery: AccountRecovery.EMAIL_ONLY,
       passwordPolicy: {
         minLength: 12,
@@ -98,7 +100,8 @@ export class Auth extends Construct {
     this.client = this.userPool.addClient("Web", {
       userPoolClientName: "web",
       generateSecret: false,
-      authFlows: { userSrp: true },
+      // `user`: choice-based sign-in (ALLOW_USER_AUTH), which the email code needs (#223).
+      authFlows: { userSrp: true, user: true },
       oAuth: {
         flows: { authorizationCodeGrant: true },
         scopes: [OAuthScope.OPENID, OAuthScope.EMAIL],

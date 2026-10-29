@@ -254,6 +254,9 @@ describe("auth and API (prod)", () => {
       Properties: Match.objectLike({
         UserPoolTier: "ESSENTIALS",
         MfaConfiguration: "OPTIONAL",
+        Policies: Match.objectLike({
+          SignInPolicy: { AllowedFirstAuthFactors: ["PASSWORD", "EMAIL_OTP"] },
+        }),
         EnabledMfas: ["SOFTWARE_TOKEN_MFA"],
         AdminCreateUserConfig: Match.objectLike({ AllowAdminCreateUserOnly: true }),
         DeletionProtection: "ACTIVE",
@@ -298,6 +301,7 @@ describe("auth and API (prod)", () => {
       CallbackURLs: Match.arrayWith(["https://sandip.dev/nutgraf/auth/callback"]),
       LogoutURLs: Match.arrayWith(["https://sandip.dev/nutgraf/"]),
       EnableTokenRevocation: true,
+      ExplicitAuthFlows: Match.arrayWith(["ALLOW_USER_SRP_AUTH", "ALLOW_USER_AUTH"]),
     });
   });
 
