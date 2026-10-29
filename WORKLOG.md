@@ -676,3 +676,29 @@ Sandip said "Start milestone 13", then asked for reminders to run the prod move 
 - A switch per stage instead of a cut-over, and a move that copies (never overwrites) so it can run twice around the flip.
 - Limits count uses with one conditional update; a reader's own limits are an operator's to set.
 - The load test waits for mail in.
+
+## 2026-10-29, late — milestone 15 started: export, delete account, onboarding
+
+Sandip: "Yes, start them" (the parts of milestone 15 that need no mail setup).
+
+**Did:**
+
+- Milestone 15 created (issues 219 to 225). Built and live: export (PR 226, #219), delete account (PR 228, #220), onboarding (PR 229, #221).
+- Filed #227: API integration tests failing now and then in tests the change did not touch; PR 226's Deploy needed two re-runs.
+
+**State now:**
+
+- Prod runs PR 229's code on today's keys: export works for Sandip's library; delete account answers 409 for everyone (today's keys, and the owner); no one sees onboarding.
+- Milestone 15 open: #222 (SES) and #223 (email code) wait on Sandip's DNS records and SES production access; #225 (highlights back) on Sandip's call; #224 (operator group) in the backlog.
+- Milestone 13 still waits on Sandip's prod move (PR 207); reminders Saturday and Tuesday.
+
+**Next:**
+
+- Sandip: the prod move (runbook in `docs/features/multi-reader.md`), then SES's DKIM records for sandip.dev and SES production access.
+- Me, unblocked: #227 (flaky integration tests), then #224 (operator group).
+
+**Decisions:**
+
+- Export is Nutgraf's data, not the newsletters' text (it is in the reader's mail).
+- Delete account runs in the jobs Lambda and deletes the sign-in server-side (`AdminDeleteUser` by `sub`), since the app's token has no admin scope; refused on today's keys and for the owner.
+- Onboarding shows only to a new reader on reader keys; the reader line comes from the interests they pick.
