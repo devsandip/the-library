@@ -4,6 +4,7 @@ import { Asks } from "./ask.js";
 import { Audits } from "./audit.js";
 import { HttpError } from "./errors.js";
 import { Following } from "./following.js";
+import { Highlights } from "./highlights.js";
 import { Predictions } from "./predictions.js";
 import { Tuneups } from "./tuneup.js";
 import type { Services } from "./port.js";
@@ -123,6 +124,7 @@ export const handler = createHandler({
   sources: new Sources(repo, (job) => invokeAsync(JOBS_FUNCTION!, job)),
   ask: new Asks(repo, corpus, new TitanEmbedder(), claude),
   following: new Following(repo),
+  highlights: new Highlights(repo),
   predictions: new Predictions(repo),
   audit: new Audits(repo),
   tuneup: new Tuneups(repo),

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { IssueListItem, SenderListItem } from "@library/core/types";
+import type { HighlightQuote, IssueListItem, SenderListItem } from "@library/core/types";
 import { conflict, notFound } from "../src/errors.js";
 import { createHandler } from "../src/handler.js";
 import type { RepoPort, Services } from "../src/port.js";
@@ -29,7 +29,12 @@ const sender: SenderListItem = {
 function setup(overrides: Partial<RepoPort> = {}) {
   const repo: RepoPort = {
     listIssues: vi.fn(async () => ({ items: [issue] })),
-    getIssue: vi.fn(async () => ({ ...issue, fromAddr: "a@b.c", html: "<p>x</p>" })),
+    getIssue: vi.fn(async () => ({
+      ...issue,
+      fromAddr: "a@b.c",
+      html: "<p>x</p>",
+      highlights: [],
+    })),
     setState: vi.fn(async (_id, state) => ({ ...issue, state })),
     setShelf: vi.fn(async (_id, shelf) => ({ ...issue, shelf })),
     setSaved: vi.fn(async (_id, saved) => ({
@@ -130,6 +135,26 @@ function setup(overrides: Partial<RepoPort> = {}) {
       })),
       unfollow: vi.fn(async () => undefined),
       seen: vi.fn(async () => undefined),
+    },
+    highlights: {
+      list: vi.fn(async () => ({ items: [] })),
+      add: vi.fn(async (issueId: string, quote: HighlightQuote, note?: string) => ({
+        id: `${issueId}.mh0abcd1wxyz`,
+        issueId,
+        ...quote,
+        ...(note ? { note } : {}),
+        createdAt: "2026-10-29T05:00:00.000Z",
+      })),
+      note: vi.fn(async (id: string, note?: string) => ({
+        id,
+        issueId: id.split(".")[0]!,
+        exact: "A passage.",
+        prefix: "",
+        suffix: "",
+        ...(note ? { note } : {}),
+        createdAt: "2026-10-29T05:00:00.000Z",
+      })),
+      remove: vi.fn(async () => undefined),
     },
     predictions: {
       list: vi.fn(async () => ({ items: [], due: 0 })),
@@ -358,6 +383,74 @@ describe("routing and validation", () => {
       expect((await call("POST", "/tuneup/dismissed", { body: { id } })).status).toBe(400);
     }
     expect((await call("POST", "/tuneup")).status).toBe(405);
+  });
+
+  it("keeps a passage cleaned, with a note, and rejects what is not one (#166)", async () => {
+    const { svc, call } = setup();
+    const r = await call("POST", "/issues/abc123/highlights", {
+      body: {
+        exact: "  The   model\nships. ",
+        prefix: "said: ",
+        suffix: " It is",
+        note: " Check. ",
+      },
+    });
+    expect(r.status).toBe(200);
+    expect(svc.highlights.add).toHaveBeenCalledWith(
+      "abc123",
+      { exact: "The model ships.", prefix: "said: ", suffix: " It is" },
+      "Check.",
+    );
+    await call("POST", "/issues/abc123/highlights", { body: { exact: "Only this" } });
+    expect(svc.highlights.add).toHaveBeenLastCalledWith(
+      "abc123",
+      { exact: "Only this", prefix: "", suffix: "" },
+      undefined,
+    );
+    const long = "x".repeat(2001);
+    for (const body of [
+      {},
+      { exact: "   " },
+      { exact: long },
+      { exact: 1 },
+      { exact: "a", prefix: 2 },
+    ]) {
+      expect((await call("POST", "/issues/abc123/highlights", { body })).status).toBe(400);
+    }
+    const tooLong = { exact: "a", note: "n".repeat(2001) };
+    expect((await call("POST", "/issues/abc123/highlights", { body: tooLong })).status).toBe(400);
+    expect((await call("POST", "/issues/a.b/highlights", { body: { exact: "a" } })).status).toBe(
+      404,
+    );
+  });
+
+  it("lists highlights a page at a time, sets and clears notes, and deletes (#166)", async () => {
+    const { svc, call } = setup();
+    expect((await call("GET", "/highlights")).body).toEqual({ items: [] });
+    expect(svc.highlights.list).toHaveBeenCalledWith(50, undefined);
+    const next = "2026-10-29T05:00:00.000Z#abc123#mh0abcd1wxyz";
+    await call("GET", "/highlights", { query: { limit: "20", before: next } });
+    expect(svc.highlights.list).toHaveBeenLastCalledWith(20, next);
+    const bad: Record<string, string>[] = [{ limit: "0" }, { limit: "201" }, { before: "nope" }];
+    for (const query of bad) {
+      expect((await call("GET", "/highlights", { query })).status).toBe(400);
+    }
+
+    const id = "abc123.mh0abcd1wxyz";
+    const set = await call("PATCH", `/highlights/${id}`, { body: { note: "Worth a post." } });
+    expect(set.body.note).toBe("Worth a post.");
+    expect(svc.highlights.note).toHaveBeenCalledWith(id, "Worth a post.");
+    await call("PATCH", `/highlights/${id}`, { body: { note: null } });
+    expect(svc.highlights.note).toHaveBeenLastCalledWith(id, undefined);
+    await call("PATCH", `/highlights/${id}`, { body: { note: "  " } });
+    expect(svc.highlights.note).toHaveBeenLastCalledWith(id, undefined);
+    expect((await call("PATCH", `/highlights/${id}`, { body: {} })).status).toBe(400);
+    expect((await call("PATCH", `/highlights/${id}`, { body: { note: 3 } })).status).toBe(400);
+    expect((await call("PATCH", "/highlights/abc123.2", { body: { note: "x" } })).status).toBe(404);
+
+    expect((await call("DELETE", `/highlights/${id}`)).status).toBe(204);
+    expect(svc.highlights.remove).toHaveBeenCalledWith(id);
+    expect((await call("POST", `/highlights/${id}`)).status).toBe(405);
   });
 
   it("lists predictions by view and takes Sandip's verdict, or null (#140)", async () => {

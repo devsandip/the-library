@@ -47,6 +47,23 @@ export const predictionKey = (issueId: string, k: number) => ({
   pk: PREDICTIONS_PK,
   sk: `${issueId}#${String(k).padStart(2, "0")}`,
 });
+/** A highlighted passage (#166), under its issue; in `gsi1` under `HIGHLIGHTS` by date too. */
+export const highlightKey = (issueId: string, key: string) => ({
+  pk: `ISSUE#${issueId}`,
+  sk: `HL#${key}`,
+});
+/** A highlight's id, `<issueId>.<key>`. */
+export const HIGHLIGHT_ID = /^([A-Za-z0-9_-]{1,64})\.([0-9a-z]{12})$/;
+/** A highlight's key from its id; undefined for anything else. */
+export function highlightKeyFromId(id: string) {
+  const m = HIGHLIGHT_ID.exec(id);
+  return m ? highlightKey(m[1]!, m[2]!) : undefined;
+}
+/** A highlight in `gsi1`, newest first for the Highlights page. */
+export const highlightIndexAttributes = (issueId: string, key: string, at: string) => ({
+  gsi1pk: PARTITION.highlights,
+  gsi1sk: `${at}#${issueId}#${key}`,
+});
 /** A prediction's key from its id, `<issueId>.<k>`; undefined for anything else. */
 export function predictionKeyFromId(id: string) {
   const m = /^([A-Za-z0-9_-]{1,64})\.([1-9][0-9]?)$/.exec(id);
@@ -54,7 +71,7 @@ export function predictionKeyFromId(id: string) {
 }
 
 export const INDEX = {
-  /** INBOX (unread + read) | ARCHIVE | SENDERS | STORIES | OPENS */
+  /** INBOX (unread + read) | ARCHIVE | SENDERS | STORIES | OPENS | HIGHLIGHTS */
   list: "gsi1",
   /**
    * Sparse: unread issues (UNREAD), saved ones (SAVED, #43), which leave UNREAD, and unread
@@ -73,6 +90,7 @@ export const PARTITION = {
   senders: "SENDERS",
   stories: "STORIES",
   opens: "OPENS",
+  highlights: "HIGHLIGHTS",
   unread: "UNREAD",
   saved: "SAVED",
   learning: "LEARNING",

@@ -11,6 +11,7 @@ export * from "./related.js";
 export * from "./stories.js";
 export * from "./shelves.js";
 export * from "./follow.js";
+export * from "./highlights.js";
 export * from "./predictions.js";
 export * from "./audit.js";
 export * from "./tuneup.js";

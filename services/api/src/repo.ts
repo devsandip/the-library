@@ -22,6 +22,9 @@ import {
   digestKey,
   followKey,
   FOLLOWING_PK,
+  highlightIndexAttributes,
+  highlightKey,
+  highlightKeyFromId,
   embeddingKey,
   eventKey,
   INDEX,
@@ -67,6 +70,7 @@ import {
 import type {
   DigestStats,
   FollowPoint,
+  Highlight,
   HistoryItem,
   HistoryResponse,
   IssueDetailResponse,
@@ -109,6 +113,7 @@ import type { TuneupStore } from "./tuneup.js";
 import type { CorpusIssue, CorpusSource, CorpusStory } from "./corpus.js";
 import type { OwnStory, RelatedSource } from "./related.js";
 import type { FollowStore } from "./following.js";
+import type { HighlightStore } from "./highlights.js";
 import type { SearchSource } from "./search.js";
 import type { PredictionStore, Verdict } from "./predictions.js";
 import type { Settlement, SettleStore, StoredPrediction } from "./settle.js";
@@ -208,6 +213,20 @@ function inReadingOrder(items: LearningItem[]): LearningItem[] {
 
 /** What Learning reads of a story (#81): never its embedding. */
 const STORY_ATTRIBUTES = ["id", "n", "headline", "summary", "link", "names", "shelf", "state"];
+
+/** A stored highlight (#166) as the API answers it. */
+function toHighlight(i: Item): Highlight {
+  return {
+    id: i.id as string,
+    issueId: i.issueId as string,
+    exact: i.exact as string,
+    prefix: (i.prefix as string | undefined) ?? "",
+    suffix: (i.suffix as string | undefined) ?? "",
+    ...(typeof i.note === "string" ? { note: i.note } : {}),
+    createdAt: i.createdAt as string,
+    ...(typeof i.updatedAt === "string" ? { updatedAt: i.updatedAt } : {}),
+  };
+}
 
 /** A stored prediction (#24) as the API reads it. */
 function toPrediction(i: Record<string, unknown>): StoredPrediction {
@@ -352,6 +371,7 @@ export class DynamoRepo
     TakesStore,
     SourceStore,
     FollowStore,
+    HighlightStore,
     SettleStore,
     PredictionStore,
     AuditStore,
@@ -615,7 +635,11 @@ export class DynamoRepo
   }
 
   async getIssue(id: string): Promise<IssueDetailResponse> {
-    const [item, place] = await Promise.all([this.mustGetIssue(id), this.nowReadingItem()]);
+    const [item, place, highlights] = await Promise.all([
+      this.mustGetIssue(id),
+      this.nowReadingItem(),
+      this.issueHighlights(id),
+    ]);
     const keys = s3Keys(id);
     // Sanitized HTML expires after a year; the clean text is kept forever.
     let html = await this.readObject(keys.html);
@@ -633,6 +657,7 @@ export class DynamoRepo
       html,
       // The reader goes back to the place in the issue Now reading points at (#44).
       ...(position > 0 && position < 1 ? { position } : {}),
+      highlights,
     };
   }
 
@@ -1659,6 +1684,91 @@ export class DynamoRepo
       // Unfollowed in the meantime: nothing to mark.
       if (!isConditionFailure(err)) throw err;
     }
+  }
+
+  // ---------- highlights (#166) ----------
+
+  /** An issue's highlights, oldest first, read consistently so one just made is there. */
+  async issueHighlights(issueId: string): Promise<Highlight[]> {
+    const items = await this.queryAll({
+      KeyConditionExpression: "pk = :pk AND begins_with(sk, :hl)",
+      ExpressionAttributeValues: { ":pk": issueKey(issueId).pk, ":hl": "HL#" },
+      ConsistentRead: true,
+    });
+    return items.map(toHighlight);
+  }
+
+  async putHighlight(h: Highlight): Promise<void> {
+    const key = h.id.slice(h.issueId.length + 1);
+    await this.ddb.send(
+      new PutCommand({
+        TableName: this.table,
+        Item: {
+          ...highlightKey(h.issueId, key),
+          ...h,
+          ...highlightIndexAttributes(h.issueId, key, h.createdAt),
+        },
+      }),
+    );
+  }
+
+  async setHighlightNote(
+    id: string,
+    note: string | undefined,
+    at: string,
+  ): Promise<Highlight | undefined> {
+    const key = highlightKeyFromId(id);
+    if (!key) return undefined;
+    const u = updateExpression(
+      note ? { note, updatedAt: at } : { updatedAt: at },
+      note ? [] : ["note"],
+    );
+    try {
+      const res = await this.ddb.send(
+        new UpdateCommand({
+          TableName: this.table,
+          Key: key,
+          UpdateExpression: u.expr,
+          ConditionExpression: "attribute_exists(pk)",
+          ExpressionAttributeNames: u.names,
+          ExpressionAttributeValues: u.values,
+          ReturnValues: "ALL_NEW",
+        }),
+      );
+      return toHighlight(res.Attributes!);
+    } catch (err) {
+      if (isConditionFailure(err)) return undefined;
+      throw err;
+    }
+  }
+
+  async deleteHighlight(id: string): Promise<void> {
+    const key = highlightKeyFromId(id);
+    if (key) await this.ddb.send(new DeleteCommand({ TableName: this.table, Key: key }));
+  }
+
+  /** Newest first from `gsi1`'s `HIGHLIGHTS`; `next` is the last one's sort key. */
+  async listHighlights(
+    limit: number,
+    before?: string,
+  ): Promise<{ items: Highlight[]; next?: string }> {
+    const res = await this.query({
+      IndexName: INDEX.list,
+      KeyConditionExpression: before ? "gsi1pk = :p AND gsi1sk < :before" : "gsi1pk = :p",
+      ExpressionAttributeValues: {
+        ":p": PARTITION.highlights,
+        ...(before ? { ":before": before } : {}),
+      },
+      ScanIndexForward: false,
+      // One more than asked, to know whether there is a next page.
+      Limit: limit + 1,
+    });
+    const page = (res.Items ?? []).slice(0, limit);
+    const more = (res.Items ?? []).length > limit;
+    return {
+      items: page.map(toHighlight),
+      ...(more ? { next: page[page.length - 1]!.gsi1sk as string } : {}),
+    };
   }
 
   // ---------- search (#53) and related stories (#20) ----------
