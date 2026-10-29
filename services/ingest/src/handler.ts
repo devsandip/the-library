@@ -14,12 +14,15 @@ import { deriveShelves, shelveStories } from "./shelves.js";
 import { Store } from "./store.js";
 import { indexStories, relinkStories } from "./stories.js";
 
-const { TABLE_NAME, BUCKET_NAME, GMAIL_PARAM, JEV_PARAM, STAGE } = process.env;
+const { TABLE_NAME, BUCKET_NAME, GMAIL_PARAM, JEV_PARAM, STAGE, READER_KEYS } = process.env;
 
 let gmail: Gmail | undefined;
 let jev: Jev | undefined;
-/** The table and bucket; each run works for the owner (#180), read when it starts. */
-const library = new Store(TABLE_NAME!, BUCKET_NAME!);
+/**
+ * The table and bucket; each run works for the owner (#180), read when it starts, on the owner's
+ * keys when `READER_KEYS` is on (milestone 13).
+ */
+const library = new Store(TABLE_NAME!, BUCKET_NAME!, { keyed: READER_KEYS === "1" });
 const bedrock = new Bedrock();
 const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
 
@@ -107,6 +110,8 @@ export interface IngestEvent {
 export async function handler(event: IngestEvent = {}) {
   const started = Date.now();
   const owner = await library.owner();
+  // On reader keys, a run without an owner would write items no reader can see.
+  if (library.keyed && !owner) throw new Error("READER_KEYS is on but no owner is named");
   const store = owner ? library.forReader(owner) : library;
   if (event.enrich) {
     const stats = await enrich(store, bedrock, {

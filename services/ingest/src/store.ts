@@ -18,35 +18,21 @@ import {
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import {
   EMBED_DIMENSIONS,
-  embeddingKey,
-  eventKey,
-  followKey,
-  FOLLOWING_PK,
   INDEX,
-  INGEST_STATE_KEY,
-  INTERESTS_KEY,
   OWNER_KEY,
   settingsKey,
-  NARRATIVE_KEY,
-  openIndexAttributes,
-  predictionKey,
-  PARTITION,
-  TOPICS_KEY,
-  issueIndexAttributes,
-  issueKey,
   retryOnConflict,
   s3Keys,
-  senderIndexAttributes,
-  senderItemKey,
   issueShelf,
   storyIndexAttributes,
-  storyKey,
   storyRef,
   toVector,
   vectorBytes,
   type IngestStats,
   type ProcessedMessage,
   type StoredFollow,
+  keysFor,
+  type Keys,
 } from "@library/core";
 import type {
   EnrichStats,
@@ -86,12 +72,16 @@ export class Store {
    * it from milestone 13 of `docs/features/multi-reader.md`; until then there is one library.
    */
   readonly reader?: Reader;
+  /** Whether this store uses its reader's keys (`READER_KEYS`, milestone 13). */
+  readonly keyed: boolean;
+  /** Every key this store reads and writes: the reader's when keyed, today's otherwise. */
+  private readonly k: Keys;
   private readonly clients: { ddb: DynamoDBClient; s3: S3Client };
 
   constructor(
     private readonly table: string,
     private readonly bucket: string,
-    opts: { ddb?: DynamoDBClient; s3?: S3Client; reader?: Reader } = {},
+    opts: { ddb?: DynamoDBClient; s3?: S3Client; reader?: Reader; keyed?: boolean } = {},
   ) {
     this.clients = { ddb: opts.ddb ?? new DynamoDBClient({}), s3: opts.s3 ?? new S3Client({}) };
     this.ddb = DynamoDBDocumentClient.from(this.clients.ddb, {
@@ -99,11 +89,29 @@ export class Store {
     });
     this.s3 = this.clients.s3;
     this.reader = opts.reader;
+    this.keyed = opts.keyed === true;
+    this.k = keysFor(this.keyed ? opts.reader?.id : undefined);
   }
 
-  /** The same table and bucket, for a reader. */
+  /** The same table and bucket, for a reader, on their keys when this store is keyed. */
   forReader(reader: Reader): Store {
-    return new Store(this.table, this.bucket, { ...this.clients, reader });
+    return new Store(this.table, this.bucket, { ...this.clients, reader, keyed: this.keyed });
+  }
+
+  /**
+   * A scan's filter for this store's items alone: the reader's prefix when keyed; otherwise every
+   * item not under a reader's prefix, so today's keys never mix with readers' copies of them.
+   */
+  private ownItems(): { expr: string; values: Record<string, string> } {
+    return this.k.prefix
+      ? { expr: "begins_with(pk, :own)", values: { ":own": this.k.prefix } }
+      : { expr: "NOT begins_with(pk, :own)", values: { ":own": "R#" } };
+  }
+
+  /** A story's index attributes on this store's keys. */
+  private storyIndex(story: Parameters<typeof storyIndexAttributes>[0]) {
+    const { set, remove } = storyIndexAttributes(story);
+    return { set: this.k.indexed(set), remove };
   }
 
   /** The owner (`CONFIG/OWNER`), or undefined until `pnpm name-owner` names one. */
@@ -142,7 +150,9 @@ export class Store {
   async existingIds(ids: string[]): Promise<Set<string>> {
     const found = new Set<string>();
     for (let i = 0; i < ids.length; i += 100) {
-      let keys: Record<string, unknown>[] | undefined = ids.slice(i, i + 100).map(issueKey);
+      let keys: Record<string, unknown>[] | undefined = ids
+        .slice(i, i + 100)
+        .map((id) => this.k.issue(id));
       while (keys?.length) {
         const res: BatchGetCommandOutput = await this.ddb.send(
           new BatchGetCommand({
@@ -150,7 +160,7 @@ export class Store {
           }),
         );
         for (const item of res.Responses?.[this.table] ?? []) {
-          found.add(String(item.pk).slice("ISSUE#".length));
+          found.add(this.k.issueIdOf(String(item.pk))!);
         }
         keys = res.UnprocessedKeys?.[this.table]?.Keys;
       }
@@ -165,7 +175,7 @@ export class Store {
         new PutCommand({
           TableName: this.table,
           Item: {
-            ...issueKey(p.id),
+            ...this.k.issue(p.id),
             id: p.id,
             state: "filtered",
             filterReason: p.reason,
@@ -208,13 +218,13 @@ export class Store {
   }
 
   private async writeIssueAndSender(p: Newsletter, keys: ReturnType<typeof s3Keys>): Promise<void> {
-    const index = issueIndexAttributes({
+    const index = this.k.issueIndex({
       id: p.id,
       senderId: p.senderId,
       receivedAt: p.receivedAt,
       state: "unread",
     });
-    const senderIndex = senderIndexAttributes(p.senderId, p.publication);
+    const senderIndex = this.k.senderIndex(p.senderId, p.publication);
 
     // Issue put and sender count move together; the condition makes a re-run a no-op, which is
     // also what makes retrying a conflicting transaction safe. Conflicts can still come from
@@ -228,7 +238,7 @@ export class Store {
                 TableName: this.table,
                 ConditionExpression: "attribute_not_exists(pk)",
                 Item: {
-                  ...issueKey(p.id),
+                  ...this.k.issue(p.id),
                   ...index.set,
                   id: p.id,
                   senderId: p.senderId,
@@ -252,7 +262,7 @@ export class Store {
             {
               Update: {
                 TableName: this.table,
-                Key: senderItemKey(p.senderId),
+                Key: this.k.senderItem(p.senderId),
                 UpdateExpression:
                   "SET senderId = :sid, senderKey = :skey, " +
                   "publication = if_not_exists(publication, :pub), " +
@@ -292,7 +302,7 @@ export class Store {
       this.ddb.send(
         new UpdateCommand({
           TableName: this.table,
-          Key: senderItemKey(p.senderId),
+          Key: this.k.senderItem(p.senderId),
           ConditionExpression: "attribute_not_exists(lastSeenAt) OR lastSeenAt < :seen",
           UpdateExpression: p.unsubscribeUrl
             ? "SET lastSeenAt = :seen, unsubscribeUrl = :unsub"
@@ -309,7 +319,7 @@ export class Store {
   /** Stored newsletters (inbox or archive) received since `sinceIso`: what reprocessing needs. */
   async recentIssues(sinceIso: string) {
     const out: { id: string; labelIds: string[]; receivedAt: string; snippet?: string }[] = [];
-    for (const partition of [PARTITION.inbox, PARTITION.archive]) {
+    for (const partition of [this.k.partition.inbox, this.k.partition.archive]) {
       let start: Record<string, unknown> | undefined;
       do {
         const res: QueryCommandOutput = await this.ddb.send(
@@ -382,7 +392,7 @@ export class Store {
     await this.ddb.send(
       new UpdateCommand({
         TableName: this.table,
-        Key: issueKey(p.id),
+        Key: this.k.issue(p.id),
         ConditionExpression: "attribute_exists(pk)",
         UpdateExpression: `SET ${sets.join(", ")}${removes.length ? ` REMOVE ${removes.join(", ")}` : ""}`,
         ExpressionAttributeValues: values,
@@ -394,24 +404,26 @@ export class Store {
   async scanForSenderRebuild(): Promise<{ issues: StoredIssue[]; senders: StoredSender[] }> {
     const issues: StoredIssue[] = [];
     const senders: StoredSender[] = [];
+    const own = this.ownItems();
     let start: Record<string, unknown> | undefined;
     do {
       const res: ScanCommandOutput = await this.ddb.send(
         new ScanCommand({
           TableName: this.table,
           ConsistentRead: true,
-          FilterExpression: "sk = :meta",
+          FilterExpression: `sk = :meta AND ${own.expr}`,
           ProjectionExpression:
             "pk, id, #st, senderId, publication, fromAddr, fromName, receivedAt, rating, " +
             "unsubscribeUrl, senderKey, muted, mustRead, up, down, issueCount, addresses, lastSeenAt",
           ExpressionAttributeNames: { "#st": "state" },
-          ExpressionAttributeValues: { ":meta": "META" },
+          ExpressionAttributeValues: { ":meta": "META", ...own.values },
           ExclusiveStartKey: start,
         }),
       );
       for (const i of res.Items ?? []) {
         const pk = String(i.pk);
-        if (pk.startsWith("ISSUE#") && i.state !== "filtered" && i.senderId) {
+        const senderId = this.k.senderIdOf(pk);
+        if (this.k.issueIdOf(pk) !== undefined && i.state !== "filtered" && i.senderId) {
           issues.push({
             id: i.id as string,
             senderId: i.senderId as string,
@@ -422,9 +434,9 @@ export class Store {
             rating: i.rating as Rating | undefined,
             unsubscribeUrl: i.unsubscribeUrl as string | undefined,
           });
-        } else if (pk.startsWith("SENDER#")) {
+        } else if (senderId !== undefined) {
           senders.push({
-            senderId: pk.slice("SENDER#".length),
+            senderId,
             senderKey: i.senderKey as string | undefined,
             publication: i.publication as string | undefined,
             muted: i.muted as boolean | undefined,
@@ -465,8 +477,8 @@ export class Store {
           new PutCommand({
             TableName: this.table,
             Item: {
-              ...senderItemKey(c.senderId),
-              ...senderIndexAttributes(c.senderId, c.publication),
+              ...this.k.senderItem(c.senderId),
+              ...this.k.senderIndex(c.senderId, c.publication),
               ...senderItemFields(c),
               muted: c.muted,
               mustRead: c.mustRead,
@@ -482,13 +494,13 @@ export class Store {
         this.ddb.send(
           new UpdateCommand({
             TableName: this.table,
-            Key: issueKey(r.id),
+            Key: this.k.issue(r.id),
             UpdateExpression: "SET senderId = :to, publication = :pub, gsi3pk = :g3",
             ConditionExpression: "senderId = :from",
             ExpressionAttributeValues: {
               ":to": r.toSenderId,
               ":pub": r.publication,
-              ":g3": `SENDER#${r.toSenderId}`,
+              ":g3": this.k.senderPartition(r.toSenderId),
               ":from": r.fromSenderId,
             },
           }),
@@ -511,7 +523,7 @@ export class Store {
 
     for (const { next, current } of plan.updates) {
       const { unsubscribeUrl, ...fields } = {
-        ...senderIndexAttributes(next.senderId, next.publication),
+        ...this.k.senderIndex(next.senderId, next.publication),
         ...senderItemFields(next),
       };
       const guard = countersAsRead(current);
@@ -528,7 +540,7 @@ export class Store {
         this.ddb.send(
           new UpdateCommand({
             TableName: this.table,
-            Key: senderItemKey(next.senderId),
+            Key: this.k.senderItem(next.senderId),
             UpdateExpression: `SET ${sets.join(", ")}${remove}`,
             ConditionExpression: `attribute_exists(pk) AND ${guard.expr}`,
             ExpressionAttributeNames: names,
@@ -544,7 +556,7 @@ export class Store {
         this.ddb.send(
           new DeleteCommand({
             TableName: this.table,
-            Key: senderItemKey(d.senderId),
+            Key: this.k.senderItem(d.senderId),
             ConditionExpression: guard.expr,
             ExpressionAttributeNames: guard.names,
             ExpressionAttributeValues: Object.keys(guard.values).length ? guard.values : undefined,
@@ -565,7 +577,7 @@ export class Store {
       new PutCommand({
         TableName: this.table,
         Item: {
-          ...INGEST_STATE_KEY,
+          ...this.k.ingestState,
           lastRunAt: new Date().toISOString(),
           lastRunStats: stats,
           lastError: stats.errors ? stats.errorSamples.join("; ") : null,
@@ -582,7 +594,7 @@ export class Store {
   /** Stored newsletters (inbox or archive) received since `sinceIso`, with their enrichment state. */
   async enrichCandidates(sinceIso: string): Promise<EnrichCandidate[]> {
     const out: EnrichCandidate[] = [];
-    for (const partition of [PARTITION.inbox, PARTITION.archive]) {
+    for (const partition of [this.k.partition.inbox, this.k.partition.archive]) {
       let start: Record<string, unknown> | undefined;
       do {
         const res: QueryCommandOutput = await this.ddb.send(
@@ -625,7 +637,7 @@ export class Store {
   }
 
   async getTopics(): Promise<Topic[] | undefined> {
-    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: TOPICS_KEY }));
+    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: this.k.topics }));
     return res.Item?.topics as Topic[] | undefined;
   }
 
@@ -633,14 +645,16 @@ export class Store {
     await this.ddb.send(
       new PutCommand({
         TableName: this.table,
-        Item: { ...TOPICS_KEY, topics, model: MODELS.classify, at: new Date().toISOString() },
+        Item: { ...this.k.topics, topics, model: MODELS.classify, at: new Date().toISOString() },
       }),
     );
   }
 
   /** The stored interests (names and texts only), to tell whether they need embedding again. */
   async getInterests(): Promise<{ name: string; text: string }[] | undefined> {
-    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: INTERESTS_KEY }));
+    const res = await this.ddb.send(
+      new GetCommand({ TableName: this.table, Key: this.k.interests }),
+    );
     const list = res.Item?.interests as { name: string; text: string }[] | undefined;
     return list?.map(({ name, text }) => ({ name, text }));
   }
@@ -654,7 +668,7 @@ export class Store {
       new PutCommand({
         TableName: this.table,
         Item: {
-          ...INTERESTS_KEY,
+          ...this.k.interests,
           interests: interests.map((i) => ({
             name: i.name,
             text: i.text,
@@ -679,7 +693,7 @@ export class Store {
           TableName: this.table,
           IndexName: INDEX.list,
           KeyConditionExpression: "gsi1pk = :p",
-          ExpressionAttributeValues: { ":p": PARTITION.senders },
+          ExpressionAttributeValues: { ":p": this.k.partition.senders },
           ProjectionExpression: "senderId, shelf, mustRead, muted",
           ExclusiveStartKey: start,
         }),
@@ -708,8 +722,8 @@ export class Store {
       await this.ddb.send(
         new UpdateCommand({
           TableName: this.table,
-          Key: issueKey(id),
-          // The same index moves as issueIndexAttributes() for "archived": INBOX to ARCHIVE
+          Key: this.k.issue(id),
+          // The same index moves as this.k.issueIndex() for "archived": INBOX to ARCHIVE
           // (same sort key), and out of UNREAD.
           UpdateExpression:
             "SET #st = :archived, gsi1pk = :archive, stateChangedAt = :now, autoArchived = :why " +
@@ -719,7 +733,7 @@ export class Store {
           ExpressionAttributeNames: { "#st": "state" },
           ExpressionAttributeValues: {
             ":archived": "archived",
-            ":archive": PARTITION.archive,
+            ":archive": this.k.partition.archive,
             ":now": now,
             ":why": reason,
             ":unread": "unread",
@@ -734,7 +748,7 @@ export class Store {
       new PutCommand({
         TableName: this.table,
         Item: {
-          ...eventKey(id, now, randomUUID().slice(0, 8)),
+          ...this.k.event(id, now, randomUUID().slice(0, 8)),
           type: "state",
           value: "archived",
           prev: "unread",
@@ -755,7 +769,7 @@ export class Store {
       await this.ddb.send(
         new UpdateCommand({
           TableName: this.table,
-          Key: issueKey(id),
+          Key: this.k.issue(id),
           UpdateExpression:
             "SET #st = :unread, gsi1pk = :inbox, gsi2pk = :unreadIdx, gsi2sk = gsi1sk, " +
             "stateChangedAt = :now REMOVE autoArchived",
@@ -763,8 +777,8 @@ export class Store {
           ExpressionAttributeNames: { "#st": "state" },
           ExpressionAttributeValues: {
             ":unread": "unread",
-            ":inbox": PARTITION.inbox,
-            ":unreadIdx": PARTITION.unread,
+            ":inbox": this.k.partition.inbox,
+            ":unreadIdx": this.k.partition.unread,
             ":now": now,
             ":archived": "archived",
           },
@@ -778,7 +792,7 @@ export class Store {
       new PutCommand({
         TableName: this.table,
         Item: {
-          ...eventKey(id, now, randomUUID().slice(0, 8)),
+          ...this.k.event(id, now, randomUUID().slice(0, 8)),
           type: "state",
           value: "unread",
           prev: "archived",
@@ -798,12 +812,12 @@ export class Store {
   async fileAsFiltered(id: string, reason: string, by: "claude" | "rule"): Promise<boolean> {
     const item = (
       await this.ddb.send(
-        new GetCommand({ TableName: this.table, Key: issueKey(id), ConsistentRead: true }),
+        new GetCommand({ TableName: this.table, Key: this.k.issue(id), ConsistentRead: true }),
       )
     ).Item;
     if (!item || item.state === "filtered" || item.rating || item.savedAt) return false;
     const now = new Date().toISOString();
-    const { remove } = issueIndexAttributes({
+    const { remove } = this.k.issueIndex({
       id,
       senderId: item.senderId as string,
       receivedAt: item.receivedAt as string,
@@ -817,7 +831,7 @@ export class Store {
               {
                 Update: {
                   TableName: this.table,
-                  Key: issueKey(id),
+                  Key: this.k.issue(id),
                   UpdateExpression:
                     "SET #st = :filtered, filterReason = :why, stateChangedAt = :now " +
                     `REMOVE ${remove.join(", ")}`,
@@ -835,7 +849,7 @@ export class Store {
               {
                 Update: {
                   TableName: this.table,
-                  Key: senderItemKey(item.senderId as string),
+                  Key: this.k.senderItem(item.senderId as string),
                   UpdateExpression: "ADD issueCount :minusOne",
                   ConditionExpression: "attribute_exists(pk)",
                   ExpressionAttributeValues: { ":minusOne": -1 },
@@ -859,7 +873,7 @@ export class Store {
       {
         PutRequest: {
           Item: {
-            ...eventKey(id, now, randomUUID().slice(0, 8)),
+            ...this.k.event(id, now, randomUUID().slice(0, 8)),
             type: "state",
             value: "filtered",
             prev: item.state,
@@ -883,7 +897,7 @@ export class Store {
           KeyConditionExpression: "gsi2pk = :p AND gsi2sk < :cutoff",
           FilterExpression: "shelf = :news AND attribute_not_exists(autoArchived)",
           ExpressionAttributeValues: {
-            ":p": PARTITION.unread,
+            ":p": this.k.partition.unread,
             ":cutoff": cutoffIso,
             ":news": "news",
           },
@@ -927,7 +941,7 @@ export class Store {
     await this.ddb.send(
       new UpdateCommand({
         TableName: this.table,
-        Key: issueKey(id),
+        Key: this.k.issue(id),
         UpdateExpression:
           "SET #sum = :sum, #topic = :topic, #promo = :promo, #selling = :selling, " +
           "#at = :at, #model = :model, #shelf = if_not_exists(#shelf, :shelf)" +
@@ -964,7 +978,7 @@ export class Store {
       new PutCommand({
         TableName: this.table,
         Item: {
-          ...embeddingKey(id),
+          ...this.k.embedding(id),
           vector: new Uint8Array(new Float32Array(vector).buffer),
           dims: vector.length,
           model: MODELS.embed,
@@ -975,7 +989,7 @@ export class Store {
     await this.ddb.send(
       new UpdateCommand({
         TableName: this.table,
-        Key: issueKey(id),
+        Key: this.k.issue(id),
         UpdateExpression: "SET embeddedAt = :at",
         ConditionExpression: "attribute_exists(pk)",
         ExpressionAttributeValues: { ":at": now },
@@ -1046,7 +1060,7 @@ export class Store {
     const res = await this.ddb.send(
       new GetCommand({
         TableName: this.table,
-        Key: storyKey(s.issueId, s.n),
+        Key: this.k.story(s.issueId, s.n),
         ProjectionExpression:
           "id, n, senderId, receivedAt, headline, summary, shelf, shelfSetBy, learning, #st, gsi2pk",
         ExpressionAttributeNames: { "#st": "state" },
@@ -1085,7 +1099,7 @@ export class Store {
     if (jev) set.shelvedAt = new Date().toISOString();
     if (next.shelf) Object.assign(set, { shelf: next.shelf, shelfSetBy: next.shelfSetBy });
     if (next.state) set.state = next.state;
-    const index = storyIndexAttributes({
+    const index = this.storyIndex({
       issueId: s.issueId,
       n: s.n,
       receivedAt: s.receivedAt,
@@ -1113,7 +1127,7 @@ export class Store {
       await this.ddb.send(
         new UpdateCommand({
           TableName: this.table,
-          Key: storyKey(s.issueId, s.n),
+          Key: this.k.story(s.issueId, s.n),
           UpdateExpression: [
             assign.length ? `SET ${assign.join(", ")}` : "",
             remove.length ? `REMOVE ${remove.join(", ")}` : "",
@@ -1149,7 +1163,7 @@ export class Store {
         this.ddb.send(
           new GetCommand({
             TableName: this.table,
-            Key: issueKey(id),
+            Key: this.k.issue(id),
             ProjectionExpression: "shelf, shelfSetBy, #st",
             ExpressionAttributeNames: { "#st": "state" },
             ConsistentRead: true,
@@ -1159,7 +1173,7 @@ export class Store {
           new QueryCommand({
             TableName: this.table,
             KeyConditionExpression: "pk = :pk AND begins_with(sk, :story)",
-            ExpressionAttributeValues: { ":pk": issueKey(id).pk, ":story": "STORY#" },
+            ExpressionAttributeValues: { ":pk": this.k.issue(id).pk, ":story": "STORY#" },
             ProjectionExpression: "shelf",
             ConsistentRead: true,
           }),
@@ -1172,7 +1186,7 @@ export class Store {
       await this.ddb.send(
         new UpdateCommand({
           TableName: this.table,
-          Key: issueKey(id),
+          Key: this.k.issue(id),
           UpdateExpression: "SET shelf = :s, shelfSetBy = :by",
           ConditionExpression: "attribute_exists(pk)",
           ExpressionAttributeValues: { ":s": shelf, ":by": "stories" },
@@ -1198,7 +1212,7 @@ export class Store {
           IndexName: INDEX.list,
           KeyConditionExpression: "gsi1pk = :p AND gsi1sk BETWEEN :from AND :to",
           ExpressionAttributeValues: {
-            ":p": PARTITION.stories,
+            ":p": this.k.partition.stories,
             ":from": fromIso,
             ":to": `${toIso}\uffff`,
           },
@@ -1224,7 +1238,7 @@ export class Store {
         new QueryCommand({
           TableName: this.table,
           KeyConditionExpression: "pk = :p",
-          ExpressionAttributeValues: { ":p": FOLLOWING_PK },
+          ExpressionAttributeValues: { ":p": this.k.followingPk },
           ConsistentRead: true,
           ExclusiveStartKey: start,
         }),
@@ -1277,7 +1291,7 @@ export class Store {
     const found = new Map<string, Float32Array>();
     const keys = refs.map((r) => {
       const at = r.lastIndexOf("#");
-      return storyKey(r.slice(0, at), Number(r.slice(at + 1)));
+      return this.k.story(r.slice(0, at), Number(r.slice(at + 1)));
     });
     for (let i = 0; i < keys.length; i += 100) {
       let batch: Record<string, unknown>[] | undefined = keys.slice(i, i + 100);
@@ -1306,7 +1320,9 @@ export class Store {
   ): Promise<Map<string, { publication: string; storyCount: number }>> {
     const found = new Map<string, { publication: string; storyCount: number }>();
     for (let i = 0; i < ids.length; i += 100) {
-      let batch: Record<string, unknown>[] | undefined = ids.slice(i, i + 100).map(issueKey);
+      let batch: Record<string, unknown>[] | undefined = ids
+        .slice(i, i + 100)
+        .map((id) => this.k.issue(id));
       while (batch?.length) {
         const res: BatchGetCommandOutput = await this.ddb.send(
           new BatchGetCommand({
@@ -1354,7 +1370,7 @@ export class Store {
       await this.ddb.send(
         new UpdateCommand({
           TableName: this.table,
-          Key: followKey(eventId),
+          Key: this.k.follow(eventId),
           UpdateExpression: `SET ${sets.join(", ")}`,
           ConditionExpression: "attribute_exists(pk)",
           ExpressionAttributeValues: values,
@@ -1374,15 +1390,15 @@ export class Store {
    */
   async indexOpens(): Promise<number> {
     let indexed = 0;
+    const own = this.ownItems();
     let start: Record<string, unknown> | undefined;
     do {
       const res: ScanCommandOutput = await this.ddb.send(
         new ScanCommand({
           TableName: this.table,
-          FilterExpression:
-            "begins_with(sk, :evt) AND #type = :open AND attribute_not_exists(gsi1pk)",
+          FilterExpression: `begins_with(sk, :evt) AND #type = :open AND attribute_not_exists(gsi1pk) AND ${own.expr}`,
           ExpressionAttributeNames: { "#type": "type" },
-          ExpressionAttributeValues: { ":evt": "EVT#", ":open": "open" },
+          ExpressionAttributeValues: { ":evt": "EVT#", ":open": "open", ...own.values },
           ProjectionExpression: "pk, sk",
           ExclusiveStartKey: start,
         }),
@@ -1392,7 +1408,7 @@ export class Store {
         const sk = i.sk as string;
         // EVT#<at>#<rand> on ISSUE#<id>
         const at = sk.split("#")[1]!;
-        const idx = openIndexAttributes(pk.slice("ISSUE#".length), at);
+        const idx = this.k.openIndex(this.k.issueIdOf(pk)!, at);
         await this.ddb.send(
           new UpdateCommand({
             TableName: this.table,
@@ -1411,7 +1427,9 @@ export class Store {
   // ---------- narrative (#18) ----------
 
   async getNarrative(): Promise<StoredNarrative | undefined> {
-    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: NARRATIVE_KEY }));
+    const res = await this.ddb.send(
+      new GetCommand({ TableName: this.table, Key: this.k.narrative }),
+    );
     if (!res.Item) return undefined;
     const { pk: _pk, sk: _sk, ...narrative } = res.Item;
     return narrative as StoredNarrative;
@@ -1419,7 +1437,7 @@ export class Store {
 
   async putNarrative(narrative: StoredNarrative): Promise<void> {
     await this.ddb.send(
-      new PutCommand({ TableName: this.table, Item: { ...NARRATIVE_KEY, ...narrative } }),
+      new PutCommand({ TableName: this.table, Item: { ...this.k.narrative, ...narrative } }),
     );
   }
 
@@ -1430,7 +1448,7 @@ export class Store {
   ): Promise<void> {
     const now = new Date().toISOString();
     const puts = stories.map((s) => ({
-      ...storyKey(issue.id, s.n),
+      ...this.k.story(issue.id, s.n),
       id: issue.id,
       n: s.n,
       senderId: issue.senderId,
@@ -1445,7 +1463,7 @@ export class Store {
       model: MODELS.classify,
       embedModel: MODELS.embed,
       at: now,
-      gsi1pk: PARTITION.stories,
+      gsi1pk: this.k.partition.stories,
       gsi1sk: `${issue.receivedAt}#${storyRef(issue.id, s.n)}`,
     }));
     // A forced redo keeps Sandip's moves and read states (#98), and can come back with fewer
@@ -1456,7 +1474,7 @@ export class Store {
       Object.assign(
         p,
         carried,
-        storyIndexAttributes({
+        this.storyIndex({
           issueId: issue.id,
           n: p.n,
           receivedAt: issue.receivedAt,
@@ -1473,7 +1491,7 @@ export class Store {
     await this.ddb.send(
       new UpdateCommand({
         TableName: this.table,
-        Key: issueKey(issue.id),
+        Key: this.k.issue(issue.id),
         UpdateExpression: "SET storiedAt = :at, storyCount = :n REMOVE storyError, storyAttempts",
         ConditionExpression: "attribute_exists(pk)",
         ExpressionAttributeValues: { ":at": now, ":n": stories.length },
@@ -1486,7 +1504,7 @@ export class Store {
     await this.ddb.send(
       new UpdateCommand({
         TableName: this.table,
-        Key: issueKey(id),
+        Key: this.k.issue(id),
         UpdateExpression: "SET storyError = :e ADD storyAttempts :one",
         ConditionExpression: "attribute_exists(pk)",
         ExpressionAttributeValues: { ":e": message.slice(0, 300), ":one": 1 },
@@ -1509,7 +1527,7 @@ export class Store {
         TableName: this.table,
         KeyConditionExpression: "pk = :pk AND begins_with(sk, :issue)",
         ExpressionAttributeValues: {
-          ":pk": predictionKey(id, 1).pk,
+          ":pk": this.k.prediction(id, 1).pk,
           ":issue": `${id}#`,
         },
         ProjectionExpression: "sk, quote, #st, setBy",
@@ -1536,11 +1554,11 @@ export class Store {
   ): Promise<void> {
     const now = new Date().toISOString();
     await this.batchWrite([
-      ...remove.map((k) => ({ DeleteRequest: { Key: predictionKey(issue.id, k) } })),
+      ...remove.map((k) => ({ DeleteRequest: { Key: this.k.prediction(issue.id, k) } })),
       ...add.map(({ k, prediction: p }) => ({
         PutRequest: {
           Item: {
-            ...predictionKey(issue.id, k),
+            ...this.k.prediction(issue.id, k),
             id: `${issue.id}.${k}`,
             issueId: issue.id,
             ...(p.n ? { n: p.n } : {}),
@@ -1564,7 +1582,7 @@ export class Store {
     await this.ddb.send(
       new UpdateCommand({
         TableName: this.table,
-        Key: issueKey(issue.id),
+        Key: this.k.issue(issue.id),
         UpdateExpression:
           "SET predictedAt = :at, predictionCount = :n REMOVE predictionError, predictionAttempts",
         ConditionExpression: "attribute_exists(pk)",
@@ -1578,7 +1596,7 @@ export class Store {
     await this.ddb.send(
       new UpdateCommand({
         TableName: this.table,
-        Key: issueKey(id),
+        Key: this.k.issue(id),
         UpdateExpression: "SET predictionError = :e ADD predictionAttempts :one",
         ConditionExpression: "attribute_exists(pk)",
         ExpressionAttributeValues: { ":e": message.slice(0, 300), ":one": 1 },
@@ -1592,7 +1610,7 @@ export class Store {
       await this.ddb.send(
         new UpdateCommand({
           TableName: this.table,
-          Key: storyKey(c.issueId, c.n),
+          Key: this.k.story(c.issueId, c.n),
           UpdateExpression: "SET eventId = :e",
           ConditionExpression: "attribute_exists(pk)",
           ExpressionAttributeValues: { ":e": c.eventId },
@@ -1606,7 +1624,7 @@ export class Store {
       new QueryCommand({
         TableName: this.table,
         KeyConditionExpression: "pk = :pk AND begins_with(sk, :story)",
-        ExpressionAttributeValues: { ":pk": issueKey(id).pk, ":story": "STORY#" },
+        ExpressionAttributeValues: { ":pk": this.k.issue(id).pk, ":story": "STORY#" },
         ProjectionExpression: "pk, sk",
       }),
     );
@@ -1619,7 +1637,7 @@ export class Store {
       new QueryCommand({
         TableName: this.table,
         KeyConditionExpression: "pk = :pk AND begins_with(sk, :story)",
-        ExpressionAttributeValues: { ":pk": issueKey(id).pk, ":story": "STORY#" },
+        ExpressionAttributeValues: { ":pk": this.k.issue(id).pk, ":story": "STORY#" },
         ProjectionExpression: "pk, sk, link, headline, shelf, shelfSetBy, #st",
         ExpressionAttributeNames: { "#st": "state" },
         ConsistentRead: true,
