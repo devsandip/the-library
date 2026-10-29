@@ -25,6 +25,15 @@ export const INTERESTS_KEY = { pk: "CONFIG", sk: "INTERESTS" } as const;
 export const OWNER_KEY = { pk: "CONFIG", sk: "OWNER" } as const;
 /** A reader's settings (#184): time zone, interests, the line prompts use. */
 export const settingsKey = (readerId: string) => ({ pk: `READER#${readerId}`, sk: "SETTINGS" });
+/**
+ * Every reader with settings, listed for the scheduled work (#210): `READERS` in `gsi1`, by
+ * reader id. The deployment's own list, never under a reader's prefix.
+ */
+export const READERS_PARTITION = "READERS";
+export const readerIndexAttributes = (readerId: string) => ({
+  gsi1pk: READERS_PARTITION,
+  gsi1sk: readerId,
+});
 /** A reader's own interests with their embeddings (#187), once they set interests. */
 export const interestsKey = (readerId: string) => ({ pk: `READER#${readerId}`, sk: "INTERESTS" });
 /** A day's model use (#208): one partition, a day per item, read back by day. */

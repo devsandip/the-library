@@ -33,6 +33,7 @@
     "settle": "tsx scripts/settle.ts",
     "name-owner": "tsx scripts/name-owner.ts",
     "move-to-reader": "tsx scripts/move-to-reader.ts",
+    "readers": "tsx scripts/readers.ts",
     "shelves": "tsx scripts/shelves.ts",
     "jev:score": "tsx scripts/jev-score.ts",
     "narrative": "tsx scripts/narrative.ts",

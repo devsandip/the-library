@@ -57,6 +57,7 @@ import {
   INT_READER,
 } from "../../../scripts/dev-stack.js";
 import { TitanEmbedder } from "../src/embed.js";
+import { DynamoRepo } from "../src/repo.js";
 
 let stack: DevStack;
 const lambda = new LambdaClient({ region: "us-east-1" });
@@ -2116,5 +2117,16 @@ describe("two readers on dev (#198)", () => {
     expect(second.body.error).toBe("That's today's 1 question. More tomorrow.");
     // Another reader's questions are their own.
     expect((await call<UsageResponse>("GET", "/usage")).status).toBe(200);
+  });
+
+  it("lists readers for the scheduled work, the owner first (#210)", async () => {
+    // The second reader saved settings above; the test reader is dev's owner.
+    const readers = await new DynamoRepo({
+      table: stack.tableName,
+      bucket: stack.contentBucket,
+      stage: "dev",
+    }).readers();
+    expect(readers[0]).toEqual(INT_READER);
+    expect(readers).toContainEqual({ id: other.sub });
   });
 });

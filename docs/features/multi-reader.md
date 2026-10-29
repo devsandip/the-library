@@ -108,6 +108,8 @@ Done when: two readers on dev see only their own data in every screen, search an
 
 **Daily limits** (#209): a question, a timeline, a comparison of takes and a source check each count one use on the reader's day; past the day's limit (50 each for now, `DAILY_LIMITS`; an operator can set a reader's own as `limits` in their settings item, which `PATCH /settings` refuses) the API answers 429 with a plain message, which the app shows where the answer would be. One conditional update counts and checks, so two requests at once cannot both take the last use. Reading a kept timeline, comparison or check is never counted.
 
+**The list of readers** (#210): saving settings puts a reader in `READERS` in `gsi1` (the deployment's own list, under no reader's prefix); `readers()` lists the owner first, then every reader with settings, for the scheduled work. `pnpm readers` is the operator's view: each reader's time zone and today's model use.
+
 1. The daily jobs (the day in brief, the top 5, settling predictions, follow checks, archiving old News, tune-up, audit) run per reader at the reader's local time, from an hourly schedule through a queue.
 2. Every Claude, Titan and Jev call recorded per reader with its cost.
 3. Daily limits on Ask, Takes, Timeline and Source, with a plain message when one is reached; a throttle per reader.

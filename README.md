@@ -43,6 +43,7 @@ pnpm install
 | `AWS_PROFILE=admin pnpm predictions` | Screen stored issues for dated, checkable predictions (`--days 120`); new ones are screened after every ingest run (#24) |
 | `AWS_PROFILE=admin pnpm name-owner` | Name the owner (#180): the reader whose Gmail the poller reads and whom the scheduled jobs serve. On prod, the one Cognito account (`--email` to pick one); on dev, `--stage dev --id <reader id>`; `--show` prints it |
 | `AWS_PROFILE=admin pnpm move-to-reader` | The move to reader keys (#199): count the items still on today's keys (dry run); `--apply` copies each to the owner's keys (never over a copy there, so it can run again); `--check` counts those without a copy; `--delete-old` deletes today's keys once every one has its copy and the stage runs on reader keys. The prod runbook is in `docs/features/multi-reader.md` |
+| `AWS_PROFILE=admin pnpm readers` | The operator's view (#210): every reader the scheduled work serves, the owner first, with their time zone and today's model use and calls (`--stage dev` for dev) |
 | `AWS_PROFILE=admin pnpm settle` | Settle the predictions that have come due, from later newsletters (`--limit 20`); prod does this daily at 07:30 IST (#139) |
 | `AWS_PROFILE=admin pnpm shelves` | Jev puts stored stories without a shelf on News or Learning (`--days 30`, `--force`); new ones are shelved after every ingest run (#81) |
 | `AWS_PROFILE=admin pnpm jev:score <labels.json>` | Score Jev's News or Learning call against labelled stories (#81); stores nothing |
