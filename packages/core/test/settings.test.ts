@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  aboutFrom,
   checkSettingsPatch,
   CRAFT,
   DEFAULT_SETTINGS,
   isTimeZone,
   PLAIN_LEARNING,
+  SUGGESTED_INTERESTS,
 } from "../src/settings.js";
 
 describe("settings (#184)", () => {
@@ -42,5 +44,18 @@ describe("settings (#184)", () => {
       error: "learning must be 1 to 600 characters",
     });
     expect(PLAIN_LEARNING).not.toMatch(/product management/);
+  });
+
+  it("makes a new reader's line from their interests, and offers interests to pick (#221)", () => {
+    const pick = (...names: string[]) => names.map((name) => ({ name, text: `${name}.` }));
+    expect(aboutFrom(pick("AI"))).toBe("The reader is interested in AI.");
+    expect(aboutFrom(pick("AI", "climate", "sailing"))).toBe(
+      "The reader is interested in AI, climate and sailing.",
+    );
+    expect(aboutFrom([])).toBe("The reader reads newsletters on many subjects.");
+    expect(SUGGESTED_INTERESTS.length).toBeGreaterThanOrEqual(10);
+    for (const i of SUGGESTED_INTERESTS) {
+      expect(checkSettingsPatch({ interests: [i] })).toEqual({ patch: { interests: [i] } });
+    }
   });
 });

@@ -1,5 +1,5 @@
 import type { ReaderExport } from "@library/core/export";
-import type { ReaderSettings } from "@library/core/settings";
+import type { ReaderSettings, SettingsAnswer } from "@library/core/settings";
 import type {
   AskResponse,
   AuditResponse,
@@ -79,8 +79,8 @@ export interface LibraryApi {
   setSaved(id: string, saved: boolean): Promise<IssueListItem>;
   listTopics(): Promise<TopicListResponse>;
   /** The reader's settings (#184): time zone, interests, the line prompts use. */
-  settings(): Promise<ReaderSettings>;
-  saveSettings(patch: Partial<ReaderSettings>): Promise<ReaderSettings>;
+  settings(): Promise<SettingsAnswer>;
+  saveSettings(patch: Partial<ReaderSettings>): Promise<SettingsAnswer>;
   /** Everything Nutgraf keeps for the reader, as one file (#219). */
   exportData(): Promise<ReaderExport>;
   /** Starts deleting everything the reader has, then their sign-in (#220). */
@@ -239,10 +239,10 @@ export class HttpLibraryApi implements LibraryApi {
     return this.request<TopicListResponse>("GET", "/topics");
   }
   settings() {
-    return this.request<ReaderSettings>("GET", "/settings");
+    return this.request<SettingsAnswer>("GET", "/settings");
   }
   saveSettings(patch: Partial<ReaderSettings>) {
-    return this.request<ReaderSettings>("PATCH", "/settings", patch);
+    return this.request<SettingsAnswer>("PATCH", "/settings", patch);
   }
   exportData() {
     return this.request<ReaderExport>("GET", "/export");

@@ -46,6 +46,46 @@ export const PLAIN_LEARNING =
   "Teaches the reader a skill or how something works: how-tos, explanations, case studies of " +
   "how something was built or decided, frameworks, and interviews about doing the work.";
 
+/** The settings as the API answers them: and whether the reader has been through onboarding. */
+export interface SettingsAnswer extends ReaderSettings {
+  /** False for a new reader on reader keys, who sees onboarding first (#221). */
+  onboarded: boolean;
+}
+
+/** What onboarding offers to pick from (#221): broad, so most readers find theirs. */
+export const SUGGESTED_INTERESTS: Interest[] = [
+  { name: "AI", text: "AI: models, products, research and the AI industry." },
+  {
+    name: "the tech industry",
+    text: "The tech industry: big tech companies, platforms and regulation.",
+  },
+  {
+    name: "startups",
+    text: "Startups: founders, fundraising, venture capital and building a company.",
+  },
+  {
+    name: "product",
+    text: "Product: strategy, discovery, design and the craft of building products.",
+  },
+  { name: "engineering", text: "Engineering: software architecture, systems and how teams build." },
+  { name: "business", text: "Business: companies, strategy, deals and how industries change." },
+  { name: "markets", text: "Markets and finance: investing, the economy and what moves prices." },
+  { name: "politics", text: "Politics and policy: governments, elections, law and regulation." },
+  { name: "science", text: "Science: research, discoveries and how the world works." },
+  { name: "climate", text: "Climate and energy: emissions, energy transition and policy." },
+  { name: "health", text: "Health and medicine: research, care, fitness and wellbeing." },
+  { name: "culture", text: "Culture: books, film, music, the internet and how people live." },
+];
+
+/** The line every prompt uses, made from a new reader's interests (#221). */
+export function aboutFrom(interests: Interest[]): string {
+  const names = interests.map((i) => i.name);
+  if (!names.length) return "The reader reads newsletters on many subjects.";
+  const list =
+    names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+  return `The reader is interested in ${list}.`;
+}
+
 /** Today's values: a reader without settings gets these. */
 export const DEFAULT_SETTINGS: ReaderSettings = {
   timeZone: READER_TIME_ZONE,

@@ -2696,6 +2696,23 @@ export class DynamoRepo
     return { items: keys.length, objects: objects.length };
   }
 
+  /**
+   * Whether the reader has been through onboarding (#221): true on today's keys (one library),
+   * for the owner, and once their settings are saved; false for a new reader.
+   */
+  async onboarded(): Promise<boolean> {
+    if (!this.reader || !this.k.prefix) return true;
+    const item = await this.ddb.send(
+      new GetCommand({
+        TableName: this.table,
+        Key: settingsKey(this.reader.id),
+        ProjectionExpression: "pk",
+      }),
+    );
+    if (item.Item) return true;
+    return (await this.owner())?.id === this.reader.id;
+  }
+
   /** Whether this repository may delete its reader: on reader keys, and not the owner (#220). */
   async deletable(): Promise<"yes" | "today's keys" | "owner"> {
     if (!this.reader || !this.k.prefix) return "today's keys";

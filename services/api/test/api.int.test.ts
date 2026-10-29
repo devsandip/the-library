@@ -28,7 +28,7 @@ import {
   processMessage,
 } from "@library/core";
 import type { ReaderExport } from "@library/core/export";
-import type { ReaderSettings } from "@library/core/settings";
+import type { ReaderSettings, SettingsAnswer } from "@library/core/settings";
 import type { UsageResponse } from "@library/core/usage";
 import type {
   AuditResponse,
@@ -2220,5 +2220,17 @@ describe("two readers on dev (#198)", () => {
       ids(await call<IssueListResponse>("GET", "/issues", { query: { view: "all" } })),
     ).toContain("fx-tldr");
     expect((await call("DELETE", "/account")).status).toBe(409);
+  });
+
+  it("sends a new reader through onboarding, never the owner (#221)", async () => {
+    const fresh = { sub: "int-test-new" };
+    expect((await call<SettingsAnswer>("GET", "/settings", fresh)).body.onboarded).toBe(false);
+    const saved = await call<SettingsAnswer>("PATCH", "/settings", {
+      ...fresh,
+      body: { timeZone: "UTC", interests: [{ name: "AI", text: "AI: models and products." }] },
+    });
+    expect(saved.body.onboarded).toBe(true);
+    expect((await call<SettingsAnswer>("GET", "/settings", fresh)).body.onboarded).toBe(true);
+    expect((await call<SettingsAnswer>("GET", "/settings")).body.onboarded).toBe(true);
   });
 });
