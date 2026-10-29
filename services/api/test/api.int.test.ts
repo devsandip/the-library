@@ -8,8 +8,11 @@ import {
   DeleteCommand,
   GetCommand,
   PutCommand,
+  QueryCommand,
   ScanCommand,
   UpdateCommand,
+  type DynamoDBDocumentClient,
+  type QueryCommandOutput,
 } from "@aws-sdk/lib-dynamodb";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
@@ -18,6 +21,7 @@ import * as fixtures from "../../../packages/core/test/fixtures.js";
 import { Store } from "../../ingest/src/store.js";
 
 import {
+  INDEX,
   readerDay,
   senderIdentity,
   shelfFor,
@@ -151,7 +155,56 @@ async function sourceSettled(path: string): Promise<SourceResponse> {
 }
 
 const ids = (r: { body: IssueListResponse }) => r.body.items.map((i) => i.id);
-const ddb = docClient();
+/**
+ * The tests write stories straight to the table, and the API reads them through the stories index
+ * (GSI1), which lags the write: a read straight after can miss a story just put, or still find one
+ * just deleted. Every story put or deleted through this client waits until the index lists it, or
+ * no longer does (#227).
+ */
+function waitsForStories(client: DynamoDBDocumentClient): DynamoDBDocumentClient {
+  const send = client.send.bind(client) as (command: unknown) => Promise<unknown>;
+  const listed = async (pk: string, sk: string) => {
+    let start: Record<string, unknown> | undefined;
+    do {
+      const res = (await send(
+        new QueryCommand({
+          TableName: stack.tableName,
+          IndexName: INDEX.list,
+          KeyConditionExpression: "gsi1pk = :p",
+          ExpressionAttributeValues: { ":p": devKeys.partition.stories },
+          ProjectionExpression: "pk, sk",
+          ExclusiveStartKey: start,
+        }),
+      )) as QueryCommandOutput;
+      if (res.Items?.some((i) => i.pk === pk && i.sk === sk)) return true;
+      start = res.LastEvaluatedKey;
+    } while (start);
+    return false;
+  };
+  const until = async (key: Record<string, unknown>, want: boolean) => {
+    const [pk, sk] = [String(key.pk), String(key.sk)];
+    if (
+      (await eventually(
+        () => listed(pk, sk),
+        (v) => v === want,
+      )) !== want
+    ) {
+      throw new Error(`the stories index never ${want ? "listed" : "dropped"} ${pk} ${sk}`);
+    }
+  };
+  (client as { send: (command: unknown) => Promise<unknown> }).send = async (command) => {
+    const out = await send(command);
+    if (command instanceof PutCommand && command.input.Item?.gsi1pk === devKeys.partition.stories) {
+      await until(command.input.Item, true);
+    } else if (command instanceof DeleteCommand && /^STORY#/.test(String(command.input.Key?.sk))) {
+      await until(command.input.Key!, false);
+    }
+    return out;
+  };
+  return client;
+}
+
+const ddb = waitsForStories(docClient());
 const getItem = (id: string) =>
   ddb
     .send(
