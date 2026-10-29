@@ -702,3 +702,33 @@ Sandip: "Yes, start them" (the parts of milestone 15 that need no mail setup).
 - Export is Nutgraf's data, not the newsletters' text (it is in the reader's mail).
 - Delete account runs in the jobs Lambda and deletes the sign-in server-side (`AdminDeleteUser` by `sub`), since the app's token has no admin scope; refused on today's keys and for the owner.
 - Onboarding shows only to a new reader on reader keys; the reader line comes from the interests they pick.
+
+## 2026-10-30, overnight — operator group, mail through SES, email codes staged, flaky tests
+
+Sandip: "yes keep building. i will check in 12 hrs".
+
+**Did:**
+
+- The operator group (#224, PR 232): a Cognito group `operators`; an operator is in it or is the owner (on today's keys, everyone). Status gives a reader their own ranking and last check only; Check Gmail now is an operator's (403 otherwise). Live.
+- SES (#222): found `sandip.dev` already verified in SES with DKIM and the account already out of the sandbox, so Sandip's two steps were done. Cognito now sends as `Nutgraf <no-reply@sandip.dev>` through SES (PR 234). Live; checked with `describe-user-pool`.
+- Email codes (#223): tried on a throwaway pool first. MFA optional and email codes cannot deploy in one update (CloudFormation rolls back), and an account that enrolled its authenticator while MFA was required has no preferred MFA, so under optional MFA it signs in with its password alone. Prod's account is in that state. Staged as two drafts: PR 235 (MFA optional) and PR 236 (email codes, on top).
+- Flaky tests (#227): PR 233 (Learning and history tests wait, and always put back) after PR 232's Deploy failed on a lag; PR 237 (the tests' table client waits for the stories index after each story it puts or deletes). Corrected PR 231's diagnosis of PR 226's run on the issue.
+- Checked Haiku 5.5 (#85): listed on Bedrock, still "not available for this account". Wrote a recommendation on #163 (bound the tune-up read by reading moved stories first).
+
+**State now:**
+
+- Prod runs PR 237's code. The three Deploys since PR 233 (233, 234, 237) passed first time; #227 counts to ten.
+- Milestone 15: #219, #220, #221, #224 closed. #222 waits on a test message (Forgot password? on the sign-in page); #223 on Sandip's step below; #225 on Sandip's call.
+- Milestone 13 still waits on the prod move (PR 207); reminders Saturday and Tuesday.
+
+**Next:**
+
+- Sandip, for email codes: set the authenticator as preferred MFA (README, "MFA optional"), then say merge: PR 235, then PR 236 updated from main. Then sign in once to check password and authenticator still work.
+- Sandip: "Forgot password?" once, to see a code arrive from no-reply@sandip.dev (#222's done-when).
+- Me: count clean Deploys for #227; close it at ten in a row.
+
+**Decisions:**
+
+- Operators: the owner always is, so prod keeps working for Sandip without anyone in the group.
+- The SES identity stays outside the repo (it existed before); the pool only points at it.
+- Email codes deploy in two steps, after Sandip's preference is set; tested on a throwaway pool, not assumed.
