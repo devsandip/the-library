@@ -5,15 +5,7 @@
 import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
-import {
-  INDEX,
-  issueKey,
-  processMessage,
-  s3Keys,
-  senderIdentity,
-  senderItemKey,
-} from "@library/core";
-import { Store } from "../src/store.js";
+import { INDEX, processMessage, s3Keys, senderIdentity } from "@library/core";
 import { eml, LABEL_NEWSLETTERS } from "../../../packages/core/test/fixtures.js";
 import {
   docClient,
@@ -23,6 +15,8 @@ import {
   seedDev,
   wipeDevTable,
   type DevStack,
+  devKeys,
+  devStore,
 } from "../../../scripts/dev-stack.js";
 
 let stack: DevStack;
@@ -60,25 +54,25 @@ describe("Store on dev", () => {
     expect(second).toEqual(first); // processed again, but writes were no-ops
 
     const pragmatic = await get(
-      senderItemKey(senderIdentity("pragmaticengineer@substack.com", "").senderId),
+      devKeys.senderItem(senderIdentity("pragmaticengineer@substack.com", "").senderId),
     );
     expect(pragmatic?.issueCount).toBe(1);
   });
 
   it("newsletters land in INBOX and UNREAD, newest first; filtered in neither", async () => {
-    const inbox = await queryUntil(INDEX.list, "INBOX", 6);
-    const unread = await queryUntil(INDEX.unread, "UNREAD", 6);
+    const inbox = await queryUntil(INDEX.list, devKeys.partition.inbox, 6);
+    const unread = await queryUntil(INDEX.unread, devKeys.partition.unread, 6);
     expect(inbox.map((i) => i.id).sort()).toEqual([...FIXTURE_NEWSLETTER_IDS].sort());
     expect(unread).toHaveLength(6);
     for (const id of FIXTURE_FILTERED_IDS) {
-      const item = await get(issueKey(id));
+      const item = await get(devKeys.issue(id));
       expect(item?.state).toBe("filtered");
       expect(item?.gsi1pk).toBeUndefined();
     }
   });
 
   it("senders are listed once each with their readable key", async () => {
-    const senders = await queryUntil(INDEX.list, "SENDERS", 6);
+    const senders = await queryUntil(INDEX.list, devKeys.partition.senders, 6);
     expect(senders.map((s) => s.senderKey).sort()).toEqual(
       [
         "bytebytego@substack.com",
@@ -99,7 +93,7 @@ describe("Store on dev", () => {
   });
 
   it("keeps each issue's From name, so sender rules can be re-applied later", async () => {
-    expect(await get(issueKey("fx-platformer"))).toMatchObject({
+    expect(await get(devKeys.issue("fx-platformer"))).toMatchObject({
       fromName: "Casey Newton",
       publication: "Platformer",
     });
@@ -113,7 +107,7 @@ describe("Store on dev", () => {
     }
   });
   it("names the owner, and builds a store for a reader on the same table (#180)", async () => {
-    const store = new Store(stack.tableName, stack.contentBucket);
+    const store = devStore(stack);
     await store.setOwner({ id: "int-owner" }, "owner@example.test");
     expect(await store.owner()).toEqual({ id: "int-owner" });
     const owned = store.forReader({ id: "int-owner" });
@@ -129,7 +123,7 @@ describe("Store on dev", () => {
       subject: "Parallel write test",
       html: "<p>One of many issues from the same sender.</p>",
     });
-    const store = new Store(stack.tableName, stack.contentBucket);
+    const store = devStore(stack);
     const ids = Array.from({ length: 20 }, (_, i) => `fx-conflict-${i}`);
     const processed = await Promise.all(
       ids.map((id, i) =>
@@ -148,7 +142,7 @@ describe("Store on dev", () => {
       }),
     );
     const sender = await get(
-      senderItemKey(senderIdentity("conflict-test@example.test", "").senderId),
+      devKeys.senderItem(senderIdentity("conflict-test@example.test", "").senderId),
     );
     expect(sender?.issueCount).toBe(20);
   });

@@ -4,7 +4,7 @@
  */
 import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
-import { issueKey, storyKey } from "@library/core";
+
 import type { ModelPort } from "../src/bedrock.js";
 import type { DecisionPort } from "../src/jev.js";
 import { deriveShelves, shelveStories } from "../src/shelves.js";
@@ -17,6 +17,8 @@ import {
   seedDev,
   wipeDevTable,
   type DevStack,
+  devKeys,
+  devStore,
 } from "../../../scripts/dev-stack.js";
 
 let stack: DevStack;
@@ -61,7 +63,7 @@ const jevSaying = (p: number): DecisionPort => ({
 
 beforeAll(async () => {
   stack = await devStack();
-  store = new Store(stack.tableName, stack.contentBucket);
+  store = devStore(stack);
   await wipeDevTable(stack);
   await seedDev(stack);
   await indexStories(store, model, { sinceIso: since });
@@ -79,15 +81,18 @@ describe("story shelves on dev", () => {
     expect(stats).toMatchObject({ checked: n, shelved: n, learning: n, errors: 0 });
 
     const [moved, other] = FIXTURE_NEWSLETTER_IDS as [string, string];
-    expect(await get(storyKey(other, 1))).toMatchObject({
+    expect(await get(devKeys.story(other, 1))).toMatchObject({
       shelf: "learning",
       learning: 0.8,
       shelfSetBy: "jev",
       shelfModel: "jev-test",
       // Unread Learning is indexed (#81), and a one-story issue follows its story.
-      gsi2pk: "LEARNING",
+      gsi2pk: devKeys.partition.learning,
     });
-    expect(await get(issueKey(other))).toMatchObject({ shelf: "learning", shelfSetBy: "stories" });
+    expect(await get(devKeys.issue(other))).toMatchObject({
+      shelf: "learning",
+      shelfSetBy: "stories",
+    });
 
     const again = await shelveStories(store, async () => jevSaying(0.8), { sinceIso: since });
     expect(again).toMatchObject({ checked: 0, shelved: 0 });
@@ -95,7 +100,7 @@ describe("story shelves on dev", () => {
     await ddb.send(
       new UpdateCommand({
         TableName: stack.tableName,
-        Key: storyKey(moved, 1),
+        Key: devKeys.story(moved, 1),
         UpdateExpression: "SET shelf = :news, shelfSetBy = :sandip",
         ExpressionAttributeValues: { ":news": "news", ":sandip": "sandip" },
       }),
@@ -105,11 +110,11 @@ describe("story shelves on dev", () => {
       force: true,
     });
     expect(forced).toMatchObject({ checked: n - 1, shelved: n - 1, learning: 0 });
-    const news = await get(storyKey(other, 1));
+    const news = await get(devKeys.story(other, 1));
     expect(news).toMatchObject({ shelf: "news", learning: 0.2 });
     expect(news?.gsi2pk).toBeUndefined();
-    expect(await get(issueKey(other))).toMatchObject({ shelf: "news", shelfSetBy: "stories" });
-    expect(await get(storyKey(moved, 1))).toMatchObject({
+    expect(await get(devKeys.issue(other))).toMatchObject({ shelf: "news", shelfSetBy: "stories" });
+    expect(await get(devKeys.story(moved, 1))).toMatchObject({
       shelf: "news",
       shelfSetBy: "sandip",
       learning: 0.8,
@@ -122,7 +127,7 @@ describe("story shelves on dev", () => {
     await ddb.send(
       new UpdateCommand({
         TableName: stack.tableName,
-        Key: storyKey(first, 1),
+        Key: devKeys.story(first, 1),
         UpdateExpression: "SET shelf = :l, shelfSetBy = :jev, learning = :p REMOVE gsi2pk, gsi2sk",
         ExpressionAttributeValues: { ":l": "learning", ":jev": "jev", ":p": 0.9 },
       }),
@@ -130,7 +135,7 @@ describe("story shelves on dev", () => {
     await ddb.send(
       new UpdateCommand({
         TableName: stack.tableName,
-        Key: issueKey(first),
+        Key: devKeys.issue(first),
         UpdateExpression: "SET shelf = :n, shelfSetBy = :claude",
         ExpressionAttributeValues: { ":n": "news", ":claude": "claude" },
       }),
@@ -138,8 +143,13 @@ describe("story shelves on dev", () => {
     const once = await deriveShelves(store, { sinceIso: since });
     expect(once.storiesChanged).toBeGreaterThanOrEqual(1);
     expect(once.skipped).toBe(0);
-    expect(await get(storyKey(first, 1))).toMatchObject({ gsi2pk: "LEARNING" });
-    expect(await get(issueKey(first))).toMatchObject({ shelf: "learning", shelfSetBy: "stories" });
+    expect(await get(devKeys.story(first, 1))).toMatchObject({
+      gsi2pk: devKeys.partition.learning,
+    });
+    expect(await get(devKeys.issue(first))).toMatchObject({
+      shelf: "learning",
+      shelfSetBy: "stories",
+    });
 
     const twice = await deriveShelves(store, { sinceIso: since });
     expect(twice).toMatchObject({ storiesChanged: 0, issuesChanged: 0, skipped: 0 });

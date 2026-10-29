@@ -5,7 +5,7 @@
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
-import { issueKey, PREDICTIONS_PK, s3Keys } from "@library/core";
+import { s3Keys } from "@library/core";
 import type { ModelPort, ToolRequest } from "../src/bedrock.js";
 import { spotPredictions } from "../src/predictions.js";
 import { Store } from "../src/store.js";
@@ -16,6 +16,8 @@ import {
   seedDev,
   wipeDevTable,
   type DevStack,
+  devKeys,
+  devStore,
 } from "../../../scripts/dev-stack.js";
 
 let stack: DevStack;
@@ -51,7 +53,7 @@ const model: ModelPort = {
 
 beforeAll(async () => {
   stack = await devStack();
-  store = new Store(stack.tableName, stack.contentBucket);
+  store = devStore(stack);
   await wipeDevTable(stack);
   await seedDev(stack);
   await new S3Client({ region: "us-east-1" }).send(
@@ -75,7 +77,7 @@ describe("predictions on dev", () => {
       new QueryCommand({
         TableName: stack.tableName,
         KeyConditionExpression: "pk = :p",
-        ExpressionAttributeValues: { ":p": PREDICTIONS_PK },
+        ExpressionAttributeValues: { ":p": devKeys.predictionsPk },
         ConsistentRead: true,
       }),
     );
@@ -93,7 +95,7 @@ describe("predictions on dev", () => {
     const issue = await ddb.send(
       new GetCommand({
         TableName: stack.tableName,
-        Key: issueKey("fx-tldr"),
+        Key: devKeys.issue("fx-tldr"),
         ConsistentRead: true,
       }),
     );
@@ -130,7 +132,7 @@ describe("predictions on dev", () => {
       new QueryCommand({
         TableName: stack.tableName,
         KeyConditionExpression: "pk = :p",
-        ExpressionAttributeValues: { ":p": PREDICTIONS_PK },
+        ExpressionAttributeValues: { ":p": devKeys.predictionsPk },
         ConsistentRead: true,
       }),
     );

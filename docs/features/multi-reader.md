@@ -87,6 +87,8 @@ The riskiest milestone: the keys of everything stored change.
 
 Done when: two readers on dev see only their own data in every screen, search and answer, the isolation tests pass in the Deploy, and prod runs on the new keys with Sandip's data whole.
 
+**Built so far:** keys bound to a reader (#195, PR 201), the API's repository (#196, PR 202) and ingest's store (#197, PR 203) on them. **Dev on reader keys** (#198): `READER_KEYS` is on for dev. The integration tests read and write as the reader `int-test` (`INT_READER`, `devKeys` and `devStore` in `scripts/dev-stack.ts`), the API's `sub` in their calls and dev's owner, which wiping the table names again; and a second reader, `int-test-other`, finds an empty library, gets 404 for the first reader's issue and newsletter by id, finds none of their newsletters in search, and keeps settings apart. With dev on reader keys, the Deploy's integration tests cover the keyed path; prod's path (switch off) is covered by unit tests until prod turns on.
+
 ### 14. Daily work per reader, metered (5)
 
 1. The daily jobs (the day in brief, the top 5, settling predictions, follow checks, archiving old News, tune-up, audit) run per reader at the reader's local time, from an hourly schedule through a queue.

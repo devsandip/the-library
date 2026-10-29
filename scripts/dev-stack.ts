@@ -11,7 +11,7 @@ import {
   ScanCommand,
   type ScanCommandOutput,
 } from "@aws-sdk/lib-dynamodb";
-import { processMessage } from "@library/core";
+import { keysFor, processMessage } from "@library/core";
 import { Store } from "../services/ingest/src/store.js";
 import * as f from "../packages/core/test/fixtures.js";
 
@@ -42,6 +42,19 @@ export async function devStack(): Promise<DevStack> {
   }
   return { tableName, contentBucket, ingestFunction, apiFunction: out("ApiFunction") };
 }
+
+/**
+ * The reader the integration tests read and write as (milestone 13): the `sub` of their API calls
+ * and dev's owner, whose keys dev's ingest Lambda uses with READER_KEYS on.
+ */
+export const INT_READER = { id: "int-test" };
+
+/** Every key of the test reader, for reading and writing items in the tests. */
+export const devKeys = keysFor(INT_READER.id);
+
+/** A store on the test reader's keys, as dev's ingest Lambda builds one for its owner. */
+export const devStore = (stack: DevStack) =>
+  new Store(stack.tableName, stack.contentBucket, { reader: INT_READER, keyed: true });
 
 export const docClient = () =>
   DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }), {
@@ -77,6 +90,8 @@ export async function wipeDevTable(stack: DevStack): Promise<number> {
     deleted += keys.length;
     start = page.LastEvaluatedKey;
   } while (start);
+  // The tests' reader stays dev's owner: ingest refuses to run on reader keys without one.
+  await devStore(stack).setOwner(INT_READER);
   return deleted;
 }
 
@@ -100,9 +115,11 @@ export const FIXTURE_NEWSLETTER_IDS = FIXTURE_INBOX.slice(0, 6).map((m) => m.id)
 export const FIXTURE_FILTERED_IDS = FIXTURE_INBOX.slice(6).map((m) => m.id);
 const BASE_TIME = Date.parse("2026-10-01T12:00:00.000Z");
 
-/** Run every fixture through the real pipeline and Store, exactly as ingest does. */
-export async function seedDev(stack: DevStack) {
-  const store = new Store(stack.tableName, stack.contentBucket);
+/**
+ * Run every fixture through the real pipeline and Store, exactly as ingest does: on the test
+ * reader's keys, or on another store's (today's keys, for the move's test).
+ */
+export async function seedDev(stack: DevStack, store: Store = devStore(stack)) {
   const counts = { newsletters: 0, filtered: 0 };
   for (const [i, m] of FIXTURE_INBOX.entries()) {
     const internalDate = String(BASE_TIME - i * 3_600_000);

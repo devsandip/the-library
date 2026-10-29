@@ -5,21 +5,16 @@
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
-import {
-  issueIndexAttributes,
-  issueKey,
-  senderIdentity,
-  senderIndexAttributes,
-  senderItemKey,
-} from "@library/core";
+import { senderIdentity } from "@library/core";
 import { rebuildSenders, type RebuildReport } from "../src/senders.js";
-import { Store } from "../src/store.js";
 import {
   docClient,
   devStack,
   seedDev,
   wipeDevTable,
   type DevStack,
+  devKeys,
+  devStore,
 } from "../../../scripts/dev-stack.js";
 
 let stack: DevStack;
@@ -36,7 +31,7 @@ const get = (key: Record<string, string>) =>
 
 /** A TLDR issue as stored before the split rule: merged sender, no From name kept. */
 async function putLegacyTldrIssue(id: string, publication: string, receivedAt: string, rating?: 1) {
-  const idx = issueIndexAttributes({
+  const idx = devKeys.issueIndex({
     id,
     senderId: legacyTldr,
     receivedAt,
@@ -48,7 +43,7 @@ async function putLegacyTldrIssue(id: string, publication: string, receivedAt: s
     new PutCommand({
       TableName: stack.tableName,
       Item: {
-        ...issueKey(id),
+        ...devKeys.issue(id),
         ...idx.set,
         id,
         senderId: legacyTldr,
@@ -75,8 +70,8 @@ beforeAll(async () => {
     new PutCommand({
       TableName: stack.tableName,
       Item: {
-        ...senderItemKey(legacyTldr),
-        ...senderIndexAttributes(legacyTldr, "TLDR Dev"),
+        ...devKeys.senderItem(legacyTldr),
+        ...devKeys.senderIndex(legacyTldr, "TLDR Dev"),
         senderId: legacyTldr,
         senderKey: "dan@tldrnewsletter.com",
         publication: "TLDR Dev",
@@ -95,7 +90,7 @@ beforeAll(async () => {
   await ddb.send(
     new UpdateCommand({
       TableName: stack.tableName,
-      Key: issueKey("fx-platformer"),
+      Key: devKeys.issue("fx-platformer"),
       UpdateExpression: "SET publication = :p REMOVE fromName",
       ExpressionAttributeValues: { ":p": "Casey Newton" },
     }),
@@ -103,11 +98,11 @@ beforeAll(async () => {
   await ddb.send(
     new UpdateCommand({
       TableName: stack.tableName,
-      Key: senderItemKey(casey),
+      Key: devKeys.senderItem(casey),
       UpdateExpression: "SET publication = :p, gsi1sk = :sk",
       ExpressionAttributeValues: {
         ":p": "Casey Newton",
-        ":sk": senderIndexAttributes(casey, "Casey Newton").gsi1sk,
+        ":sk": devKeys.senderIndex(casey, "Casey Newton").gsi1sk,
       },
     }),
   );
@@ -115,7 +110,7 @@ beforeAll(async () => {
 
 describe("rebuild senders on dev", () => {
   it("a dry run reports the plan and writes nothing", async () => {
-    const report = await rebuildSenders(new Store(stack.tableName, stack.contentBucket), {
+    const report = await rebuildSenders(devStore(stack), {
       apply: false,
     });
     expect(report).toMatchObject({
@@ -126,44 +121,44 @@ describe("rebuild senders on dev", () => {
       deleted: ["TLDR Dev"],
     });
     expect([...report.created].sort()).toEqual(["TLDR Dev (1)", "TLDR IT (1)"]);
-    expect((await get(senderItemKey(legacyTldr)))?.issueCount).toBe(2);
+    expect((await get(devKeys.senderItem(legacyTldr)))?.issueCount).toBe(2);
   });
 
   it("apply splits and renames senders, keeping ratings, mutes and stars", async () => {
-    const report = await rebuildSenders(new Store(stack.tableName, stack.contentBucket), {
+    const report = await rebuildSenders(devStore(stack), {
       apply: true,
     });
     expect(report).toMatchObject({ applied: true, errors: 0 });
 
     const dev = sid("dan@tldrnewsletter.com", "TLDR Dev");
     const it_ = sid("dan@tldrnewsletter.com", "TLDR IT");
-    expect(await get(issueKey("fx-legacy-tldr-it"))).toMatchObject({
+    expect(await get(devKeys.issue("fx-legacy-tldr-it"))).toMatchObject({
       senderId: it_,
-      gsi3pk: `SENDER#${it_}`,
+      gsi3pk: devKeys.senderPartition(it_),
       rating: 1,
       state: "unread",
     });
-    expect(await get(senderItemKey(it_))).toMatchObject({
+    expect(await get(devKeys.senderItem(it_))).toMatchObject({
       publication: "TLDR IT",
       issueCount: 1,
       up: 1,
       muted: true,
       mustRead: true,
     });
-    expect(await get(senderItemKey(dev))).toMatchObject({
+    expect(await get(devKeys.senderItem(dev))).toMatchObject({
       publication: "TLDR Dev",
       issueCount: 1,
       up: 0,
       muted: true,
     });
-    expect(await get(senderItemKey(legacyTldr))).toBeUndefined();
+    expect(await get(devKeys.senderItem(legacyTldr))).toBeUndefined();
 
-    expect(await get(senderItemKey(casey))).toMatchObject({
+    expect(await get(devKeys.senderItem(casey))).toMatchObject({
       publication: "Platformer",
-      gsi1sk: senderIndexAttributes(casey, "Platformer").gsi1sk,
+      gsi1sk: devKeys.senderIndex(casey, "Platformer").gsi1sk,
       issueCount: 1,
     });
-    expect((await get(issueKey("fx-platformer")))?.publication).toBe("Platformer");
+    expect((await get(devKeys.issue("fx-platformer")))?.publication).toBe("Platformer");
   });
 
   it("a second run, through the dev Lambda, finds nothing to change", async () => {
