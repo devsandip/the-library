@@ -48,6 +48,7 @@ import {
   type StoredFollow,
   byReader,
   READER_MOVE,
+  addDays,
 } from "@library/core";
 import type {
   DigestStats,
@@ -90,6 +91,13 @@ import type {
 } from "@library/core/types";
 import { readerOf, type Reader } from "@library/core/reader";
 import { DEFAULT_SETTINGS, type ReaderSettings } from "@library/core/settings";
+import {
+  dayUsageOf,
+  useAttribute,
+  type Feature,
+  type Use,
+  type UsageResponse,
+} from "@library/core/usage";
 import { badRequest, conflict, notFound } from "./errors.js";
 import type { ListOptions, RepoPort } from "./port.js";
 import type { AuditStore } from "./audit.js";
@@ -2553,6 +2561,46 @@ export class DynamoRepo
   }
 
   /** The five interests' embeddings, written by enrichment; empty until the first run. */
+  /** Adds a model call to the reader's usage for their day (#208). */
+  async recordUsage(feature: Feature, use: Omit<Use, "calls">, at = Date.now()): Promise<void> {
+    const { timeZone } = await this.settings();
+    const a = (c: keyof Use) => useAttribute(feature, c);
+    await this.ddb.send(
+      new UpdateCommand({
+        TableName: this.table,
+        Key: this.k.usage(readerDay(at, timeZone)),
+        UpdateExpression: "ADD #c :one, #i :in, #o :out, #ct :cents",
+        ExpressionAttributeNames: {
+          "#c": a("calls"),
+          "#i": a("inputTokens"),
+          "#o": a("outputTokens"),
+          "#ct": a("cents"),
+        },
+        ExpressionAttributeValues: {
+          ":one": 1,
+          ":in": use.inputTokens,
+          ":out": use.outputTokens,
+          ":cents": use.cents,
+        },
+      }),
+    );
+  }
+
+  /** The reader's usage for their last `days` days, newest first (#208). */
+  async usage(days = 30): Promise<UsageResponse> {
+    const { timeZone } = await this.settings();
+    const from = addDays(readerDay(Date.now(), timeZone), 1 - days);
+    const res = await this.ddb.send(
+      new QueryCommand({
+        TableName: this.table,
+        KeyConditionExpression: "pk = :pk AND sk >= :from",
+        ExpressionAttributeValues: { ":pk": this.k.usagePk, ":from": from },
+        ScanIndexForward: false,
+      }),
+    );
+    return { days: (res.Items ?? []).map(dayUsageOf) };
+  }
+
   /** The reader's own interests once they set some (#187), today's (`CONFIG/INTERESTS`) before. */
   private async interestVectors(): Promise<InterestVector[]> {
     const own = this.reader

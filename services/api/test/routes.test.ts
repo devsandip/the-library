@@ -45,6 +45,7 @@ function setup(overrides: Partial<RepoPort> = {}) {
     })),
     listTopics: vi.fn(async () => [{ name: "AI", description: "Models and tools" }]),
     settings: vi.fn(async () => DEFAULT_SETTINGS),
+    usage: vi.fn(async () => ({ days: [] })),
     saveSettings: vi.fn(async (patch: Partial<ReaderSettings>) => ({
       ...DEFAULT_SETTINGS,
       ...patch,

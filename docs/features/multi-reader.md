@@ -102,6 +102,10 @@ Done when: two readers on dev see only their own data in every screen, search an
 
 ### 14. Daily work per reader, metered (5)
 
+[Milestone 14](https://github.com/devsandip/the-library/milestone/14): issues 208 to 212. The load test moves after mail in, when readers have mail of their own to run on.
+
+**The meter** (#208): every Claude, Titan and Jev call is added to the reader's `USAGE` item for their day, by feature (`packages/core/src/usage.ts`). The API wraps each service's Claude and Titan with the feature it serves (`services/api/src/meter.ts`), the jobs likewise, and ingest each step's model port and Jev (`services/ingest/src/meter.ts`). `GET /usage` answers a reader's last 30 days.
+
 1. The daily jobs (the day in brief, the top 5, settling predictions, follow checks, archiving old News, tune-up, audit) run per reader at the reader's local time, from an hourly schedule through a queue.
 2. Every Claude, Titan and Jev call recorded per reader with its cost.
 3. Daily limits on Ask, Takes, Timeline and Source, with a plain message when one is reached; a throttle per reader.

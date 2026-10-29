@@ -27,6 +27,9 @@ export const OWNER_KEY = { pk: "CONFIG", sk: "OWNER" } as const;
 export const settingsKey = (readerId: string) => ({ pk: `READER#${readerId}`, sk: "SETTINGS" });
 /** A reader's own interests with their embeddings (#187), once they set interests. */
 export const interestsKey = (readerId: string) => ({ pk: `READER#${readerId}`, sk: "INTERESTS" });
+/** A day's model use (#208): one partition, a day per item, read back by day. */
+export const USAGE_PK = "USAGE";
+export const usageKey = (day: string) => ({ pk: USAGE_PK, sk: day });
 /** The Summary's top 5 as first shown on a day (#5): `ids`, `at`. */
 export const digestKey = (day: string) => ({ pk: `DIGEST#${day}`, sk: "META" });
 /** Titan embedding of an issue, kept out of the META item so it never lands in an index. */
@@ -209,6 +212,8 @@ export function keysFor(readerId?: string) {
     topics: key(TOPICS_KEY),
     interests: key(INTERESTS_KEY),
     digest: (day: string) => key(digestKey(day)),
+    usagePk: `${p}${USAGE_PK}`,
+    usage: (day: string) => key(usageKey(day)),
     embedding: (id: string) => key(embeddingKey(id)),
     story: (id: string, n: number) => key(storyKey(id, n)),
     timeline: (eventId: string) => key(timelineKey(eventId)),

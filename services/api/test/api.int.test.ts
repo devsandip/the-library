@@ -19,6 +19,7 @@ import {
   vectorBytes,
 } from "@library/core";
 import type { ReaderSettings } from "@library/core/settings";
+import type { UsageResponse } from "@library/core/usage";
 import type {
   AuditResponse,
   Prediction,
@@ -2080,5 +2081,18 @@ describe("two readers on dev (#198)", () => {
     expect((await call<ReaderSettings>("GET", "/settings")).body.timeZone).not.toBe(
       "Europe/London",
     );
+  });
+
+  it("records model use for the reader who asked, and no one else (#208)", async () => {
+    const mine = (await call<UsageResponse>("GET", "/usage")).body.days;
+    const today = mine[0];
+    expect(today?.features.ask?.calls).toBeGreaterThan(0);
+    expect(today?.features.ask?.cents).toBeGreaterThan(0);
+    expect(today?.cents).toBeGreaterThan(0);
+    // None of the first reader's calls is the second reader's (whose own search may be).
+    const theirs = (await call<UsageResponse>("GET", "/usage", other)).body.days[0];
+    for (const f of ["ask", "takes", "timeline", "source"] as const) {
+      expect(theirs?.features[f]).toBeUndefined();
+    }
   });
 });

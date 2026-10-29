@@ -3,6 +3,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { S3Client } from "@aws-sdk/client-s3";
 import { readerOf, type Reader } from "@library/core/reader";
+import type { Feature } from "@library/core/usage";
 import { Asks } from "./ask.js";
 import { Audits } from "./audit.js";
 import { HttpError, unauthorized } from "./errors.js";
@@ -12,7 +13,7 @@ import { Predictions } from "./predictions.js";
 import { Tuneups } from "./tuneup.js";
 import type { Services } from "./port.js";
 import { BedrockClaude } from "./claude.js";
-import { TitanEmbedder } from "./embed.js";
+import { meteredClaude, meteredEmbedder } from "./meter.js";
 import { DynamoRepo } from "./repo.js";
 import { API_PREFIX, route, type Request } from "./routes.js";
 import { CorpusCache } from "./corpus.js";
@@ -131,20 +132,23 @@ function servicesOf(reader: Reader): Services {
   // Kept between requests: the corpus, and recent query embeddings. Dev reads the corpus every
   // time: integration tests rewrite it between calls.
   const corpus = new CorpusCache(repo, STAGE === "prod" ? {} : { ttlMs: 0 });
+  // Every model call is recorded against this reader (#208).
+  const meter = { record: repo.recordUsage.bind(repo) };
+  const claudeFor = (f: Feature) => meteredClaude(claude, f, meter);
   return {
     repo,
-    search: new Search(repo, new TitanEmbedder(), corpus),
+    search: new Search(repo, meteredEmbedder("search", meter), corpus),
     related: new Related(repo, corpus),
-    timelines: new Timelines(repo, corpus, claude),
-    takes: new Takes(repo, corpus, claude),
+    timelines: new Timelines(repo, corpus, claudeFor("timeline")),
+    takes: new Takes(repo, corpus, claudeFor("takes")),
     sources: new Sources(repo, (job) => invokeAsync(JOBS_FUNCTION!, { ...job, reader: reader.id })),
-    ask: new Asks(repo, corpus, new TitanEmbedder(), claude),
+    ask: new Asks(repo, corpus, meteredEmbedder("ask", meter), claudeFor("ask")),
     following: new Following(repo),
     highlights: new Highlights(repo),
     predictions: new Predictions(repo),
     audit: new Audits(repo),
     tuneup: new Tuneups(repo),
-    settings: new Settings(repo, new TitanEmbedder()),
+    settings: new Settings(repo, meteredEmbedder("interests", meter)),
     startIngest: () => invokeAsync(INGEST_FUNCTION!, {}),
   };
 }
