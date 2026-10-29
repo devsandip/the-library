@@ -1196,6 +1196,76 @@ dialog {
   box-shadow: inset 0 0 0 1px var(--ink);
 }
 
+/* Settings (#188): the reader's time zone and interests. */
+.settings-note {
+  margin: 6px 0 0;
+  color: var(--ink-2);
+  font: 400 14px/1.4 var(--font-text);
+}
+
+.settings-zone {
+  margin-top: 12px;
+}
+
+.settings-zone select {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--ink);
+  font: 400 16px/1 var(--font-text);
+}
+
+.settings-here {
+  margin-top: 8px;
+}
+
+.settings-interests {
+  display: grid;
+  gap: 14px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-interest {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-interest .field {
+  margin-top: 0;
+}
+
+.settings-text {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 16px/1.4 var(--font-text);
+  resize: vertical;
+}
+
+.settings-remove {
+  justify-self: start;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  font: 600 13px/1 var(--font-text);
+}
+
+.settings-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 24px;
+}
+
 .field {
   display: flex;
   align-items: center;
