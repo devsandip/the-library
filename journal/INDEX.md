@@ -1,7 +1,7 @@
 # Nutgraf: Journal
 
 Last refreshed: 2026-10-28 19:05
-Latest entry: [2026-10-29-1700-nutgraf-for-any-reader.md](entries/2026-10-29-1700-nutgraf-for-any-reader.md)
+Latest entry: [2026-10-29-1950-every-item-has-an-owner.md](entries/2026-10-29-1950-every-item-has-an-owner.md)
 
 A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Called The Library until 2026-10-12. Live at https://sandip.dev/nutgraf/.
 
@@ -35,6 +35,7 @@ Since 2026-10-19 the thumbs ask one thing: was it useful? Relevant and Irrelevan
 
 - [2026-10-28 19:05: Weekly tune-up](entries/2026-10-28-1905-weekly-tune-up.md)
 - [2026-10-29 17:00: Nutgraf for any reader](entries/2026-10-29-1700-nutgraf-for-any-reader.md)
+- [2026-10-29 19:50: Every item has an owner](entries/2026-10-29-1950-every-item-has-an-owner.md)
 - [2026-10-28 14:50: Subscription audit](entries/2026-10-28-1450-subscription-audit.md)
 - [2026-10-28 10:50: Who called it](entries/2026-10-28-1050-who-called-it.md)
 - [2026-10-28 09:05: The hunt on real links](entries/2026-10-28-0905-the-hunt-on-real-links.md)
