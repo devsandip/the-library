@@ -16,11 +16,30 @@ function capture() {
   return sent;
 }
 
-/** Every partition value a command names: its key, its index partitions and its `:p`-like values. */
+/**
+ * Every partition value a command names: its key or item (with its index partitions), every key
+ * of a batch or transaction, and the partition its key condition queries.
+ */
 function partitions(input: Record<string, unknown>): string[] {
   const out: string[] = [];
-  const key = input.Key as { pk?: string } | undefined;
-  if (key?.pk) out.push(key.pk);
+  const fromItem = (i: Record<string, unknown> | undefined) => {
+    for (const [k, v] of Object.entries(i ?? {})) {
+      if (/^(pk|gsi[1-4]pk)$/.test(k) && typeof v === "string") out.push(v);
+    }
+  };
+  fromItem(input.Key as Record<string, unknown>);
+  fromItem(input.Item as Record<string, unknown>);
+  for (const r of Object.values(
+    (input.RequestItems ?? {}) as Record<string, { Keys?: object[] }>,
+  )) {
+    for (const k of r.Keys ?? []) fromItem(k as Record<string, unknown>);
+  }
+  for (const t of (input.TransactItems ?? []) as Record<string, Record<string, unknown>>[]) {
+    for (const op of Object.values(t)) {
+      fromItem(op.Key as Record<string, unknown>);
+      fromItem(op.Item as Record<string, unknown>);
+    }
+  }
   const cond = input.KeyConditionExpression as string | undefined;
   const values = (input.ExpressionAttributeValues ?? {}) as Record<string, unknown>;
   const names = (input.ExpressionAttributeNames ?? {}) as Record<string, string>;
@@ -47,6 +66,7 @@ describe("the repository on the reader's keys (#196)", () => {
     await r.history("2026-10-29").catch(() => undefined);
     await r.listHighlights(50).catch(() => undefined);
     await r.listTopics().catch(() => undefined);
+    await r.summary().catch(() => undefined);
   };
 
   it("names only the reader's partitions when keyed", async () => {
@@ -56,6 +76,8 @@ describe("the repository on the reader's keys (#196)", () => {
     expect(named.length).toBeGreaterThan(8);
     // Settings and interests are the reader's own items already (READER#<id>).
     expect(named.filter((pk) => !pk.startsWith(P) && pk !== `READER#${READER}`)).toEqual([]);
+    // Batch reads too: the Summary reads its digest days and rated issues in batches.
+    expect(sent.some((c) => c.name === "BatchGetCommand")).toBe(true);
   });
 
   it("names today's partitions with the switch off", async () => {

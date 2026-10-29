@@ -19,12 +19,10 @@ import {
   CANDIDATE_DAYS,
   DIGEST_DAYS,
   DIGEST_SIZE,
-  digestKey,
   INDEX,
   OWNER_KEY,
   settingsKey,
   interestsKey,
-  issueKey,
   issueShelf,
   pickTop,
   rank,
@@ -929,7 +927,12 @@ export class DynamoRepo
       const page = await this.readRaw(q, opts.limit - items.length, cursor);
       const ids = [...new Set(page.items.map((s) => s.id as string))];
       const issues = new Map(
-        (await this.batchGet(ids.map(issueKey), LIST_ATTRIBUTES)).map((i) => [i.id as string, i]),
+        (
+          await this.batchGet(
+            ids.map((id) => this.k.issue(id)),
+            LIST_ATTRIBUTES,
+          )
+        ).map((i) => [i.id as string, i]),
       );
       for (const s of page.items) {
         const issue = issues.get(s.id as string);
@@ -1014,7 +1017,12 @@ export class DynamoRepo
     });
     const ids = [...new Set(stories.map((s) => s.id as string))];
     const topics = new Map(
-      (await this.batchGet(ids.map(issueKey), ["id", "topic", "state"]))
+      (
+        await this.batchGet(
+          ids.map((id) => this.k.issue(id)),
+          ["id", "topic", "state"],
+        )
+      )
         .filter((i) => i.state !== "filtered")
         .map((i) => [i.id as string, i.topic as string | undefined]),
     );
@@ -1251,7 +1259,10 @@ export class DynamoRepo
       if ((latest.get(o.id)?.at ?? "") < o.at) latest.set(o.id, { at: o.at, via: o.via });
     }
     const starred = new Set(senders.filter((s) => s.mustRead).map((s) => s.senderId));
-    const issues = await this.batchGet([...latest.keys()].map(issueKey), LIST_ATTRIBUTES);
+    const issues = await this.batchGet(
+      [...latest.keys()].map((id) => this.k.issue(id)),
+      LIST_ATTRIBUTES,
+    );
     const items: HistoryItem[] = issues
       // An issue opened and later found to be account mail (#50) is no longer an issue.
       .filter((i) => i.state !== "filtered")
@@ -1872,7 +1883,10 @@ export class DynamoRepo
 
   /** These issues as list rows, read now (#53); any filtered since they were found are left out. */
   async listItems(ids: string[]): Promise<IssueListItem[]> {
-    const items = await this.batchGet(ids.map(issueKey), LIST_ATTRIBUTES);
+    const items = await this.batchGet(
+      ids.map((id) => this.k.issue(id)),
+      LIST_ATTRIBUTES,
+    );
     return items.filter((i) => i.state !== "filtered").map(toListItem);
   }
 
@@ -2488,11 +2502,15 @@ export class DynamoRepo
    */
   private async digestStats(now = Date.now()): Promise<DigestStats> {
     const { timeZone } = await this.settings();
-    const digests = await this.batchGet(recentDays(now, DIGEST_DAYS, timeZone).map(digestKey), [
-      "ids",
-    ]);
+    const digests = await this.batchGet(
+      recentDays(now, DIGEST_DAYS, timeZone).map((day) => this.k.digest(day)),
+      ["ids"],
+    );
     const ids = [...new Set(digests.flatMap((d) => (d.ids as string[] | undefined) ?? []))];
-    const rated = await this.batchGet(ids.map(issueKey), ["rating"]);
+    const rated = await this.batchGet(
+      ids.map((id) => this.k.issue(id)),
+      ["rating"],
+    );
     return {
       days: digests.length,
       shown: ids.length,
