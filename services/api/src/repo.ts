@@ -19,27 +19,11 @@ import {
   CANDIDATE_DAYS,
   DIGEST_DAYS,
   DIGEST_SIZE,
-  digestKey,
-  followKey,
-  FOLLOWING_PK,
-  highlightIndexAttributes,
-  highlightKey,
-  highlightKeyFromId,
-  embeddingKey,
-  eventKey,
   INDEX,
-  INGEST_STATE_KEY,
-  INTERESTS_KEY,
   OWNER_KEY,
   settingsKey,
   interestsKey,
-  NARRATIVE_KEY,
-  NOW_READING_KEY,
-  openIndexAttributes,
-  issueIndexAttributes,
-  issueKey,
   issueShelf,
-  PARTITION,
   pickTop,
   rank,
   readerDay,
@@ -48,22 +32,14 @@ import {
   relatedIssues,
   retryOnConflict,
   s3Keys,
-  senderItemKey,
   storyIndexAttributes,
-  storyKey,
+  keysFor,
+  type Keys,
   storyRef,
   storyShelf,
-  sourceKey,
-  sourceRunKey,
-  PREDICTIONS_PK,
-  predictionKeyFromId,
   type AuditData,
   type TuneupData,
-  TUNEUP_KEY,
   trackRecord,
-  takesKey,
-  timelineKey,
-  TOPICS_KEY,
   toVector,
   EMBED_MODEL,
   EMBED_DIMENSIONS,
@@ -411,6 +387,11 @@ export class DynamoRepo
    * the reader (milestone 13); until then all readers share the one library.
    */
   readonly reader?: Reader;
+  /**
+   * Every key this repository reads and writes (milestone 13): the reader's when `keyed`
+   * (`READER_KEYS` on), today's otherwise.
+   */
+  private readonly k: Keys;
   /** Issue embeddings already read (they do not change); see `embeddings`. */
   private readonly vectorCache = new Map<string, Float32Array>();
 
@@ -419,10 +400,13 @@ export class DynamoRepo
     bucket: string;
     stage: string;
     reader?: Reader;
+    /** Use the reader's keys (`READER_KEYS`); today's keys otherwise. */
+    keyed?: boolean;
     ddb?: DynamoDBClient;
     s3?: S3Client;
   }) {
     this.reader = opts.reader;
+    this.k = keysFor(opts.keyed ? opts.reader?.id : undefined);
     this.table = opts.table;
     this.bucket = opts.bucket;
     this.stage = opts.stage;
@@ -467,6 +451,12 @@ export class DynamoRepo
     return next;
   }
 
+  /** A story's index attributes on this repository's keys. */
+  private storyIndex(story: Parameters<typeof storyIndexAttributes>[0]) {
+    const { set, remove } = storyIndexAttributes(story);
+    return { set: this.k.indexed(set), remove };
+  }
+
   // ---------- issues ----------
 
   private unreadQuery(filter?: Filter): IndexQuery {
@@ -474,7 +464,7 @@ export class DynamoRepo
       index: INDEX.unread,
       pkAttr: "gsi2pk",
       skAttr: "gsi2sk",
-      pkValue: PARTITION.unread,
+      pkValue: this.k.partition.unread,
       filter,
     };
   }
@@ -491,7 +481,7 @@ export class DynamoRepo
         index: INDEX.unread,
         pkAttr: "gsi2pk",
         skAttr: "gsi2sk",
-        pkValue: PARTITION.saved,
+        pkValue: this.k.partition.saved,
         filter: andFilters(
           senderIds?.length ? inFilter("senderId", "sid", senderIds) : undefined,
           extra,
@@ -503,7 +493,7 @@ export class DynamoRepo
         index: INDEX.bySender,
         pkAttr: "gsi3pk",
         skAttr: "gsi3sk",
-        pkValue: `SENDER#${senderIds[0]}`,
+        pkValue: this.k.senderPartition(senderIds[0]!),
         filter: andFilters(inFilter("state", "st", VIEW_STATES[view]), extra),
       };
     }
@@ -514,7 +504,7 @@ export class DynamoRepo
             index: INDEX.list,
             pkAttr: "gsi1pk",
             skAttr: "gsi1sk",
-            pkValue: view === "archived" ? PARTITION.archive : PARTITION.inbox,
+            pkValue: view === "archived" ? this.k.partition.archive : this.k.partition.inbox,
           };
     // Archived is an explicit view: show everything archived. DynamoDB allows 100 values in IN;
     // muting more than 100 senders is not a real scenario.
@@ -541,7 +531,8 @@ export class DynamoRepo
       k !== null &&
       Object.keys(k).length === 4 &&
       attrs.every((a) => typeof k[a] === "string") &&
-      k[q.pkAttr] === q.pkValue;
+      k[q.pkAttr] === q.pkValue &&
+      this.k.owns(k.pk as string);
     if (!valid) throw badRequest("bad cursor");
     return k;
   }
@@ -685,7 +676,9 @@ export class DynamoRepo
   }
 
   private async mustGetIssue(id: string): Promise<Item> {
-    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: issueKey(id) }));
+    const res = await this.ddb.send(
+      new GetCommand({ TableName: this.table, Key: this.k.issue(id) }),
+    );
     if (!res.Item || res.Item.state === "filtered") throw notFound("issue not found");
     return res.Item;
   }
@@ -743,7 +736,7 @@ export class DynamoRepo
     return {
       Put: {
         TableName: this.table,
-        Item: { ...eventKey(id, at, randomUUID().slice(0, 8)), ...data },
+        Item: { ...this.k.event(id, at, randomUUID().slice(0, 8)), ...data },
       },
     };
   }
@@ -755,7 +748,7 @@ export class DynamoRepo
     // Archiving a saved issue takes it off the Saved list too (#43): done with it.
     const unsave = state === "archived" && item.savedAt !== undefined;
     const savedAt = unsave ? undefined : (item.savedAt as string | undefined);
-    const idx = issueIndexAttributes({
+    const idx = this.k.issueIndex({
       id,
       senderId: item.senderId as string,
       receivedAt: item.receivedAt as string,
@@ -772,7 +765,7 @@ export class DynamoRepo
       {
         Update: {
           TableName: this.table,
-          Key: issueKey(id),
+          Key: this.k.issue(id),
           UpdateExpression: u.expr,
           ConditionExpression: "#cur = :cur",
           ExpressionAttributeNames: { ...u.names, "#cur": "state" },
@@ -796,7 +789,7 @@ export class DynamoRepo
     if (saved && item.state === "archived") throw badRequest("archived issues cannot be saved");
     const now = new Date().toISOString();
     const savedAt = saved ? now : undefined;
-    const idx = issueIndexAttributes({
+    const idx = this.k.issueIndex({
       id,
       senderId: item.senderId as string,
       receivedAt: item.receivedAt as string,
@@ -813,7 +806,7 @@ export class DynamoRepo
       {
         Update: {
           TableName: this.table,
-          Key: issueKey(id),
+          Key: this.k.issue(id),
           UpdateExpression: u.expr,
           // The indexes follow the state read above; another device may have changed either.
           ConditionExpression: `${saved ? "attribute_not_exists" : "attribute_exists"}(#sv) AND #st = :st`,
@@ -844,7 +837,7 @@ export class DynamoRepo
         {
           Update: {
             TableName: this.table,
-            Key: issueKey(id),
+            Key: this.k.issue(id),
             UpdateExpression: "SET #sh = :sh, #by = :by",
             ConditionExpression: "attribute_exists(pk)",
             ExpressionAttributeNames: { "#sh": "shelf", "#by": "shelfSetBy" },
@@ -862,7 +855,7 @@ export class DynamoRepo
       {
         Update: {
           TableName: this.table,
-          Key: issueKey(id),
+          Key: this.k.issue(id),
           UpdateExpression: "SET #sh = :sh, #by = :by",
           ConditionExpression: "attribute_exists(pk)",
           ExpressionAttributeNames: { "#sh": "shelf", "#by": "shelfSetBy" },
@@ -901,7 +894,7 @@ export class DynamoRepo
             index: INDEX.unread,
             pkAttr: "gsi2pk",
             skAttr: "gsi2sk",
-            pkValue: PARTITION.learning,
+            pkValue: this.k.partition.learning,
             filter: who,
             attributes: STORY_ATTRIBUTES,
           }
@@ -909,7 +902,7 @@ export class DynamoRepo
             index: INDEX.list,
             pkAttr: "gsi1pk",
             skAttr: "gsi1sk",
-            pkValue: PARTITION.stories,
+            pkValue: this.k.partition.stories,
             filter: andFilters(
               who,
               { expr: "#lsh = :lsh", names: { "#lsh": "shelf" }, values: { ":lsh": "learning" } },
@@ -934,7 +927,12 @@ export class DynamoRepo
       const page = await this.readRaw(q, opts.limit - items.length, cursor);
       const ids = [...new Set(page.items.map((s) => s.id as string))];
       const issues = new Map(
-        (await this.batchGet(ids.map(issueKey), LIST_ATTRIBUTES)).map((i) => [i.id as string, i]),
+        (
+          await this.batchGet(
+            ids.map((id) => this.k.issue(id)),
+            LIST_ATTRIBUTES,
+          )
+        ).map((i) => [i.id as string, i]),
       );
       for (const s of page.items) {
         const issue = issues.get(s.id as string);
@@ -959,7 +957,7 @@ export class DynamoRepo
   async setStory(id: string, n: number, patch: StoryPatch): Promise<IssueStory> {
     await this.mustGetIssue(id);
     const res = await this.ddb.send(
-      new GetCommand({ TableName: this.table, Key: storyKey(id, n), ConsistentRead: true }),
+      new GetCommand({ TableName: this.table, Key: this.k.story(id, n), ConsistentRead: true }),
     );
     if (!res.Item) throw notFound("story not found");
     let s: Item = res.Item;
@@ -978,7 +976,7 @@ export class DynamoRepo
   /** A story's state with the Learning index that follows, if its shelf is still as read. */
   private async putStoryState(id: string, s: Item, state: StoryState) {
     const shelf = s.shelf as Shelf | undefined;
-    const index = storyIndexAttributes({
+    const index = this.storyIndex({
       issueId: id,
       n: s.n as number,
       receivedAt: s.receivedAt as string,
@@ -995,7 +993,7 @@ export class DynamoRepo
       await this.ddb.send(
         new UpdateCommand({
           TableName: this.table,
-          Key: storyKey(id, s.n as number),
+          Key: this.k.story(id, s.n as number),
           UpdateExpression: u.expr,
           ConditionExpression:
             "attribute_exists(pk) AND " + (shelf ? "#csh = :csh" : "attribute_not_exists(#csh)"),
@@ -1014,12 +1012,17 @@ export class DynamoRepo
     const stories = await this.queryAll({
       IndexName: INDEX.unread,
       KeyConditionExpression: "gsi2pk = :p",
-      ExpressionAttributeValues: { ":p": PARTITION.learning },
+      ExpressionAttributeValues: { ":p": this.k.partition.learning },
       ProjectionExpression: "id, senderId",
     });
     const ids = [...new Set(stories.map((s) => s.id as string))];
     const topics = new Map(
-      (await this.batchGet(ids.map(issueKey), ["id", "topic", "state"]))
+      (
+        await this.batchGet(
+          ids.map((id) => this.k.issue(id)),
+          ["id", "topic", "state"],
+        )
+      )
         .filter((i) => i.state !== "filtered")
         .map((i) => [i.id as string, i.topic as string | undefined]),
     );
@@ -1041,7 +1044,7 @@ export class DynamoRepo
   private storyShelves(id: string): Promise<Item[]> {
     return this.queryAll({
       KeyConditionExpression: "pk = :pk AND begins_with(sk, :story)",
-      ExpressionAttributeValues: { ":pk": issueKey(id).pk, ":story": "STORY#" },
+      ExpressionAttributeValues: { ":pk": this.k.issue(id).pk, ":story": "STORY#" },
       ProjectionExpression: "#n, receivedAt, shelf, shelfSetBy, learning, #st",
       ExpressionAttributeNames: { "#n": "n", "#st": "state" },
       ConsistentRead: true,
@@ -1054,7 +1057,7 @@ export class DynamoRepo
    */
   private async putStoryShelf(id: string, s: Item, shelf: Shelf, by: StoryShelfSetBy) {
     const state = s.state as StoryState | undefined;
-    const index = storyIndexAttributes({
+    const index = this.storyIndex({
       issueId: id,
       n: s.n as number,
       receivedAt: s.receivedAt as string,
@@ -1066,7 +1069,7 @@ export class DynamoRepo
       await this.ddb.send(
         new UpdateCommand({
           TableName: this.table,
-          Key: storyKey(id, s.n as number),
+          Key: this.k.story(id, s.n as number),
           UpdateExpression: u.expr,
           ConditionExpression:
             "attribute_exists(pk) AND " + (state ? "#cst = :cst" : "attribute_not_exists(#cst)"),
@@ -1089,7 +1092,7 @@ export class DynamoRepo
     await this.ddb.send(
       new UpdateCommand({
         TableName: this.table,
-        Key: issueKey(id),
+        Key: this.k.issue(id),
         UpdateExpression: "SET shelf = :s, shelfSetBy = :by",
         ConditionExpression: "attribute_exists(pk)",
         ExpressionAttributeValues: { ":s": shelf, ":by": "stories" },
@@ -1105,7 +1108,7 @@ export class DynamoRepo
 
     const now = new Date().toISOString();
     const rating = value === 0 ? undefined : value;
-    const idx = issueIndexAttributes({
+    const idx = this.k.issueIndex({
       id,
       senderId: item.senderId as string,
       receivedAt: item.receivedAt as string,
@@ -1125,7 +1128,7 @@ export class DynamoRepo
       {
         Update: {
           TableName: this.table,
-          Key: issueKey(id),
+          Key: this.k.issue(id),
           UpdateExpression: u.expr,
           // Optimistic: whatever we read must still be there (another device may have rated).
           ConditionExpression: prev === 0 ? "attribute_not_exists(#cur)" : "#cur = :cur",
@@ -1136,7 +1139,7 @@ export class DynamoRepo
       {
         Update: {
           TableName: this.table,
-          Key: senderItemKey(item.senderId as string),
+          Key: this.k.senderItem(item.senderId as string),
           UpdateExpression: "ADD up :du, down :dd",
           ExpressionAttributeValues: { ":du": du, ":dd": dd },
         },
@@ -1150,7 +1153,7 @@ export class DynamoRepo
     const [, place] = await Promise.all([this.mustGetIssue(id), this.nowReadingItem()]);
     const now = new Date().toISOString();
     // Indexed by time for read history (#42).
-    const open = { type: "open", ...openIndexAttributes(id, now) };
+    const open = { type: "open", ...this.k.openIndex(id, now) };
     // Now reading (#44) points at the issue opened last. Reopening it keeps the place, unless it
     // was finished: then it starts again from the top.
     const kept = place?.issueId === id ? (place.position as number) : 0;
@@ -1167,7 +1170,7 @@ export class DynamoRepo
   async logPeek(id: string): Promise<void> {
     await this.mustGetIssue(id);
     const now = new Date().toISOString();
-    const peek = { type: "peek", ...openIndexAttributes(id, now) };
+    const peek = { type: "peek", ...this.k.openIndex(id, now) };
     await this.ddb.send(new PutCommand(this.event(id, now, peek).Put));
   }
 
@@ -1175,7 +1178,7 @@ export class DynamoRepo
 
   private async nowReadingItem(): Promise<Item | undefined> {
     const res = await this.ddb.send(
-      new GetCommand({ TableName: this.table, Key: NOW_READING_KEY }),
+      new GetCommand({ TableName: this.table, Key: this.k.nowReading }),
     );
     return res.Item;
   }
@@ -1185,7 +1188,7 @@ export class DynamoRepo
     await this.ddb.send(
       new PutCommand({
         TableName: this.table,
-        Item: { ...NOW_READING_KEY, issueId: id, position, since: now, at: now },
+        Item: { ...this.k.nowReading, issueId: id, position, since: now, at: now },
       }),
     );
   }
@@ -1202,7 +1205,7 @@ export class DynamoRepo
       await this.ddb.send(
         new UpdateCommand({
           TableName: this.table,
-          Key: NOW_READING_KEY,
+          Key: this.k.nowReading,
           UpdateExpression: "SET #p = :p, #at = :at",
           ConditionExpression: "#id = :id",
           ExpressionAttributeNames: { "#p": "position", "#at": "at", "#id": "issueId" },
@@ -1221,7 +1224,7 @@ export class DynamoRepo
     const place = await this.nowReadingItem();
     if (!place || (place.position as number) >= 1) return {};
     const res = await this.ddb.send(
-      new GetCommand({ TableName: this.table, Key: issueKey(place.issueId as string) }),
+      new GetCommand({ TableName: this.table, Key: this.k.issue(place.issueId as string) }),
     );
     const item = res.Item;
     if (!item || item.state === "filtered" || item.state === "archived") return {};
@@ -1256,7 +1259,10 @@ export class DynamoRepo
       if ((latest.get(o.id)?.at ?? "") < o.at) latest.set(o.id, { at: o.at, via: o.via });
     }
     const starred = new Set(senders.filter((s) => s.mustRead).map((s) => s.senderId));
-    const issues = await this.batchGet([...latest.keys()].map(issueKey), LIST_ATTRIBUTES);
+    const issues = await this.batchGet(
+      [...latest.keys()].map((id) => this.k.issue(id)),
+      LIST_ATTRIBUTES,
+    );
     const items: HistoryItem[] = issues
       // An issue opened and later found to be account mail (#50) is no longer an issue.
       .filter((i) => i.state !== "filtered")
@@ -1286,7 +1292,11 @@ export class DynamoRepo
       const res: QueryCommandOutput = await this.query({
         IndexName: INDEX.list,
         KeyConditionExpression: "gsi1pk = :p AND gsi1sk BETWEEN :from AND :to",
-        ExpressionAttributeValues: { ":p": PARTITION.opens, ":from": from, ":to": `${to}\uffff` },
+        ExpressionAttributeValues: {
+          ":p": this.k.partition.opens,
+          ":from": from,
+          ":to": `${to}\uffff`,
+        },
         ProjectionExpression: "gsi1sk, #t",
         ExpressionAttributeNames: { "#t": "type" },
         ExclusiveStartKey: start,
@@ -1307,7 +1317,7 @@ export class DynamoRepo
       KeyConditionExpression:
         side === "before" ? "gsi1pk = :p AND gsi1sk < :edge" : "gsi1pk = :p AND gsi1sk > :edge",
       ExpressionAttributeValues: {
-        ":p": PARTITION.opens,
+        ":p": this.k.partition.opens,
         ":edge": side === "before" ? edge : `${edge}\uffff`,
       },
       ProjectionExpression: "gsi1sk",
@@ -1326,7 +1336,7 @@ export class DynamoRepo
       this.mustGetIssue(id),
       this.query({
         KeyConditionExpression: "pk = :pk AND begins_with(sk, :story)",
-        ExpressionAttributeValues: { ":pk": issueKey(id).pk, ":story": "STORY#" },
+        ExpressionAttributeValues: { ":pk": this.k.issue(id).pk, ":story": "STORY#" },
         // Not the embedding: a few lines of text each.
         ProjectionExpression: "#n, #h, #s, #l, #nm, #sh, #st",
         ExpressionAttributeNames: {
@@ -1348,7 +1358,7 @@ export class DynamoRepo
   async storyVectors(id: string): Promise<OwnStory[]> {
     const res = await this.query({
       KeyConditionExpression: "pk = :pk AND begins_with(sk, :story)",
-      ExpressionAttributeValues: { ":pk": issueKey(id).pk, ":story": "STORY#" },
+      ExpressionAttributeValues: { ":pk": this.k.issue(id).pk, ":story": "STORY#" },
       ProjectionExpression: "#n, #h, #sid, #at, #v",
       ExpressionAttributeNames: {
         "#n": "n",
@@ -1382,12 +1392,12 @@ export class DynamoRepo
       this.ddb.send(
         new GetCommand({
           TableName: this.table,
-          Key: issueKey(id),
+          Key: this.k.issue(id),
           ProjectionExpression: "#pub, #c",
           ExpressionAttributeNames: { "#pub": "publication", "#c": "storyCount" },
         }),
       ),
-      this.ddb.send(new GetCommand({ TableName: this.table, Key: storyKey(id, n) })),
+      this.ddb.send(new GetCommand({ TableName: this.table, Key: this.k.story(id, n) })),
     ]);
     const s = story.Item;
     if (!issue.Item || !s || typeof s.receivedAt !== "string") return undefined;
@@ -1411,7 +1421,7 @@ export class DynamoRepo
   /** The timeline kept for an event, if one was written. */
   async getTimeline(eventId: string): Promise<Timeline | undefined> {
     const res = await this.ddb.send(
-      new GetCommand({ TableName: this.table, Key: timelineKey(eventId) }),
+      new GetCommand({ TableName: this.table, Key: this.k.timeline(eventId) }),
     );
     const t = res.Item;
     if (!t) return undefined;
@@ -1427,7 +1437,7 @@ export class DynamoRepo
 
   async getTakes(eventId: string): Promise<Takes | undefined> {
     const res = await this.ddb.send(
-      new GetCommand({ TableName: this.table, Key: takesKey(eventId) }),
+      new GetCommand({ TableName: this.table, Key: this.k.takes(eventId) }),
     );
     const t = res.Item;
     if (!t) return undefined;
@@ -1451,7 +1461,7 @@ export class DynamoRepo
       this.ddb.send(
         new GetCommand({
           TableName: this.table,
-          Key: issueKey(id),
+          Key: this.k.issue(id),
           ProjectionExpression: "#pub, #st",
           ExpressionAttributeNames: { "#pub": "publication", "#st": "state" },
         }),
@@ -1459,7 +1469,7 @@ export class DynamoRepo
       this.ddb.send(
         new GetCommand({
           TableName: this.table,
-          Key: storyKey(id, n),
+          Key: this.k.story(id, n),
           ProjectionExpression: "#h, #s, #nm, #l",
           ExpressionAttributeNames: {
             "#h": "headline",
@@ -1489,12 +1499,12 @@ export class DynamoRepo
   async getSource(id: string, n: number): Promise<{ check?: SourceCheck; run?: SourceRunItem }> {
     const res = await this.query({
       KeyConditionExpression: "pk = :pk",
-      ExpressionAttributeValues: { ":pk": sourceKey(id, n).pk },
+      ExpressionAttributeValues: { ":pk": this.k.source(id, n).pk },
       ConsistentRead: true,
     });
     const items = res.Items ?? [];
-    const c = items.find((i) => i.sk === sourceKey(id, n).sk);
-    const r = items.find((i) => i.sk === sourceRunKey(id, n).sk);
+    const c = items.find((i) => i.sk === this.k.source(id, n).sk);
+    const r = items.find((i) => i.sk === this.k.sourceRun(id, n).sk);
     return {
       ...(c
         ? {
@@ -1531,7 +1541,7 @@ export class DynamoRepo
       await this.ddb.send(
         new PutCommand({
           TableName: this.table,
-          Item: { ...sourceRunKey(id, n), status: "running", since },
+          Item: { ...this.k.sourceRun(id, n), status: "running", since },
           ConditionExpression: "attribute_not_exists(pk) OR #st <> :running OR #since <= :stale",
           ExpressionAttributeNames: { "#st": "status", "#since": "since" },
           ExpressionAttributeValues: { ":running": "running", ":stale": staleBefore },
@@ -1549,7 +1559,7 @@ export class DynamoRepo
     await this.ddb.send(
       new UpdateCommand({
         TableName: this.table,
-        Key: sourceRunKey(id, n),
+        Key: this.k.sourceRun(id, n),
         UpdateExpression: reading
           ? "SET #pages = :pages, #reading = :reading"
           : "SET #pages = :pages REMOVE #reading",
@@ -1566,7 +1576,7 @@ export class DynamoRepo
     await this.ddb.send(
       new UpdateCommand({
         TableName: this.table,
-        Key: sourceRunKey(id, n),
+        Key: this.k.sourceRun(id, n),
         UpdateExpression: none
           ? "SET #st = :st, #none = :none REMOVE #reading"
           : "SET #st = :st REMOVE #none, #reading",
@@ -1581,8 +1591,8 @@ export class DynamoRepo
     await this.ddb.send(
       new TransactWriteCommand({
         TransactItems: [
-          { Put: { TableName: this.table, Item: { ...sourceKey(id, n), ...check } } },
-          { Delete: { TableName: this.table, Key: sourceRunKey(id, n) } },
+          { Put: { TableName: this.table, Item: { ...this.k.source(id, n), ...check } } },
+          { Delete: { TableName: this.table, Key: this.k.sourceRun(id, n) } },
         ],
       }),
     );
@@ -1595,7 +1605,7 @@ export class DynamoRepo
     do {
       const res = await this.query({
         KeyConditionExpression: "pk = :p",
-        ExpressionAttributeValues: { ":p": PREDICTIONS_PK },
+        ExpressionAttributeValues: { ":p": this.k.predictionsPk },
         ExclusiveStartKey: start,
       });
       for (const i of res.Items ?? []) out.push(toPrediction(i));
@@ -1606,7 +1616,7 @@ export class DynamoRepo
 
   /** Writes a prediction's settlement (#139), unless Sandip has set its verdict meanwhile. */
   async settlePrediction(id: string, s: Settlement): Promise<void> {
-    const key = predictionKeyFromId(id);
+    const key = this.k.predictionFromId(id);
     if (!key) throw new Error(`not a prediction id: ${id}`);
     const set: Record<string, unknown> = {
       status: s.status,
@@ -1650,7 +1660,7 @@ export class DynamoRepo
     verdict: Verdict,
     at: string,
   ): Promise<StoredPrediction | undefined> {
-    const key = predictionKeyFromId(id);
+    const key = this.k.predictionFromId(id);
     if (!key) return undefined;
     try {
       const res = await this.ddb.send(
@@ -1682,14 +1692,14 @@ export class DynamoRepo
   /** Keeps takes for their event (#17), replacing any earlier ones. */
   async putTakes(eventId: string, takes: StoredTakes): Promise<void> {
     await this.ddb.send(
-      new PutCommand({ TableName: this.table, Item: { ...takesKey(eventId), ...takes } }),
+      new PutCommand({ TableName: this.table, Item: { ...this.k.takes(eventId), ...takes } }),
     );
   }
 
   /** Keeps a timeline for its event, replacing any earlier one. */
   async putTimeline(eventId: string, timeline: StoredTimeline): Promise<void> {
     await this.ddb.send(
-      new PutCommand({ TableName: this.table, Item: { ...timelineKey(eventId), ...timeline } }),
+      new PutCommand({ TableName: this.table, Item: { ...this.k.timeline(eventId), ...timeline } }),
     );
   }
 
@@ -1699,7 +1709,7 @@ export class DynamoRepo
   async listFollows(): Promise<StoredFollow[]> {
     const items = await this.queryAll({
       KeyConditionExpression: "pk = :p",
-      ExpressionAttributeValues: { ":p": FOLLOWING_PK },
+      ExpressionAttributeValues: { ":p": this.k.followingPk },
       ConsistentRead: true,
     });
     return items.map((f) => ({
@@ -1721,7 +1731,7 @@ export class DynamoRepo
       await this.ddb.send(
         new PutCommand({
           TableName: this.table,
-          Item: { ...followKey(follow.eventId), ...follow },
+          Item: { ...this.k.follow(follow.eventId), ...follow },
           ConditionExpression: "attribute_not_exists(pk)",
         }),
       );
@@ -1733,7 +1743,7 @@ export class DynamoRepo
   }
 
   async deleteFollow(eventId: string): Promise<void> {
-    await this.ddb.send(new DeleteCommand({ TableName: this.table, Key: followKey(eventId) }));
+    await this.ddb.send(new DeleteCommand({ TableName: this.table, Key: this.k.follow(eventId) }));
   }
 
   async seeFollow(eventId: string, at: string): Promise<void> {
@@ -1741,7 +1751,7 @@ export class DynamoRepo
       await this.ddb.send(
         new UpdateCommand({
           TableName: this.table,
-          Key: followKey(eventId),
+          Key: this.k.follow(eventId),
           UpdateExpression: "SET seenAt = :at",
           ConditionExpression: "attribute_exists(pk)",
           ExpressionAttributeValues: { ":at": at },
@@ -1759,7 +1769,7 @@ export class DynamoRepo
   async issueHighlights(issueId: string): Promise<Highlight[]> {
     const items = await this.queryAll({
       KeyConditionExpression: "pk = :pk AND begins_with(sk, :hl)",
-      ExpressionAttributeValues: { ":pk": issueKey(issueId).pk, ":hl": "HL#" },
+      ExpressionAttributeValues: { ":pk": this.k.issue(issueId).pk, ":hl": "HL#" },
       ConsistentRead: true,
     });
     return items.map(toHighlight);
@@ -1771,9 +1781,9 @@ export class DynamoRepo
       new PutCommand({
         TableName: this.table,
         Item: {
-          ...highlightKey(h.issueId, key),
+          ...this.k.highlight(h.issueId, key),
           ...h,
-          ...highlightIndexAttributes(h.issueId, key, h.createdAt),
+          ...this.k.highlightIndex(h.issueId, key, h.createdAt),
         },
       }),
     );
@@ -1784,7 +1794,7 @@ export class DynamoRepo
     note: string | undefined,
     at: string,
   ): Promise<Highlight | undefined> {
-    const key = highlightKeyFromId(id);
+    const key = this.k.highlightFromId(id);
     if (!key) return undefined;
     const u = updateExpression(
       note ? { note, updatedAt: at } : { updatedAt: at },
@@ -1810,7 +1820,7 @@ export class DynamoRepo
   }
 
   async deleteHighlight(id: string): Promise<void> {
-    const key = highlightKeyFromId(id);
+    const key = this.k.highlightFromId(id);
     if (key) await this.ddb.send(new DeleteCommand({ TableName: this.table, Key: key }));
   }
 
@@ -1823,7 +1833,7 @@ export class DynamoRepo
       IndexName: INDEX.list,
       KeyConditionExpression: before ? "gsi1pk = :p AND gsi1sk < :before" : "gsi1pk = :p",
       ExpressionAttributeValues: {
-        ":p": PARTITION.highlights,
+        ":p": this.k.partition.highlights,
         ...(before ? { ":before": before } : {}),
       },
       ScanIndexForward: false,
@@ -1855,8 +1865,8 @@ export class DynamoRepo
       },
     };
     const [inbox, archive, stories] = await Promise.all([
-      this.queryAll({ ...words, ...this.partition(PARTITION.inbox) }),
-      this.queryAll({ ...words, ...this.partition(PARTITION.archive) }),
+      this.queryAll({ ...words, ...this.partition(this.k.partition.inbox) }),
+      this.queryAll({ ...words, ...this.partition(this.k.partition.archive) }),
       this.everyStory(),
     ]);
     const issues: CorpusIssue[] = [...inbox, ...archive].map((i) => ({
@@ -1873,7 +1883,10 @@ export class DynamoRepo
 
   /** These issues as list rows, read now (#53); any filtered since they were found are left out. */
   async listItems(ids: string[]): Promise<IssueListItem[]> {
-    const items = await this.batchGet(ids.map(issueKey), LIST_ATTRIBUTES);
+    const items = await this.batchGet(
+      ids.map((id) => this.k.issue(id)),
+      LIST_ATTRIBUTES,
+    );
     return items.filter((i) => i.state !== "filtered").map(toListItem);
   }
 
@@ -1883,7 +1896,7 @@ export class DynamoRepo
    */
   private async everyStory(): Promise<CorpusStory[]> {
     const first = await this.query({
-      ...this.partition(PARTITION.stories),
+      ...this.partition(this.k.partition.stories),
       ProjectionExpression: "gsi1sk",
       Limit: 1,
     });
@@ -1903,7 +1916,7 @@ export class DynamoRepo
             // Sort keys are "<receivedAt>#<id>#<nn>", so none equals a week's bound.
             KeyConditionExpression: "gsi1pk = :p AND gsi1sk BETWEEN :from AND :to",
             ExpressionAttributeValues: {
-              ":p": PARTITION.stories,
+              ":p": this.k.partition.stories,
               ":from": from,
               ":to": new Date(Date.parse(from) + WEEK).toISOString(),
             },
@@ -1965,7 +1978,7 @@ export class DynamoRepo
       const res: QueryCommandOutput = await this.query({
         IndexName: INDEX.list,
         KeyConditionExpression: "gsi1pk = :p",
-        ExpressionAttributeValues: { ":p": PARTITION.senders },
+        ExpressionAttributeValues: { ":p": this.k.partition.senders },
         ExclusiveStartKey: start,
       });
       items.push(...(res.Items ?? []));
@@ -1976,13 +1989,13 @@ export class DynamoRepo
 
   async getSender(senderId: string): Promise<SenderDetailResponse> {
     const res = await this.ddb.send(
-      new GetCommand({ TableName: this.table, Key: senderItemKey(senderId) }),
+      new GetCommand({ TableName: this.table, Key: this.k.senderItem(senderId) }),
     );
     if (!res.Item) throw notFound("sender not found");
     const issues = await this.query({
       IndexName: INDEX.bySender,
       KeyConditionExpression: "gsi3pk = :p",
-      ExpressionAttributeValues: { ":p": `SENDER#${senderId}` },
+      ExpressionAttributeValues: { ":p": this.k.senderPartition(senderId) },
       ScanIndexForward: false,
       Limit: 100,
     });
@@ -2009,9 +2022,9 @@ export class DynamoRepo
       });
     const issueAttrs = ["id", "senderId", "receivedAt", "rating", "promo"];
     const [inbox, archive, stories, opens, first, senders] = await Promise.all([
-      after(PARTITION.inbox, since.issues, issueAttrs),
-      after(PARTITION.archive, since.issues, issueAttrs),
-      after(PARTITION.stories, since.stories, [
+      after(this.k.partition.inbox, since.issues, issueAttrs),
+      after(this.k.partition.archive, since.issues, issueAttrs),
+      after(this.k.partition.stories, since.stories, [
         "id",
         "n",
         "senderId",
@@ -2019,9 +2032,9 @@ export class DynamoRepo
         "headline",
         "eventId",
       ]),
-      after(PARTITION.opens, since.opened, ["gsi1sk"]),
+      after(this.k.partition.opens, since.opened, ["gsi1sk"]),
       this.query({
-        ...this.partition(PARTITION.opens),
+        ...this.partition(this.k.partition.opens),
         ProjectionExpression: "gsi1sk",
         Limit: 1,
       }),
@@ -2066,9 +2079,9 @@ export class DynamoRepo
       });
     const issueAttrs = ["id", "senderId", "autoArchived"];
     const [inbox, archive, stories, senders, state] = await Promise.all([
-      all(PARTITION.inbox, issueAttrs),
-      all(PARTITION.archive, issueAttrs),
-      all(PARTITION.stories, [
+      all(this.k.partition.inbox, issueAttrs),
+      all(this.k.partition.archive, issueAttrs),
+      all(this.k.partition.stories, [
         "id",
         "n",
         "senderId",
@@ -2079,7 +2092,7 @@ export class DynamoRepo
         "shelfSetBy",
       ]),
       this.listSenders(),
-      this.ddb.send(new GetCommand({ TableName: this.table, Key: TUNEUP_KEY })),
+      this.ddb.send(new GetCommand({ TableName: this.table, Key: this.k.tuneup })),
     ]);
     const issue = (i: Item, archived: boolean) => ({
       id: i.id as string,
@@ -2113,7 +2126,7 @@ export class DynamoRepo
     await this.ddb.send(
       new UpdateCommand({
         TableName: this.table,
-        Key: TUNEUP_KEY,
+        Key: this.k.tuneup,
         UpdateExpression: "SET dismissed = if_not_exists(dismissed, :empty)",
         ExpressionAttributeValues: { ":empty": {} },
       }),
@@ -2121,7 +2134,7 @@ export class DynamoRepo
     await this.ddb.send(
       new UpdateCommand({
         TableName: this.table,
-        Key: TUNEUP_KEY,
+        Key: this.k.tuneup,
         UpdateExpression: "SET dismissed.#id = :n",
         ExpressionAttributeNames: { "#id": id },
         ExpressionAttributeValues: { ":n": fixes },
@@ -2137,7 +2150,7 @@ export class DynamoRepo
       const res = await this.ddb.send(
         new UpdateCommand({
           TableName: this.table,
-          Key: senderItemKey(senderId),
+          Key: this.k.senderItem(senderId),
           UpdateExpression: u.expr,
           ConditionExpression: "attribute_exists(pk)",
           ExpressionAttributeNames: u.names,
@@ -2163,7 +2176,7 @@ export class DynamoRepo
     const issues = await this.queryAll({
       IndexName: INDEX.bySender,
       KeyConditionExpression: "gsi3pk = :p",
-      ExpressionAttributeValues: { ":p": `SENDER#${senderId}` },
+      ExpressionAttributeValues: { ":p": this.k.senderPartition(senderId) },
       ProjectionExpression: "id, shelfAuto, shelfSetBy",
     });
 
@@ -2201,7 +2214,7 @@ export class DynamoRepo
           .send(
             new UpdateCommand({
               TableName: this.table,
-              Key: issueKey(id),
+              Key: this.k.issue(id),
               ExpressionAttributeNames: names,
               ...u,
             }),
@@ -2232,7 +2245,7 @@ export class DynamoRepo
   }
 
   async listTopics(): Promise<Topic[]> {
-    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: TOPICS_KEY }));
+    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: this.k.topics }));
     return (res.Item?.topics as Topic[] | undefined) ?? [];
   }
 
@@ -2253,7 +2266,7 @@ export class DynamoRepo
         KeyConditionExpression: "gsi2pk = :p",
         ProjectionExpression: "#sid, #sh, #tp",
         ExpressionAttributeNames: { "#sid": "senderId", "#sh": "shelf", "#tp": "topic" },
-        ExpressionAttributeValues: { ":p": PARTITION.unread },
+        ExpressionAttributeValues: { ":p": this.k.partition.unread },
         ExclusiveStartKey: start,
       });
       for (const i of res.Items ?? []) {
@@ -2281,7 +2294,7 @@ export class DynamoRepo
       const res: QueryCommandOutput = await this.query({
         IndexName: INDEX.unread,
         KeyConditionExpression: "gsi2pk = :p",
-        ExpressionAttributeValues: { ":p": PARTITION.saved },
+        ExpressionAttributeValues: { ":p": this.k.partition.saved },
         Select: "COUNT",
         ExclusiveStartKey: start,
       });
@@ -2316,7 +2329,11 @@ export class DynamoRepo
         KeyConditionExpression: "gsi2pk = :p AND gsi2sk > :since",
         FilterExpression: news.expr,
         ExpressionAttributeNames: news.names,
-        ExpressionAttributeValues: { ":p": PARTITION.unread, ":since": since, ...news.values },
+        ExpressionAttributeValues: {
+          ":p": this.k.partition.unread,
+          ":since": since,
+          ...news.values,
+        },
         ExclusiveStartKey: start,
       });
       items.push(...(res.Items ?? []).filter((i) => !muted.has(i.senderId as string)));
@@ -2414,7 +2431,7 @@ export class DynamoRepo
   /** Every issue that is not filtered out: the inbox and the archive. */
   private async everyIssue(): Promise<Item[]> {
     const out: Item[] = [];
-    for (const partition of [PARTITION.inbox, PARTITION.archive]) {
+    for (const partition of [this.k.partition.inbox, this.k.partition.archive]) {
       let start: Item | undefined;
       do {
         const res: QueryCommandOutput = await this.query({
@@ -2440,7 +2457,7 @@ export class DynamoRepo
   ): Promise<{ ids: string[]; at: string } | undefined> {
     const logged = async () => {
       const item = (
-        await this.ddb.send(new GetCommand({ TableName: this.table, Key: digestKey(day) }))
+        await this.ddb.send(new GetCommand({ TableName: this.table, Key: this.k.digest(day) }))
       ).Item;
       return item && { ids: (item.ids as string[] | undefined) ?? [], at: item.at as string };
     };
@@ -2452,7 +2469,7 @@ export class DynamoRepo
       await this.ddb.send(
         new PutCommand({
           TableName: this.table,
-          Item: { ...digestKey(day), ids: top, at },
+          Item: { ...this.k.digest(day), ids: top, at },
           ConditionExpression: "attribute_not_exists(pk)",
         }),
       );
@@ -2466,7 +2483,9 @@ export class DynamoRepo
 
   /** The latest narrative of the day's news (#18), if it was written in the last 24 hours. */
   private async narrative(now: number): Promise<Narrative | undefined> {
-    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: NARRATIVE_KEY }));
+    const res = await this.ddb.send(
+      new GetCommand({ TableName: this.table, Key: this.k.narrative }),
+    );
     const n = res.Item;
     if (!n || now - Date.parse(n.at as string) > 24 * 3_600_000) return undefined;
     return {
@@ -2483,11 +2502,15 @@ export class DynamoRepo
    */
   private async digestStats(now = Date.now()): Promise<DigestStats> {
     const { timeZone } = await this.settings();
-    const digests = await this.batchGet(recentDays(now, DIGEST_DAYS, timeZone).map(digestKey), [
-      "ids",
-    ]);
+    const digests = await this.batchGet(
+      recentDays(now, DIGEST_DAYS, timeZone).map((day) => this.k.digest(day)),
+      ["ids"],
+    );
     const ids = [...new Set(digests.flatMap((d) => (d.ids as string[] | undefined) ?? []))];
-    const rated = await this.batchGet(ids.map(issueKey), ["rating"]);
+    const rated = await this.batchGet(
+      ids.map((id) => this.k.issue(id)),
+      ["rating"],
+    );
     return {
       days: digests.length,
       shown: ids.length,
@@ -2534,7 +2557,7 @@ export class DynamoRepo
       : undefined;
     const item =
       own ??
-      (await this.ddb.send(new GetCommand({ TableName: this.table, Key: INTERESTS_KEY }))).Item;
+      (await this.ddb.send(new GetCommand({ TableName: this.table, Key: this.k.interests }))).Item;
     const list = (item?.interests as { name: string; vector: Uint8Array }[] | undefined) ?? [];
     return list.map((i) => ({ name: i.name, vector: toVector(i.vector) }));
   }
@@ -2570,7 +2593,7 @@ export class DynamoRepo
         "#at": "ratedAt",
         "#sub": "subject",
       },
-      ExpressionAttributeValues: { ":p": PARTITION.rated },
+      ExpressionAttributeValues: { ":p": this.k.partition.rated },
       ScanIndexForward: false,
       Limit: 300,
     });
@@ -2600,7 +2623,7 @@ export class DynamoRepo
     for (let n = 0; n < unique.length; n += 100) {
       let keys: Record<string, unknown>[] | undefined = unique
         .slice(n, n + 100)
-        .map((id) => embeddingKey(id));
+        .map((id) => this.k.embedding(id));
       for (let attempt = 0; keys?.length && attempt < 5; attempt++) {
         if (attempt) await new Promise((r) => setTimeout(r, 100 * 2 ** attempt));
         const res: BatchGetCommandOutput = await this.ddb.send(
@@ -2615,7 +2638,7 @@ export class DynamoRepo
           }),
         );
         for (const item of res.Responses?.[this.table] ?? []) {
-          const id = (item.pk as string).slice("ISSUE#".length);
+          const id = this.k.issueIdOf(item.pk as string)!;
           const vector = toVector(item.vector as Uint8Array);
           out.set(id, vector);
           if (keep) this.vectorCache.set(id, vector);
@@ -2630,7 +2653,7 @@ export class DynamoRepo
 
   async status(): Promise<StatusResponse> {
     const [res, digestStats] = await Promise.all([
-      this.ddb.send(new GetCommand({ TableName: this.table, Key: INGEST_STATE_KEY })),
+      this.ddb.send(new GetCommand({ TableName: this.table, Key: this.k.ingestState })),
       this.digestStats(),
     ]);
     return {

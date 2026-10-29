@@ -55,7 +55,7 @@ export function createJobHandler(
   };
 }
 
-const { TABLE_NAME, BUCKET_NAME, STAGE } = process.env;
+const { TABLE_NAME, BUCKET_NAME, STAGE, READER_KEYS } = process.env;
 const ddb = new DynamoDBClient({});
 const s3 = new S3Client({});
 const claude = new BedrockClaude();
@@ -66,6 +66,7 @@ const repoFor = (reader: Reader | undefined) =>
     bucket: BUCKET_NAME!,
     stage: STAGE ?? "unknown",
     reader,
+    keyed: READER_KEYS === "1",
     ddb,
     s3,
   });

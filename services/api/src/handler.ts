@@ -99,7 +99,7 @@ export function createHandler(servicesFor: (reader: Reader) => Services) {
   };
 }
 
-const { TABLE_NAME, BUCKET_NAME, INGEST_FUNCTION, JOBS_FUNCTION, STAGE } = process.env;
+const { TABLE_NAME, BUCKET_NAME, INGEST_FUNCTION, JOBS_FUNCTION, STAGE, READER_KEYS } = process.env;
 const lambda = new LambdaClient({});
 
 /** Starts a Lambda without waiting for it. */
@@ -124,6 +124,7 @@ function servicesOf(reader: Reader): Services {
     bucket: BUCKET_NAME!,
     stage: STAGE ?? "unknown",
     reader,
+    keyed: READER_KEYS === "1",
     ddb,
     s3,
   });
