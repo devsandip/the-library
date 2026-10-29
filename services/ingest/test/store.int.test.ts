@@ -112,6 +112,15 @@ describe("Store on dev", () => {
       expect(head.ContentLength).toBeGreaterThan(0);
     }
   });
+  it("names the owner, and builds a store for a reader on the same table (#180)", async () => {
+    const store = new Store(stack.tableName, stack.contentBucket);
+    await store.setOwner({ id: "int-owner" }, "owner@example.test");
+    expect(await store.owner()).toEqual({ id: "int-owner" });
+    const owned = store.forReader({ id: "int-owner" });
+    expect(owned.reader).toEqual({ id: "int-owner" });
+    expect(await owned.owner()).toEqual({ id: "int-owner" });
+  });
+
   it("parallel issues from one sender all land (transaction conflicts are retried)", async () => {
     // Reproduces the first prod backfill: issues from one sender written at the same moment all
     // update that sender's item, and DynamoDB cancels the colliding transactions.

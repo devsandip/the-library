@@ -31,6 +31,7 @@
     "stories": "tsx scripts/stories.ts",
     "predictions": "tsx scripts/predictions.ts",
     "settle": "tsx scripts/settle.ts",
+    "name-owner": "tsx scripts/name-owner.ts",
     "shelves": "tsx scripts/shelves.ts",
     "jev:score": "tsx scripts/jev-score.ts",
     "narrative": "tsx scripts/narrative.ts",

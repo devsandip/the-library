@@ -19,13 +19,14 @@ import { SourceChecker } from "./source.js";
 
 /**
  * The jobs Lambda's handler. A source check runs for the reader who asked for it (#179); settling
- * runs for no particular reader until the owner is named (#180).
+ * runs for the owner (#180), until the daily jobs run per reader.
  */
 export function createJobHandler(
   workFor: (reader: Reader | undefined) => {
     checker: Pick<SourceChecker, "check">;
     settler: Pick<Settler, "settleDue">;
   },
+  owner: () => Promise<Reader | undefined>,
 ) {
   return async (job: Job): Promise<SettleStats | void> => {
     const started = Date.now();
@@ -34,7 +35,7 @@ export function createJobHandler(
         await workFor(readerOf(job.reader)).checker.check(job.id, job.n);
         return;
       }
-      if (job.kind === "settle") return await workFor(undefined).settler.settleDue(job.limit);
+      if (job.kind === "settle") return await workFor(await owner()).settler.settleDue(job.limit);
       throw new Error(`unknown job ${String((job as { kind: unknown }).kind)}`);
     } catch (err) {
       // A source check's run is marked failed already; thrown so the Lambda counts the error.
@@ -59,8 +60,8 @@ const ddb = new DynamoDBClient({});
 const s3 = new S3Client({});
 const claude = new BedrockClaude();
 
-export const handler = createJobHandler((reader) => {
-  const repo = new DynamoRepo({
+const repoFor = (reader: Reader | undefined) =>
+  new DynamoRepo({
     table: TABLE_NAME!,
     bucket: BUCKET_NAME!,
     stage: STAGE ?? "unknown",
@@ -68,8 +69,14 @@ export const handler = createJobHandler((reader) => {
     ddb,
     s3,
   });
-  return {
-    checker: new SourceChecker(repo, claude),
-    settler: new Settler(repo, new CorpusCache(repo), new TitanEmbedder(), claude, CLAUDE_MODEL),
-  };
-});
+
+export const handler = createJobHandler(
+  (reader) => {
+    const repo = repoFor(reader);
+    return {
+      checker: new SourceChecker(repo, claude),
+      settler: new Settler(repo, new CorpusCache(repo), new TitanEmbedder(), claude, CLAUDE_MODEL),
+    };
+  },
+  () => repoFor(undefined).owner(),
+);

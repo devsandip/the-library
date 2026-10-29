@@ -30,6 +30,7 @@ import {
   INDEX,
   INGEST_STATE_KEY,
   INTERESTS_KEY,
+  OWNER_KEY,
   NARRATIVE_KEY,
   NOW_READING_KEY,
   openIndexAttributes,
@@ -106,7 +107,7 @@ import type {
   UnreadCountsResponse,
   View,
 } from "@library/core/types";
-import type { Reader } from "@library/core/reader";
+import { readerOf, type Reader } from "@library/core/reader";
 import { badRequest, conflict, notFound } from "./errors.js";
 import type { ListOptions, RepoPort } from "./port.js";
 import type { AuditStore } from "./audit.js";
@@ -407,6 +408,12 @@ export class DynamoRepo
       marshallOptions: { removeUndefinedValues: true },
     });
     this.s3 = opts.s3 ?? new S3Client({});
+  }
+
+  /** The owner (`CONFIG/OWNER`, #180): whom the scheduled jobs serve; undefined until named. */
+  async owner(): Promise<Reader | undefined> {
+    const res = await this.ddb.send(new GetCommand({ TableName: this.table, Key: OWNER_KEY }));
+    return readerOf(res.Item?.readerId);
   }
 
   // ---------- issues ----------
