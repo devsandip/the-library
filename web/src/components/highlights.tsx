@@ -70,8 +70,8 @@ export function LostHighlights({ h }: { h: Highlighting }) {
       <p class="label">Highlights the page no longer shows</p>
       {h.lost.map((x) => (
         <button type="button" key={x.id} class="hl-lost-item" onClick={() => h.edit(x.id)}>
-          <span class="hl-lost-quote">{x.exact}</span>
-          {x.note && <span class="hl-lost-note">{x.note}</span>}
+          <span class="hl-passage">{x.exact}</span>
+          {x.note && <span class="hl-passage-note">{x.note}</span>}
         </button>
       ))}
     </section>

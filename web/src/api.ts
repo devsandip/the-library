@@ -11,6 +11,7 @@ import type {
   HistoryResponse,
   Highlight,
   HighlightQuote,
+  HighlightsResponse,
   IssueDetailResponse,
   IssueListItem,
   IssueListResponse,
@@ -125,6 +126,8 @@ export interface LibraryApi {
   dismissTuneup(id: string): Promise<TuneupResponse>;
   /** Sandip's verdict on a prediction, or null to hand it back to settling. */
   setVerdict(id: string, verdict: Exclude<PredictionStatus, "open"> | null): Promise<Prediction>;
+  /** Highlights (#168), newest first, a page at a time; `next` is the following page's `before`. */
+  highlights(opts?: { limit?: number; before?: string }): Promise<HighlightsResponse>;
   /**
    * Keeps a passage of the issue (#167), with a note if given. The same passage in the same place
    * again answers the one kept.
@@ -325,6 +328,13 @@ export class HttpLibraryApi implements LibraryApi {
     return this.request<Prediction>("PATCH", `/predictions/${encodeURIComponent(id)}`, {
       verdict,
     });
+  }
+  highlights(opts: { limit?: number; before?: string } = {}) {
+    const q = new URLSearchParams();
+    if (opts.limit) q.set("limit", String(opts.limit));
+    if (opts.before) q.set("before", opts.before);
+    const query = q.toString();
+    return this.request<HighlightsResponse>("GET", `/highlights${query ? `?${query}` : ""}`);
   }
   addHighlight(issueId: string, quote: HighlightQuote, note?: string) {
     return this.request<Highlight>("POST", `/issues/${encodeURIComponent(issueId)}/highlights`, {

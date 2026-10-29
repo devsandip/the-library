@@ -28,6 +28,7 @@ import type {
   FollowPoint,
   Highlight,
   HighlightQuote,
+  HighlightsResponse,
   HistoryResponse,
   IssueDetailResponse,
   IssueListItem,
@@ -506,18 +507,38 @@ for (const [id, hours] of [
 }
 
 /**
- * Kept passages (#167). The first issue starts with two: one with a note, and one its page no
- * longer holds, which the reader lists under the issue.
+ * Kept passages (#167, #168). The first issue starts with two: one with a note, and one its page
+ * no longer holds, which the reader lists under the issue. A few more, over the last two weeks,
+ * fill the Highlights page.
  */
 const highlights = new Map<string, Highlight>();
-for (const [exact, hours, note] of [
-  ["Newsletters arrive as 600 pixel wide tables like this one.", 3, "The reason the frame scales."],
-  ["A passage from an older version of this issue, gone from its page.", 2, undefined],
+for (const [issueId, exact, hours, note] of [
+  [
+    "mock-1",
+    "Newsletters arrive as 600 pixel wide tables like this one.",
+    3,
+    "Why the frame scales.",
+  ],
+  ["mock-1", "A passage from an older version of this issue, gone from its page.", 2, undefined],
+  ["mock-3", "Sentence 3 of part 2 is placeholder text for local development.", 30, undefined],
+  [
+    "mock-3",
+    "Sentence 1 of part 4 is placeholder text for local development.",
+    29,
+    "Worth a post on [[Reading]], with the $5 to $10 figure.",
+  ],
+  ["mock-7", "Sentence 6 of part 1 is placeholder text for local development.", 120, undefined],
+  [
+    "mock-12",
+    "Sentence 2 of part 5 is placeholder text for local development.",
+    300,
+    "Ask about this.",
+  ],
 ] as const) {
   const at = now - hours * HOUR;
   const h: Highlight = {
-    id: `mock-1.${newHighlightKey(at)}`,
-    issueId: "mock-1",
+    id: `${issueId}.${newHighlightKey(at)}`,
+    issueId,
     exact,
     prefix: "",
     suffix: "",
@@ -1023,6 +1044,17 @@ export class MockLibraryApi implements LibraryApi {
       unsubscribeUrl: "https://example.test/unsubscribe",
       ...(position > 0 && position < 1 ? { position } : {}),
       highlights: issueHighlights(id),
+    };
+  }
+  async highlights(opts: { limit?: number; before?: string } = {}): Promise<HighlightsResponse> {
+    await delay();
+    const all = [...highlights.values()]
+      .filter((h) => !opts.before || h.createdAt < opts.before)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const page = all.slice(0, opts.limit ?? 50);
+    return {
+      items: page.map((h) => ({ ...h, issue: withStar(strip(find(h.issueId))) })),
+      ...(all.length > page.length ? { next: page[page.length - 1]!.createdAt } : {}),
     };
   }
   async addHighlight(issueId: string, quote: HighlightQuote, note?: string): Promise<Highlight> {

@@ -3,6 +3,7 @@ import type { StatusResponse } from "@library/core/types";
 import { useApp } from "../context.js";
 import { clock } from "../format.js";
 import { useFollowing } from "../following.js";
+import { highlightCount, useHighlights } from "../highlights.js";
 import { usePredictions } from "../predictions.js";
 import { dropCount, useAudit } from "../audit.js";
 import { useTuneup, waitingCount } from "../tuneup.js";
@@ -13,6 +14,7 @@ import {
   auditHref,
   tuneupHref,
   followingHref,
+  highlightsHref,
   predictionsHref,
   historyHref,
   newslettersHref,
@@ -38,8 +40,8 @@ export function health(s: StatusResponse | undefined): { word: string; tone: str
 }
 
 /**
- * Library (P6): Search on top, then Ask, Following, Predictions, History, Newsletters, Subscription
- * audit, Tune-up, Status and Settings;
+ * Library (P6): Search on top, then Ask, Following, Highlights, Predictions, History, Newsletters,
+ * Subscription audit, Tune-up, Status and Settings;
  * under them the places still to come. New destinations arrive here, so the tab bar never grows.
  */
 export function LibraryHome() {
@@ -52,6 +54,7 @@ export function LibraryHome() {
     followed.status === "ok"
       ? { unseen: followed.data.unseen, count: followed.data.items.length }
       : { unseen: 0, count: 0 };
+  const kept = highlightCount(useHighlights("once").state);
   const predicted = usePredictions("open", false).state;
   const audited = useAudit("once").state;
   const drop = dropCount(audited);
@@ -86,6 +89,15 @@ export function LibraryHome() {
               : following.count
                 ? `${following.count} ${following.count === 1 ? "story" : "stories"}`
                 : "Stories you track"}
+          </span>
+          <span class="chev" aria-hidden="true">
+            ›
+          </span>
+        </a>
+        <a class="group-row" href={highlightsHref()}>
+          <span class="group-name">Highlights</span>
+          <span class="label">
+            {kept === undefined ? "Passages you kept" : kept ? `${kept} kept` : "None yet"}
           </span>
           <span class="chev" aria-hidden="true">
             ›

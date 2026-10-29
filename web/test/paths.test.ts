@@ -8,6 +8,7 @@ import {
   browseHref,
   DEFAULT_QUEUE,
   highlightHref,
+  highlightsHref,
   issueHref,
   parse,
   queueHref,
@@ -188,6 +189,7 @@ describe("Following (#22)", () => {
   it("lives under Library", () => {
     expect(followingHref()).toBe("/library/following");
     expect(at(followingHref())).toEqual({ name: "following" });
+    expect(at(highlightsHref())).toEqual({ name: "highlights" });
     expect(at("/library/following/x")).toEqual({ name: "not-found" });
     expect(predictionsHref()).toBe("/library/predictions");
     expect(at(predictionsHref())).toEqual({ name: "predictions", view: "open" });
