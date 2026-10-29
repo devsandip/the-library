@@ -200,6 +200,8 @@ Every write that changes `state`, `rating` or `savedAt` recomputes all index key
 
 HTTP API, one route `ANY /nutgraf/api/{proxy+}` behind the Cognito JWT authorizer (issuer = user pool, audience = app client). One Node 24 Lambda with an explicit route table. All responses are JSON with `Cache-Control: no-store`.
 
+**The reader** (#179): the handler reads the token's `sub` as the reader and refuses a request without one (401) before any route runs. Each reader's services (repository, corpus cache, deep dives) are built on their first request and kept while the Lambda is warm, up to 20 readers. Until the keys carry the reader (milestone 13 of `docs/features/multi-reader.md`), every reader reads the one library.
+
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/nutgraf/api/issues?view=unread\|all\|archived\|saved&shelf=news\|learning&topic=&sender=&cursor=&limit=` | Newest first; `saved` (#43) newest saved first, read or not, hiding no one. `sender` (up to 50 ids) and `topic` (up to 20) each take several, comma-separated, meaning any of them. Home views hide muted senders unless they are picked. Unread without a sender filter lists Must Read newsletters first; every list marks their issues `mustRead`. `shelf=news` also returns issues Claude has not sorted yet. |

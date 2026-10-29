@@ -123,7 +123,12 @@ export interface SourcePort {
  * Work for the jobs Lambda (`./jobs.ts`), which may take longer than the API's 28 s: a source
  * check the API starts, or the day's settling of predictions (#139), on a schedule or by hand.
  */
-export type Job = { kind: "source"; id: string; n: number } | { kind: "settle"; limit?: number };
+/**
+ * A job for the jobs Lambda. A source check carries the reader who asked for it (#179); settling
+ * runs on a schedule, for the owner until the daily jobs run per reader.
+ */
+export type Job =
+  { kind: "source"; id: string; n: number; reader?: string } | { kind: "settle"; limit?: number };
 
 /** A question answered from the newsletters (#21). */
 export interface AskPort {

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { Reader } from "@library/core/reader";
 import { createJobHandler } from "../src/jobs.js";
 
 const stats = {
@@ -17,10 +18,19 @@ const stats = {
 function setup() {
   const checker = { check: vi.fn(async () => ({})) };
   const settler = { settleDue: vi.fn(async () => stats) };
-  return { checker, settler, handler: createJobHandler({ checker, settler }) };
+  const workFor = vi.fn((_reader?: Reader) => ({ checker, settler }));
+  return { checker, settler, workFor, handler: createJobHandler(workFor) };
 }
 
 describe("jobs", () => {
+  it("runs a source check for the reader who asked for it (#179)", async () => {
+    const { workFor, handler } = setup();
+    await handler({ kind: "source", id: "tldr", n: 2, reader: "reader-1" });
+    expect(workFor).toHaveBeenLastCalledWith({ id: "reader-1" });
+    await handler({ kind: "source", id: "tldr", n: 2 });
+    expect(workFor).toHaveBeenLastCalledWith(undefined);
+  });
+
   it("runs a source check, and throws what it throws so the Lambda counts the error", async () => {
     const { checker, handler } = setup();
     await handler({ kind: "source", id: "tldr", n: 2 });

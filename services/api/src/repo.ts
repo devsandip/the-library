@@ -106,6 +106,7 @@ import type {
   UnreadCountsResponse,
   View,
 } from "@library/core/types";
+import type { Reader } from "@library/core/reader";
 import { badRequest, conflict, notFound } from "./errors.js";
 import type { ListOptions, RepoPort } from "./port.js";
 import type { AuditStore } from "./audit.js";
@@ -382,6 +383,11 @@ export class DynamoRepo
   private readonly table: string;
   private readonly bucket: string;
   private readonly stage: string;
+  /**
+   * Whose library this is (#179). Every read and write will be scoped to it once the keys carry
+   * the reader (milestone 13); until then all readers share the one library.
+   */
+  readonly reader?: Reader;
   /** Issue embeddings already read (they do not change); see `embeddings`. */
   private readonly vectorCache = new Map<string, Float32Array>();
 
@@ -389,9 +395,11 @@ export class DynamoRepo
     table: string;
     bucket: string;
     stage: string;
+    reader?: Reader;
     ddb?: DynamoDBClient;
     s3?: S3Client;
   }) {
+    this.reader = opts.reader;
     this.table = opts.table;
     this.bucket = opts.bucket;
     this.stage = opts.stage;
