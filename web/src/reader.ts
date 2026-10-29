@@ -1,22 +1,25 @@
-import { useEffect, useRef } from "preact/hooks";
+import { useCallback, useEffect, useRef } from "preact/hooks";
 import type { IssueListItem } from "@library/core/types";
 import { useIssueActions, type IssueChange } from "./actions.js";
 import { useApp } from "./context.js";
 import { useAsync } from "./hooks.js";
 import { useLibrary } from "./library.js";
 import { useReadingPlace } from "./components/now-reading.js";
+import { useHighlighting } from "./highlighting.js";
 
 /**
  * One open issue, on either device. Opening it marks it read and makes it the Continue item
  * (rules 18 and 19); the place is kept as a share of the issue while it scrolls (#44) and put
  * back on the next visit. The actions change it here and tell the list beside it (`onChange`).
  * A visit that starts on one of its stories (`onStory`: from Learning, #81) reads that story, not
- * the issue, so the issue keeps its state.
+ * the issue, so the issue keeps its state. Its highlights are marked in the page (#167); `hl`
+ * opens it at one of them instead of at its place.
  */
 export function useOpenIssue(
   id: string,
   onChange?: (id: string, change: Partial<IssueListItem>) => void,
   onStory = false,
+  hl?: string,
 ) {
   const { api } = useApp();
   const { counts, nowReading } = useLibrary();
@@ -45,27 +48,38 @@ export function useOpenIssue(
     }
   }, [issue.data]);
 
-  const onFit = useReadingPlace(id, issue.data?.position, (issueId, place, keepalive) => {
-    // The Continue pill keeps up; a finished issue leaves it.
-    nowReading.set((cur) => {
-      const n = cur.nowReading;
-      if (n?.issue.id !== issueId) return cur;
-      return place >= 1
-        ? {}
-        : { nowReading: { ...n, position: place, at: new Date().toISOString() } };
-    });
-    const pointed = nowReading.data?.nowReading?.issue.id === issueId;
-    void api.savePosition(issueId, place, keepalive).then(
-      // A place saved in another issue moves Continue to it.
-      () => !pointed && place < 1 && nowReading.reload(),
-      () => undefined,
-    );
-  });
+  const { fit, jump, ...highlights } = useHighlighting(issue, hl);
+  const onPlace = useReadingPlace(
+    id,
+    issue.data?.position,
+    (issueId, place, keepalive) => {
+      // The Continue pill keeps up; a finished issue leaves it.
+      nowReading.set((cur) => {
+        const n = cur.nowReading;
+        if (n?.issue.id !== issueId) return cur;
+        return place >= 1
+          ? {}
+          : { nowReading: { ...n, position: place, at: new Date().toISOString() } };
+      });
+      const pointed = nowReading.data?.nowReading?.issue.id === issueId;
+      void api.savePosition(issueId, place, keepalive).then(
+        // A place saved in another issue moves Continue to it.
+        () => !pointed && place < 1 && nowReading.reload(),
+        () => undefined,
+      );
+    },
+    jump,
+  );
+  // Marked first, so a highlight to open at is there to scroll to.
+  const onFit = useCallback((frame: HTMLIFrameElement) => {
+    fit(frame);
+    onPlace(frame);
+  }, []);
 
   const patch = (issueId: string, change: IssueChange) => {
     if (issueId === id) issue.set((d) => ({ ...d, ...change }));
     latest.current?.(issueId, change);
   };
   const actions = useIssueActions({ patch });
-  return { issue, onFit, actions };
+  return { issue, onFit, actions, highlights };
 }

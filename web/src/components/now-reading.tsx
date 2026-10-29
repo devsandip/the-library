@@ -20,7 +20,8 @@ const INPUTS = ["wheel", "touchstart", "keydown", "mousedown"] as const;
  */
 class Place {
   private frame?: HTMLIFrameElement;
-  private target?: number;
+  /** Puts the reader back: at the saved place, or at a highlight (#167). */
+  private restore?: (v: FrameView) => void;
   private deadline = 0;
   private moved = false;
   private finished = false;
@@ -48,7 +49,7 @@ class Place {
     removeEventListener("pagehide", this.onPageHide);
   }
 
-  fit(frame: HTMLIFrameElement, start: number | undefined) {
+  fit(frame: HTMLIFrameElement, start: number | undefined, jump?: () => boolean) {
     // Input over the newsletter happens in the frame's own document.
     const doc = frame.contentDocument;
     if (doc && !this.docs.includes(doc)) {
@@ -57,14 +58,16 @@ class Place {
     }
     if (!this.frame) {
       this.saved = start ?? 0;
-      if (start !== undefined && start > 0 && start < 1) {
-        this.target = start;
-        this.deadline = Date.now() + RESTORE_MS;
+      // Opened at a highlight, the reader goes to it rather than to the saved place.
+      if (jump) this.restore = () => void jump();
+      else if (start !== undefined && start > 0 && start < 1) {
+        this.restore = (v) => scrollTo(0, scrollFor(start, v));
       }
+      if (this.restore) this.deadline = Date.now() + RESTORE_MS;
     }
     this.frame = frame;
     const v = this.view();
-    if (v && this.target !== undefined && this.restoring()) scrollTo(0, scrollFor(this.target, v));
+    if (v && this.restoring()) this.restore?.(v);
   }
 
   private view(): FrameView | undefined {
@@ -75,7 +78,7 @@ class Place {
   }
 
   private restoring(): boolean {
-    return this.target !== undefined && !this.moved && Date.now() < this.deadline;
+    return this.restore !== undefined && !this.moved && Date.now() < this.deadline;
   }
 
   private readonly onScroll = () => {
@@ -129,16 +132,18 @@ class Place {
 /**
  * Puts the reader back at its place in an issue and saves the place while it scrolls (#44).
  * `start` is the place the issue opened with; `save` gets each new place (1 means finished),
- * with `keepalive` when the page may be going away. Returns the frame's `onFit`.
+ * with `keepalive` when the page may be going away. `jump`, when the issue is opened at a
+ * highlight (#167), scrolls to it instead. Returns the frame's `onFit`.
  */
 export function useReadingPlace(
   id: string,
   start: number | undefined,
   save: (id: string, place: number, keepalive: boolean) => void,
+  jump?: () => boolean,
 ): (frame: HTMLIFrameElement) => void {
   const place = useRef<Place | undefined>(undefined);
-  const latest = useRef({ start, save });
-  latest.current = { start, save };
+  const latest = useRef({ start, save, jump });
+  latest.current = { start, save, jump };
 
   useEffect(() => {
     const p = new Place((value, keepalive) => latest.current.save(id, value, keepalive));
@@ -148,7 +153,8 @@ export function useReadingPlace(
   }, [id]);
 
   return useCallback(
-    (frame: HTMLIFrameElement) => place.current?.fit(frame, latest.current.start),
+    (frame: HTMLIFrameElement) =>
+      place.current?.fit(frame, latest.current.start, latest.current.jump),
     [],
   );
 }

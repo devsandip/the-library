@@ -148,9 +148,9 @@ export function PullToRefresh() {
 }
 
 /**
- * A bottom sheet (the Topics, Senders and Show sheets): a modal dialog, so focus stays inside and
- * Escape closes it; a tap on the scrim closes it too. Changes apply live; Clear resets that part
- * and Done closes.
+ * A bottom sheet (the Topics, Senders and Show sheets, a highlight's): a modal dialog, so focus
+ * stays inside and Escape closes it; a tap on the scrim closes it too. Changes apply live; Clear
+ * resets that part and Done closes. `class` adds to the sheet's own.
  */
 export function Sheet({
   open,
@@ -159,6 +159,7 @@ export function Sheet({
   onClear,
   children,
   tall = false,
+  class: extra,
 }: {
   open: boolean;
   title: string;
@@ -166,6 +167,7 @@ export function Sheet({
   onClear?: () => void;
   children: ComponentChildren;
   tall?: boolean;
+  class?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -177,7 +179,7 @@ export function Sheet({
   return (
     <dialog
       ref={dialog}
-      class={`sheet${tall ? " tall" : ""}`}
+      class={`sheet${tall ? " tall" : ""}${extra ? ` ${extra}` : ""}`}
       aria-label={title}
       onClose={onClose}
       onClick={(e) => {

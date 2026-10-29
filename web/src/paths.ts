@@ -47,7 +47,7 @@ export type Screen =
   | { name: "newsletter"; slug: string }
   | { name: "status" }
   | { name: "settings" }
-  | { name: "issue"; id: string; story?: number; deep?: Deep }
+  | { name: "issue"; id: string; story?: number; deep?: Deep; hl?: string }
   | {
       name: "queue";
       tab: QueueTab;
@@ -55,6 +55,7 @@ export type Screen =
       id?: string;
       story?: number;
       deep?: Deep;
+      hl?: string;
     }
   | { name: "not-found" };
 
@@ -76,6 +77,9 @@ const storyOf = (v: string | undefined) => {
   return Number.isInteger(n) && n > 0 ? n : undefined;
 };
 const deepOf = (v: string | undefined) => DEEPS.find((d) => d === v);
+/** A highlight to open an issue at (#167): `<issueId>.<key>`. */
+const hlOf = (v: string | undefined) =>
+  v && /^[A-Za-z0-9_-]{1,64}\.[0-9a-z]{12}$/.test(v) ? v : undefined;
 
 export function readBrowse(q: Query): BrowseFilters {
   return {
@@ -126,6 +130,13 @@ const storyPath = (story?: number, deep?: Deep) =>
 
 export const issueHref = (id: string, story?: number, deep?: Deep) =>
   `${BASE}/issue/${encodeURIComponent(id)}${storyPath(story, deep)}`;
+
+/** A view of an issue opened at one of its highlights (#167), on either device. */
+export const withHighlight = (href: string, hl: string | undefined) =>
+  hl ? `${href}${href.includes("?") ? "&" : "?"}hl=${encodeURIComponent(hl)}` : href;
+
+/** The issue opened at a highlight, from the Highlights page. */
+export const highlightHref = (issueId: string, hl: string) => withHighlight(issueHref(issueId), hl);
 
 export function queueHref(
   tab: QueueTab,
@@ -209,7 +220,7 @@ export function parse(path: string, q: Query): Screen {
       break;
     case "issue": {
       if (!a) break;
-      if (!b) return { name: "issue", id: a };
+      if (!b) return { name: "issue", id: a, hl: hlOf(q.hl) };
       const story = b === "story" ? storyOf(c) : undefined;
       if (story === undefined || (d && !deepOf(d)) || parts.length > 5) break;
       return { name: "issue", id: a, story, deep: deepOf(d) };
@@ -222,7 +233,15 @@ export function parse(path: string, q: Query): Screen {
         return tab === "saved" ? { name: "saved" } : { name: "queue", tab, filters: readQueue(q) };
       const story = b === "story" ? storyOf(c) : undefined;
       if (b && (story === undefined || (d && !deepOf(d)) || parts.length > 5)) break;
-      return { name: "queue", tab, filters: readQueue(q), id: a, story, deep: deepOf(d) };
+      return {
+        name: "queue",
+        tab,
+        filters: readQueue(q),
+        id: a,
+        story,
+        deep: deepOf(d),
+        hl: story ? undefined : hlOf(q.hl),
+      };
     }
   }
   return { name: "not-found" };
@@ -281,12 +300,15 @@ export function redirect(path: string, q: Query, wide: boolean): string | undefi
     }
     // The console opens an issue under News until it knows the issue's shelf.
     if (screen.name === "issue") {
-      return queueHref("news", DEFAULT_QUEUE, screen.id, screen.story, screen.deep);
+      return withHighlight(
+        queueHref("news", DEFAULT_QUEUE, screen.id, screen.story, screen.deep),
+        screen.hl,
+      );
     }
     return undefined;
   }
   if (screen.name === "queue") {
-    if (screen.id) return issueHref(screen.id, screen.story, screen.deep);
+    if (screen.id) return withHighlight(issueHref(screen.id, screen.story, screen.deep), screen.hl);
     if (screen.tab === "news") return todayHref();
     const f = screen.filters;
     return browseHref({ kind: "learning", show: f.show, topics: f.topics, senders: f.senders });

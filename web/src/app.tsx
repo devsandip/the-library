@@ -169,7 +169,15 @@ function Phone({ screen }: { screen: Screen }) {
       view = <LibraryHome />;
       break;
     case "issue":
-      view = <Reader key={screen.id} id={screen.id} story={screen.story} deep={screen.deep} />;
+      view = (
+        <Reader
+          key={screen.id}
+          id={screen.id}
+          story={screen.story}
+          deep={screen.deep}
+          hl={screen.hl}
+        />
+      );
       break;
     default:
       view = libraryPage(screen, false) ?? <NotFound />;

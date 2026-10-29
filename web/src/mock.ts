@@ -8,6 +8,13 @@ import { byVerdict, suggest } from "@library/core/audit";
 import { followOrder, followView, type StoredFollow } from "@library/core/follow";
 import { storyRef } from "@library/core/stories";
 import { issueDoc, queryTerms, rankByWords, storyDoc } from "@library/core/search";
+import {
+  cleanNote,
+  cleanQuote,
+  HIGHLIGHT_MAX,
+  newHighlightKey,
+  sameQuote,
+} from "@library/core/highlights";
 import type {
   AskResponse,
   AuditCard,
@@ -19,6 +26,8 @@ import type {
   Follow,
   FollowingResponse,
   FollowPoint,
+  Highlight,
+  HighlightQuote,
   HistoryResponse,
   IssueDetailResponse,
   IssueListItem,
@@ -451,7 +460,7 @@ function sampleHtml(subject: string, publication: string): string {
   const parts = [1, 2, 3, 4, 5, 6]
     .map(
       (n) => `<h2 style="font-size:20px">Part ${n}</h2>
-<p>${`This is placeholder body text for part ${n}, for local development. `.repeat(10)}</p>
+<p>${Array.from({ length: 10 }, (_, k) => `Sentence ${k + 1} of part ${n} is placeholder text for local development. `).join("")}</p>
 ${n % 2 ? `<img src="${PLACEHOLDER_IMAGE}" width="600" alt="illustration ${n}">` : ""}`,
     )
     .join("\n");
@@ -495,6 +504,32 @@ for (const [id, hours] of [
   const i = issues.find((x) => x.id === id);
   if (i && i.state !== "archived") i.savedAt = new Date(now - hours * HOUR).toISOString();
 }
+
+/**
+ * Kept passages (#167). The first issue starts with two: one with a note, and one its page no
+ * longer holds, which the reader lists under the issue.
+ */
+const highlights = new Map<string, Highlight>();
+for (const [exact, hours, note] of [
+  ["Newsletters arrive as 600 pixel wide tables like this one.", 3, "The reason the frame scales."],
+  ["A passage from an older version of this issue, gone from its page.", 2, undefined],
+] as const) {
+  const at = now - hours * HOUR;
+  const h: Highlight = {
+    id: `mock-1.${newHighlightKey(at)}`,
+    issueId: "mock-1",
+    exact,
+    prefix: "",
+    suffix: "",
+    ...(note ? { note } : {}),
+    createdAt: new Date(at).toISOString(),
+  };
+  highlights.set(h.id, h);
+}
+const issueHighlights = (id: string) =>
+  [...highlights.values()]
+    .filter((h) => h.issueId === id)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
 /** Today's top 5 as first shown, like the API's digest log, and when. */
 let mockDigest: string[] | undefined;
@@ -987,8 +1022,45 @@ export class MockLibraryApi implements LibraryApi {
       fromAddr: "hello@example.test",
       unsubscribeUrl: "https://example.test/unsubscribe",
       ...(position > 0 && position < 1 ? { position } : {}),
-      highlights: [],
+      highlights: issueHighlights(id),
     };
+  }
+  async addHighlight(issueId: string, quote: HighlightQuote, note?: string): Promise<Highlight> {
+    await delay(120);
+    find(issueId);
+    const q = cleanQuote(quote);
+    if (!q.exact || q.exact.length > HIGHLIGHT_MAX) throw new Error("passage too long or empty");
+    const kept = issueHighlights(issueId).find((h) => sameQuote(h, q));
+    if (kept) return kept;
+    const at = Date.now();
+    const n = note === undefined ? undefined : cleanNote(note);
+    const h: Highlight = {
+      id: `${issueId}.${newHighlightKey(at)}`,
+      issueId,
+      ...q,
+      ...(n ? { note: n } : {}),
+      createdAt: new Date(at).toISOString(),
+    };
+    highlights.set(h.id, h);
+    return h;
+  }
+  async setHighlightNote(id: string, note: string | null): Promise<Highlight> {
+    await delay(80);
+    const h = highlights.get(id);
+    if (!h) throw new Error("highlight not found");
+    const { note: _old, ...rest } = h;
+    const n = note === null ? undefined : cleanNote(note);
+    const next: Highlight = {
+      ...rest,
+      ...(n ? { note: n } : {}),
+      updatedAt: new Date().toISOString(),
+    };
+    highlights.set(id, next);
+    return next;
+  }
+  async deleteHighlight(id: string): Promise<void> {
+    await delay(80);
+    highlights.delete(id);
   }
   async setState(id: string, state: ReaderState) {
     await delay(80);

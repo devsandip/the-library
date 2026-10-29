@@ -9,6 +9,8 @@ import type {
   PredictionsResponse,
   PredictionView,
   HistoryResponse,
+  Highlight,
+  HighlightQuote,
   IssueDetailResponse,
   IssueListItem,
   IssueListResponse,
@@ -123,6 +125,14 @@ export interface LibraryApi {
   dismissTuneup(id: string): Promise<TuneupResponse>;
   /** Sandip's verdict on a prediction, or null to hand it back to settling. */
   setVerdict(id: string, verdict: Exclude<PredictionStatus, "open"> | null): Promise<Prediction>;
+  /**
+   * Keeps a passage of the issue (#167), with a note if given. The same passage in the same place
+   * again answers the one kept.
+   */
+  addHighlight(issueId: string, quote: HighlightQuote, note?: string): Promise<Highlight>;
+  /** A highlight's note, or none with null. */
+  setHighlightNote(id: string, note: string | null): Promise<Highlight>;
+  deleteHighlight(id: string): Promise<void>;
   /** What the newsletters said (#53): by words, then by meaning. */
   search(q: string, sort: SearchSort): Promise<SearchResponse>;
   listSenders(): Promise<SenderListResponse>;
@@ -315,6 +325,18 @@ export class HttpLibraryApi implements LibraryApi {
     return this.request<Prediction>("PATCH", `/predictions/${encodeURIComponent(id)}`, {
       verdict,
     });
+  }
+  addHighlight(issueId: string, quote: HighlightQuote, note?: string) {
+    return this.request<Highlight>("POST", `/issues/${encodeURIComponent(issueId)}/highlights`, {
+      ...quote,
+      ...(note ? { note } : {}),
+    });
+  }
+  setHighlightNote(id: string, note: string | null) {
+    return this.request<Highlight>("PATCH", `/highlights/${encodeURIComponent(id)}`, { note });
+  }
+  deleteHighlight(id: string) {
+    return this.request<void>("DELETE", `/highlights/${encodeURIComponent(id)}`);
   }
   search(q: string, sort: SearchSort) {
     const query = new URLSearchParams({ q });

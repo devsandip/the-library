@@ -12,6 +12,7 @@ import { useOpenIssue } from "../reader.js";
 import { useSource, useTakes, useTimeline } from "../timeline.js";
 import { KIND_WORD } from "../sentence.js";
 import { NewsletterFrame } from "../components/newsletter-frame.js";
+import { HighlightButton, HighlightSheet, LostHighlights } from "../components/highlights.js";
 import { isWebLink } from "../components/peek.js";
 import { Thumbs } from "../components/thumbs.js";
 import { namesLine, RelatedList } from "../components/story.js";
@@ -36,16 +37,32 @@ function fromLabel(path: string | undefined): string {
  * Reading an issue on the phone (P4): a way back and the original on top, the issue's header,
  * then the newsletter's own page, never recoloured, scaled to the column. The action bar at the
  * bottom: thumbs up and down (was it useful?), Save, Archive, and the stories of a digest. A story
- * opens as a sheet over the page.
+ * opens as a sheet over the page. A passage selected in the page can be highlighted (#167); `hl`
+ * opens the issue at one.
  */
-export function Reader({ id, story, deep }: { id: string; story?: number; deep?: Deep }) {
+export function Reader({
+  id,
+  story,
+  deep,
+  hl,
+}: {
+  id: string;
+  story?: number;
+  deep?: Deep;
+  hl?: string;
+}) {
   const { route } = useLocation();
   const [from] = useState(() => {
     const prev = previousPath();
     // Opened from its own story sheet's URL: the way back is still where the reader came from.
     return fromLabel(prev?.startsWith(issueHref(id)) ? undefined : prev);
   });
-  const { issue, onFit, actions } = useOpenIssue(id, undefined, story !== undefined);
+  const { issue, onFit, actions, highlights } = useOpenIssue(
+    id,
+    undefined,
+    story !== undefined,
+    hl,
+  );
   const stories = useStories(id).data?.stories ?? [];
   const storyActions = useStoryActions();
   const digest = stories.length > 1;
@@ -143,6 +160,9 @@ export function Reader({ id, story, deep }: { id: string; story?: number; deep?:
       <div class="page">
         <NewsletterFrame html={d.html} title={d.subject} onFit={onFit} />
       </div>
+      <LostHighlights h={highlights} />
+      <HighlightButton h={highlights} />
+      <HighlightSheet h={highlights} />
 
       <div class="action-bar" role="toolbar" aria-label="Issue actions">
         <Thumbs issue={d} actions={actions} class="act thumb" />
