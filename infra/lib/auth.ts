@@ -2,6 +2,7 @@ import { Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
 import {
   AccountRecovery,
   CfnManagedLoginBranding,
+  CfnUserPoolGroup,
   FeaturePlan,
   ManagedLoginVersion,
   Mfa,
@@ -56,6 +57,15 @@ export class Auth extends Construct {
       },
       deletionProtection: true,
       removalPolicy: RemovalPolicy.RETAIN,
+    });
+
+    // Operators (#224) see how the mail runs went and may check the mail now. The owner always
+    // may; others are added by hand (README, "The operator group"). The name matches
+    // OPERATORS_GROUP in packages/core/src/reader.ts.
+    new CfnUserPoolGroup(this, "Operators", {
+      userPoolId: this.userPool.userPoolId,
+      groupName: "operators",
+      description: "Nutgraf operators: Status's mail runs and Check now",
     });
 
     this.userPool.addDomain("Domain", {

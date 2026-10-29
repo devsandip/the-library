@@ -261,6 +261,10 @@ describe("auth and API (prod)", () => {
     });
   });
 
+  it("an operators group (#224)", () => {
+    t.hasResourceProperties("AWS::Cognito::UserPoolGroup", { GroupName: "operators" });
+  });
+
   it("managed login v2 on the fixed prefix, with a branding resource", () => {
     t.hasResourceProperties("AWS::Cognito::UserPoolDomain", {
       Domain: "thelibrary-sandip",

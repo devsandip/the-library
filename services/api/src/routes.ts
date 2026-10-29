@@ -10,11 +10,12 @@ import type {
   SearchSort,
   SenderPatch,
   Shelf,
+  StatusResponse,
   StoryPatch,
   StoryState,
   View,
 } from "@library/core/types";
-import { badRequest, HttpError, notFound, tooMany } from "./errors.js";
+import { badRequest, forbidden, HttpError, notFound, tooMany } from "./errors.js";
 import type { Services } from "./port.js";
 
 export const API_PREFIX = "/nutgraf/api";
@@ -25,6 +26,8 @@ export interface Request {
   path: string;
   query: Record<string, string | undefined>;
   body?: string;
+  /** The Cognito groups the reader's token names (#224). */
+  groups?: readonly string[];
 }
 
 export interface Response {
@@ -527,7 +530,8 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
   {
     method: "POST",
     pattern: /^\/ingest$/,
-    handler: async (svc) => {
+    handler: async (svc, req) => {
+      if (!(await svc.operator(req.groups ?? []))) throw forbidden("operators only");
       await svc.startIngest();
       return { status: 202, body: { started: true } };
     },
@@ -535,7 +539,13 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
   {
     method: "GET",
     pattern: /^\/status$/,
-    handler: async (svc) => ok(await svc.repo.status()),
+    handler: async (svc, req) => {
+      const [s, operator] = await Promise.all([svc.repo.status(), svc.operator(req.groups ?? [])]);
+      if (operator) return ok({ ...s, operator });
+      // A reader's own: their ranking and their last check, without the runs' workings (#224).
+      const own: StatusResponse = { stage: s.stage, operator, digestStats: s.digestStats };
+      return ok(s.lastRunAt ? { ...own, lastRunAt: s.lastRunAt } : own);
+    },
   },
 ];
 

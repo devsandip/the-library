@@ -19,7 +19,10 @@ export function digestLine(s: DigestStats): string {
   );
 }
 
-/** Status: the last Gmail check and what Claude did, the ranking's hit rate, and sign out. */
+/**
+ * Status: the ranking's hit rate and sign out; for an operator (#224), the last Gmail check and
+ * what Claude did, and checking now. A reader who is not one sees their own status only.
+ */
 export function Status({ wide }: { wide: boolean }) {
   const { auth } = useApp();
   const { status, refresh, refreshing } = useLibrary();
@@ -30,6 +33,7 @@ export function Status({ wide }: { wide: boolean }) {
   const enrich = s?.lastEnrich;
   const stories = s?.lastStories;
   const shelves = s?.lastShelves;
+  const operator = s?.operator ?? false;
 
   return (
     <Page
@@ -49,18 +53,37 @@ export function Status({ wide }: { wide: boolean }) {
         <dl class="facts">
           <dt>Signed in as</dt>
           <dd>{auth?.email() ?? "mock user"}</dd>
-          <dt>Stage</dt>
-          <dd>{s.stage}</dd>
+          {operator && (
+            <>
+              <dt>Stage</dt>
+              <dd>{s.stage}</dd>
+            </>
+          )}
           {s.digestStats && s.digestStats.shown > 0 && (
             <>
               <dt>Ranking</dt>
               <dd>{digestLine(s.digestStats)}</dd>
             </>
           )}
-          <dt>Last check</dt>
-          <dd>
-            {s.lastRunAt ? `${clock(s.lastRunAt)}, ${relativeTime(s.lastRunAt)}` : "Not yet run"}
-          </dd>
+          {(operator || s.lastRunAt) && (
+            <>
+              <dt>Last check</dt>
+              <dd>
+                {s.lastRunAt
+                  ? `${clock(s.lastRunAt)}, ${relativeTime(s.lastRunAt)}`
+                  : "Not yet run"}
+              </dd>
+            </>
+          )}
+          {!operator && !s.lastRunAt && (
+            <>
+              <dt>Newsletters</dt>
+              <dd>
+                Getting your newsletters into Nutgraf is coming: you'll forward them to a private
+                address, or connect Gmail.
+              </dd>
+            </>
+          )}
           {run && (
             <>
               <dt>Last run</dt>
@@ -131,17 +154,19 @@ export function Status({ wide }: { wide: boolean }) {
         </dl>
       )}
       <div class="page-actions">
-        <button
-          type="button"
-          class="btn fill"
-          disabled={refreshing}
-          onClick={() => {
-            setAsked(true);
-            void refresh();
-          }}
-        >
-          {refreshing ? "Checking Gmail…" : "Check Gmail now"}
-        </button>
+        {operator && (
+          <button
+            type="button"
+            class="btn fill"
+            disabled={refreshing}
+            onClick={() => {
+              setAsked(true);
+              void refresh();
+            }}
+          >
+            {refreshing ? "Checking Gmail…" : "Check Gmail now"}
+          </button>
+        )}
         {auth && (
           <button type="button" class="btn line" onClick={() => void auth.signOut()}>
             Sign out

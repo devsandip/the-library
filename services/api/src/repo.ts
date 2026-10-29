@@ -2899,7 +2899,7 @@ export class DynamoRepo
 
   // ---------- status ----------
 
-  async status(): Promise<StatusResponse> {
+  async status(): Promise<Omit<StatusResponse, "operator">> {
     const [res, digestStats] = await Promise.all([
       this.ddb.send(new GetCommand({ TableName: this.table, Key: this.k.ingestState })),
       this.digestStats(),

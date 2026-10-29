@@ -81,8 +81,8 @@ const BBG = senderIdentity("bytebytego@substack.com", "").senderId;
 async function call<T = unknown>(
   method: string,
   path: string,
-  /** `sub`: another reader than the tests' own (#198). */
-  opts: { query?: Record<string, string>; body?: unknown; sub?: string } = {},
+  /** `sub`: another reader than the tests' own (#198); `groups`: their Cognito groups (#224). */
+  opts: { query?: Record<string, string>; body?: unknown; sub?: string; groups?: string } = {},
 ): Promise<{ status: number; body: T }> {
   const event = {
     version: "2.0",
@@ -94,7 +94,16 @@ async function call<T = unknown>(
     isBase64Encoded: false,
     requestContext: {
       http: { method, path: `/nutgraf/api${path}` },
-      authorizer: { jwt: { claims: { sub: opts.sub ?? INT_READER.id }, scopes: [] } },
+      authorizer: {
+        jwt: {
+          claims: {
+            sub: opts.sub ?? INT_READER.id,
+            // As API Gateway passes an array claim on: one string in brackets.
+            ...(opts.groups ? { "cognito:groups": opts.groups } : {}),
+          },
+          scopes: [],
+        },
+      },
     },
   };
   const res = await lambda.send(
@@ -432,8 +441,9 @@ describe("API on dev", () => {
     ).toBe(204);
   });
 
-  it("reports status and accepts a refresh request", async () => {
-    expect((await call<StatusResponse>("GET", "/status")).body.stage).toBe("dev");
+  it("reports status and accepts a refresh request from the owner, an operator (#224)", async () => {
+    const s = (await call<StatusResponse>("GET", "/status")).body;
+    expect(s).toMatchObject({ stage: "dev", operator: true });
     expect((await call("POST", "/ingest")).status).toBe(202);
   });
 
@@ -2119,6 +2129,22 @@ describe("two readers on dev (#198)", () => {
     expect(
       (await call<SearchResponse>("GET", "/search", { ...other, query: q })).body.items,
     ).toEqual([]);
+  });
+
+  it("sees their own status and may not check the mail, unless an operator (#224)", async () => {
+    const own = await call<StatusResponse>("GET", "/status", other);
+    expect(own.status).toBe(200);
+    expect(own.body.operator).toBe(false);
+    expect(Object.keys(own.body).sort()).toEqual(
+      ["digestStats", "operator", "stage", ...(own.body.lastRunAt ? ["lastRunAt"] : [])].sort(),
+    );
+    expect(await call("POST", "/ingest", other)).toMatchObject({
+      status: 403,
+      body: { error: "operators only" },
+    });
+
+    const op = await call<StatusResponse>("GET", "/status", { ...other, groups: "[operators]" });
+    expect(op.body.operator).toBe(true);
   });
 
   it("keeps settings apart", async () => {
