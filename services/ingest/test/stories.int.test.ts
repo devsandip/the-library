@@ -116,7 +116,7 @@ describe("story index on dev", () => {
     expect(await get(devKeys.story(id, 2))).toMatchObject({
       headline: "only",
       shelf: "learning",
-      shelfSetBy: "sandip",
+      shelfSetBy: "reader",
       state: "read",
     });
     // Read, so not in the unread Learning index; the other story carries nothing.

@@ -14,10 +14,10 @@ export type View = "unread" | "all" | "archived" | "saved";
 export type Shelf = "news" | "learning";
 /**
  * Who decided an issue's shelf. `stories`: it follows its stories (#81), Learning when every one
- * is. An issue with no stories: the sender's "always" setting, Sandip moving it, or, before #81,
- * Claude.
+ * is. An issue with no stories: the sender's "always" setting, the reader moving it ("reader";
+ * "sandip" before #181), or, before #81, Claude.
  */
-export type ShelfSetBy = "stories" | "claude" | "sender" | "sandip";
+export type ShelfSetBy = "stories" | "claude" | "sender" | "reader" | "sandip";
 
 export interface Topic {
   name: string;
@@ -722,8 +722,8 @@ export interface Prediction {
   settledAt?: string;
   why?: string;
   evidence?: PredictionEvidence[];
-  /** Sandip's own verdict (#140), which is never settled again. */
-  setBy?: "sandip";
+  /** The reader's own verdict (#140), which is never settled again; "sandip" before #181. */
+  setBy?: "reader" | "sandip";
 }
 
 /** A later story that settles a prediction (#139). */
@@ -788,8 +788,11 @@ export interface StoryStats {
   durationMs: number;
 }
 
-/** Who decided a story's shelf (#81): Jev, the newsletter's "always" setting, or Sandip moving it. */
-export type StoryShelfSetBy = "jev" | "sender" | "sandip";
+/**
+ * Who decided a story's shelf (#81): Jev, the newsletter's "always" setting, or the reader moving
+ * it ("reader"; "sandip" on moves stored before #181).
+ */
+export type StoryShelfSetBy = "jev" | "sender" | "reader" | "sandip";
 /** A Learning story's own state (#81), apart from its issue's. Absent means unread. */
 export type StoryState = "unread" | "read" | "archived";
 

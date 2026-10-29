@@ -5,7 +5,7 @@
  * The story's shelf is its effective one (Sandip's move, then its newsletter's setting, then
  * Jev), and its issue's shelf follows its stories.
  */
-import { shelfFor, storyIndexAttributes, storyRef, storyShelf } from "@library/core";
+import { byReader, shelfFor, storyIndexAttributes, storyRef, storyShelf } from "@library/core";
 import type {
   Shelf,
   ShelfDeriveStats,
@@ -85,7 +85,7 @@ export async function shelveStories(
     store.enrichCandidates(opts.sinceIso),
   ]);
   const todo = stories.filter((s) =>
-    opts.force ? s.shelfSetBy !== "sandip" : s.learning === undefined,
+    opts.force ? !byReader(s.shelfSetBy) : s.learning === undefined,
   );
   stats.checked = todo.length;
   const touched = new Set<string>();

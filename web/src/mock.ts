@@ -1343,7 +1343,7 @@ export class MockLibraryApi implements LibraryApi {
     if (!p) throw new Error("no such prediction");
     const { setBy: _s, why: _w, evidence: _e, settledAt: _a, ...rest } = p;
     const next: Prediction = verdict
-      ? { ...p, status: verdict, setBy: "sandip", settledAt: new Date().toISOString() }
+      ? { ...p, status: verdict, setBy: "reader", settledAt: new Date().toISOString() }
       : { ...rest, status: "open" };
     predictions.set(id, next);
     return next;

@@ -327,7 +327,7 @@ describe("API on dev", () => {
 
     const moved = await call("PATCH", "/issues/fx-pragmatic", { body: { shelf: "news" } });
     expect(moved.body).toMatchObject({ shelf: "news" });
-    expect(await getItem("fx-pragmatic")).toMatchObject({ shelfSetBy: "sandip" });
+    expect(await getItem("fx-pragmatic")).toMatchObject({ shelfSetBy: "reader" });
 
     expect(
       (await call("PATCH", `/senders/${LENNY}`, { body: { shelf: "learning" } })).body,
@@ -1078,8 +1078,8 @@ describe("API on dev", () => {
     await call("PATCH", `/issues/${id}`, { body: { shelf: "learning" } });
     expect(await shelves()).toEqual({
       stories: [
-        ["learning", "sandip", "LEARNING"],
-        ["learning", "sandip", "LEARNING"],
+        ["learning", "reader", "LEARNING"],
+        ["learning", "reader", "LEARNING"],
       ],
       issue: ["learning", "stories"],
     });
@@ -1087,8 +1087,8 @@ describe("API on dev", () => {
     expect(back.body).toMatchObject({ shelf: "news" });
     expect(await shelves()).toEqual({
       stories: [
-        ["news", "sandip", "-"],
-        ["news", "sandip", "-"],
+        ["news", "reader", "-"],
+        ["news", "reader", "-"],
       ],
       issue: ["news", "stories"],
     });
@@ -1529,7 +1529,7 @@ describe("API on dev", () => {
     const overruled = await call<Prediction>("PATCH", "/predictions/fx-tldr.1", {
       body: { verdict: "wrong" },
     });
-    expect(overruled.body).toMatchObject({ status: "wrong", setBy: "sandip" });
+    expect(overruled.body).toMatchObject({ status: "wrong", setBy: "reader" });
     const sender = await call<SenderDetailResponse>("GET", `/senders/${tldr.senderId}`);
     expect(sender.body.record).toEqual({ right: 0, wrong: 1, unclear: 0, open: 0 });
 

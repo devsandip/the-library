@@ -271,12 +271,15 @@ describe("carriedOver (#98)", () => {
   ];
   const s = (headline: string, link?: string) => ({ headline, summary: "S.", names: [], link });
 
-  it("keeps Sandip's move and the read state of the old story with the same link", () => {
+  it("keeps the reader's move and the read state of the old story with the same link", () => {
+    // A move stored before #181 says "sandip"; carried, it says "reader".
     expect(carriedOver(s("A new headline", "https://a.test/1"), old)).toEqual({
       shelf: "learning",
-      shelfSetBy: "sandip",
+      shelfSetBy: "reader",
       state: "read",
     });
+    const moved = [{ ...old[0]!, shelfSetBy: "reader" }];
+    expect(carriedOver(s("A new headline", "https://a.test/1"), moved).shelfSetBy).toBe("reader");
   });
 
   it("matches on the headline's words when the link does not, and leaves Jev's shelf to Jev", () => {
