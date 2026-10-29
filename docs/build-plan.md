@@ -11,7 +11,7 @@ Every milestone ends with `pnpm test`, `pnpm lint` and `pnpm typecheck` green, a
 
 Open work (fixes, new features, the rest of Phase 2) is tracked as [GitHub issues](https://github.com/devsandip/the-library/issues). This file keeps the plan for each phase.
 
-**Opening Nutgraf to any reader** (2026-10-29): milestones 11 to 17 in [features/multi-reader.md](features/multi-reader.md).
+**Opening Nutgraf to any reader** (2026-10-29): milestones 11 to 15, then mail in, Google sign-in and launch, in [features/multi-reader.md](features/multi-reader.md).
 
 ## Status (2026-10-10)
 

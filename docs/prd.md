@@ -22,7 +22,7 @@ A private, single-user web reader that ingests my newsletters daily, ranks them 
 
 ## Who it is for (updated 2026-10-29)
 
-Nutgraf is for anyone. It runs for one reader, Sandip, while the app is tested; at a broader launch anyone can sign up. The single-user lines in this brief describe that testing phase, not the product. Features are designed for any reader, on their own devices and tools: a reader's personal setup (an Obsidian vault, one Gmail account) is never the product. What was built for one reader: `docs/reports/2026-10-29-single-reader-audit.md`. The plan to open it: `docs/features/multi-reader.md`.
+Nutgraf is for anyone. It runs for one reader, Sandip, while the app is tested; at a broader launch anyone can sign up. The single-user lines in this brief describe that testing phase, not the product. Features are designed for any reader, on their own devices and tools: a reader's personal setup (an Obsidian vault, one Gmail account) is never the product. What was built for one reader: `docs/reports/2026-10-29-single-reader-audit.md`. The plan to open it: `docs/features/multi-reader.md`. Decided 2026-10-29: Nutgraf stays at `sandip.dev/nutgraf`; readers sign up with an email address and sign in with a one-time code or link by email; Google sign-in and mail in come later.
 
 ## Name and tone
 
@@ -48,7 +48,7 @@ Nutgraf is for anyone. It runs for one reader, Sandip, while the app is tested; 
 
 ## Sources
 
-My sources while testing; after launch, each reader's newsletters arrive at their own address.
+My sources while testing; after launch, each reader's newsletters come in by connecting their Gmail or by forwarding to a private address (which one is decided later).
 
 - Gmail labels: `Newsletters` (id `Label_244609042207730416`) and `Meco_97675919-0d09-4077-a165-9d5569fa1957` (id `Label_18`)
 - Also include these senders, which currently land in the inbox unlabeled: ByteByteGo (`bytebytego@substack.com`), The Pragmatic Engineer (`pragmaticengineer@substack.com`, `pragmaticengineer+deepdives@substack.com`), Lenny's Newsletter (`lenny*@substack.com`)
