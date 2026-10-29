@@ -1,4 +1,4 @@
-import { READER_TIME_ZONE } from "@library/core/days";
+import { readerZone } from "./zone.js";
 import type { Narrative } from "@library/core/types";
 
 /** "3h ago", "yesterday", "Oct 2". */
@@ -32,7 +32,7 @@ export function age(iso: string, now = Date.now()): string {
   const d = Math.floor(h / 24);
   if (d < 7) return `${d}d`;
   return new Date(iso).toLocaleDateString("en-GB", {
-    timeZone: READER_TIME_ZONE,
+    timeZone: readerZone(),
     day: "numeric",
     month: "short",
   });
@@ -40,13 +40,12 @@ export function age(iso: string, now = Date.now()): string {
 
 /** "Today", "6 Oct", or "Mar 2025" from another year: the dates on a timeline. */
 export function shortDate(iso: string, now = Date.now()): string {
-  const day = (t: number) =>
-    new Date(t).toLocaleDateString("en-CA", { timeZone: READER_TIME_ZONE });
+  const day = (t: number) => new Date(t).toLocaleDateString("en-CA", { timeZone: readerZone() });
   if (day(Date.parse(iso)) === day(now)) return "Today";
   const d = new Date(iso);
   const sameYear = day(Date.parse(iso)).slice(0, 4) === day(now).slice(0, 4);
   return d.toLocaleDateString("en-GB", {
-    timeZone: READER_TIME_ZONE,
+    timeZone: readerZone(),
     ...(sameYear ? { day: "numeric", month: "short" } : { month: "short", year: "numeric" }),
   });
 }
@@ -54,7 +53,7 @@ export function shortDate(iso: string, now = Date.now()): string {
 /** "06:14", in the reader's time zone, 24-hour: the mono meta lines and "Checked 12:30". */
 export function clock(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-GB", {
-    timeZone: READER_TIME_ZONE,
+    timeZone: readerZone(),
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
@@ -65,7 +64,7 @@ export function clock(iso: string): string {
 export function dateShort(now = new Date()): string {
   return now
     .toLocaleDateString("en-GB", {
-      timeZone: READER_TIME_ZONE,
+      timeZone: readerZone(),
       weekday: "short",
       day: "numeric",
       month: "short",
@@ -79,13 +78,13 @@ export function narrativeLine(n: Narrative, now = Date.now()): string {
   return `${n.stories} stories from ${papers}, updated ${relativeTime(n.at, now)}.`;
 }
 
-/** Noon of a reader's day, safe to format in the reader's time zone. */
-const noonOf = (day: string) => new Date(`${day}T12:00:00+05:30`);
+/** Noon UTC of a day, formatted in UTC: the day's own date, whatever the reader's zone. */
+const noonOf = (day: string) => new Date(`${day}T12:00:00Z`);
 
 /** "Friday 9 October", for read history's day (#42). */
 export function dayLine(day: string): string {
   return noonOf(day).toLocaleDateString(undefined, {
-    timeZone: READER_TIME_ZONE,
+    timeZone: "UTC",
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -95,7 +94,7 @@ export function dayLine(day: string): string {
 /** "Thu 8 Oct", for read history's previous and next buttons. */
 export function shortDay(day: string): string {
   return noonOf(day).toLocaleDateString(undefined, {
-    timeZone: READER_TIME_ZONE,
+    timeZone: "UTC",
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -105,7 +104,7 @@ export function shortDay(day: string): string {
 /** "6:42 PM" (or "18:42", by locale), when an issue was opened. */
 export function clockTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, {
-    timeZone: READER_TIME_ZONE,
+    timeZone: readerZone(),
     hour: "numeric",
     minute: "2-digit",
   });

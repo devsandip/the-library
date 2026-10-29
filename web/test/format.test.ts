@@ -1,5 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { age, clock, narrativeLine, reasonCode, reasonLine, shortDate } from "../src/format.js";
+import { afterEach, describe, expect, it } from "vitest";
+import { READER_TIME_ZONE } from "@library/core/days";
+import { setReaderZone } from "../src/zone.js";
+import {
+  age,
+  clock,
+  dayLine,
+  narrativeLine,
+  reasonCode,
+  reasonLine,
+  shortDate,
+  shortDay,
+} from "../src/format.js";
 import { digestLine } from "../src/pages/status.js";
 
 describe("digestLine", () => {
@@ -69,5 +80,19 @@ describe("ranking reasons", () => {
     );
     expect(reasonCode("Just in", undefined)).toBe("Just in");
     expect(reasonCode(undefined, "Tech")).toBe("Tech");
+  });
+});
+
+describe("in the reader's time zone (#185)", () => {
+  afterEach(() => setReaderZone(READER_TIME_ZONE));
+
+  it("shows clocks and dates in the reader's zone, and a day as its own date", () => {
+    const iso = "2026-10-29T03:30:00.000Z";
+    expect(clock(iso)).toBe("09:00");
+    setReaderZone("America/New_York");
+    expect(clock(iso)).toBe("23:30");
+    expect(shortDate(iso, Date.parse("2026-10-30T12:00:00Z"))).toBe("28 Oct");
+    expect(dayLine("2026-10-29")).toMatch(/29/);
+    expect(shortDay("2026-11-01")).toMatch(/1/);
   });
 });

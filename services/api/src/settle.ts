@@ -6,7 +6,8 @@
  * it. Unclear ones are tried again a fortnight later, three times in all. Sandip's own verdicts
  * are never settled again.
  */
-import { claudeCents, readerDay, READER } from "@library/core";
+import type { ReaderSettings } from "@library/core/settings";
+import { addDays, claudeCents, readerDay, READER, READER_TIME_ZONE } from "@library/core";
 import type {
   Prediction,
   PredictionEvidence,
@@ -56,11 +57,10 @@ export interface SettleStore {
   listPredictions(): Promise<StoredPrediction[]>;
   /** Writes the settlement unless Sandip has set a verdict since. */
   settlePrediction(id: string, s: Settlement): Promise<void>;
+  /** The owner's settings: their day decides what is due (#185). */
+  settings(): Promise<ReaderSettings>;
   listSenders(): Promise<SenderListItem[]>;
 }
-
-const addDays = (day: string, days: number) =>
-  new Date(Date.parse(`${day}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 
 /** Whether a prediction is due to be settled today: due, not Sandip's, open or unclear to retry. */
 export function settleable(p: StoredPrediction, today: string): boolean {
@@ -69,7 +69,12 @@ export function settleable(p: StoredPrediction, today: string): boolean {
   return p.status === "unclear" && (p.tries ?? 0) < SETTLE_TRIES && (p.nextTry ?? today) <= today;
 }
 
-export function settleRequest(p: Prediction, items: AskItem[], today: string): ToolRequest {
+export function settleRequest(
+  p: Prediction,
+  items: AskItem[],
+  today: string,
+  timeZone = READER_TIME_ZONE,
+): ToolRequest {
   return {
     system: [
       `You settle one prediction from a reader's newsletters against what their later ` +
@@ -96,13 +101,13 @@ export function settleRequest(p: Prediction, items: AskItem[], today: string): T
     user: [
       `Prediction: ${p.text}`,
       `Who: ${p.who}${p.own ? ` (${p.publication}'s own call)` : ""}`,
-      `Said: ${readerDay(Date.parse(p.saidAt))} in ${p.publication}: "${p.quote}"`,
+      `Said: ${readerDay(Date.parse(p.saidAt), timeZone)} in ${p.publication}: "${p.quote}"`,
       `Due: ${p.due}`,
       "",
       ...items.map((i) =>
         [
           i.id,
-          readerDay(Date.parse(i.receivedAt)),
+          readerDay(Date.parse(i.receivedAt), timeZone),
           i.publication,
           `${i.headline}. ${i.summary}`,
           i.names.join(", ") || "-",
@@ -180,7 +185,8 @@ export class Settler {
   /** Settles today's due predictions, at most `limit`, oldest due first. */
   async settleDue(limit = SETTLE_PER_DAY): Promise<SettleStats> {
     const started = this.now();
-    const today = readerDay(started);
+    const { timeZone } = await this.store.settings();
+    const today = readerDay(started, timeZone);
     const stats: SettleStats = {
       due: 0,
       right: 0,
@@ -205,7 +211,7 @@ export class Settler {
         try {
           const eligible = (issueId: string) =>
             issueId !== p.issueId && !muted.has(corpus.issues.get(issueId)?.senderId ?? "");
-          const from = addDays(readerDay(Date.parse(p.saidAt)), 1);
+          const from = addDays(readerDay(Date.parse(p.saidAt), timeZone), 1);
           const vector = await this.embedder.embed(p.text);
           const keys = searchStories(
             { query: p.text, from, to: today },
@@ -213,6 +219,7 @@ export class Settler {
             corpus,
             eligible,
             SETTLE_STORIES,
+            timeZone,
           );
           const items = askItems(keys, corpus);
           const tries = (p.tries ?? 0) + 1;
@@ -222,7 +229,7 @@ export class Settler {
             stats.nothingFound++;
             s = { ...base, status: "unclear", why: NOTHING_SINCE, evidence: [] };
           } else {
-            const res = await this.claude.callTool(settleRequest(p, items, today));
+            const res = await this.claude.callTool(settleRequest(p, items, today, timeZone));
             stats.inputTokens += res.inputTokens;
             stats.outputTokens += res.outputTokens;
             s = {

@@ -1,5 +1,5 @@
 import { useState } from "preact/hooks";
-import { readerDay } from "@library/core/days";
+import { today } from "../zone.js";
 import type { IssueListItem } from "@library/core/types";
 import { BASE } from "../config.js";
 import { shortDate } from "../format.js";
@@ -93,7 +93,7 @@ export function Highlights({ wide }: { wide: boolean }) {
                 type="date"
                 class="btn line sm"
                 value={since}
-                max={readerDay(Date.now())}
+                max={today()}
                 onInput={(e) => setSince((e.target as HTMLInputElement).value)}
               />
             </label>

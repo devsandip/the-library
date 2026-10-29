@@ -1,5 +1,6 @@
 import { useLocation } from "preact-iso";
-import { isReaderDay, readerDay } from "@library/core/days";
+import { isReaderDay } from "@library/core/days";
+import { today as todayInZone } from "../zone.js";
 import type { HistoryItem } from "@library/core/types";
 import { useApp } from "../context.js";
 import { patchIssue } from "../data.js";
@@ -19,7 +20,7 @@ import { openHref, Page } from "./page.js";
 export function History({ day: asked, wide }: { day?: string; wide: boolean }) {
   const { api } = useApp();
   const { route } = useLocation();
-  const today = readerDay(Date.now());
+  const today = todayInZone();
   const day = asked && isReaderDay(asked) && asked <= today ? asked : today;
   const history = useAsync(() => api.history(day), [day], `history:${day}`);
   useScrollMemory(history.status === "ok");

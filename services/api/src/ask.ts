@@ -8,11 +8,13 @@
  * Two Haiku calls of under a cent each and a few Titan embeddings, about 10 seconds, so it fits
  * the API's time limit with no background job. Nothing is kept.
  */
+import type { ReaderSettings } from "@library/core/settings";
 import {
   claudeCents,
   isReaderDay,
   queryTerms,
   READER,
+  READER_TIME_ZONE,
   readerDay,
   readerDayBounds,
   searchIssues,
@@ -55,6 +57,8 @@ export interface AskSearch {
 /** Where Ask reads which newsletters are muted. DynamoRepo implements it; tests use a fake. */
 export interface AskSource {
   listSenders(): Promise<SenderListItem[]>;
+  /** The reader's settings: their days for "last week" and the dates Claude reads (#185). */
+  settings(): Promise<ReaderSettings>;
 }
 
 /** One line of the answer's input. */
@@ -159,9 +163,10 @@ export function searchStories(
   corpus: Pick<Corpus, "docs" | "stories" | "issues">,
   eligible: (issueId: string) => boolean,
   limit = ASK_STORIES,
+  timeZone = READER_TIME_ZONE,
 ): string[] {
-  const from = search.from ? readerDayBounds(search.from).from : "";
-  const to = search.to ? readerDayBounds(search.to).to : "￿";
+  const from = search.from ? readerDayBounds(search.from, timeZone).from : "";
+  const to = search.to ? readerDayBounds(search.to, timeZone).to : "￿";
   const ok = (issueId: string) => {
     const at = corpus.issues.get(issueId)?.receivedAt;
     return at !== undefined && at >= from && at <= to && eligible(issueId);
@@ -216,7 +221,12 @@ export function askItems(
     .map((i, k) => ({ id: String(k + 1), ...i }));
 }
 
-export function answerRequest(q: string, items: AskItem[], today: string): ToolRequest {
+export function answerRequest(
+  q: string,
+  items: AskItem[],
+  today: string,
+  timeZone = READER_TIME_ZONE,
+): ToolRequest {
   return {
     system: [
       `You answer one reader's question from the stories in their own newsletters. ${READER} ` +
@@ -241,7 +251,7 @@ export function answerRequest(q: string, items: AskItem[], today: string): ToolR
       ...items.map((i) =>
         [
           i.id,
-          readerDay(Date.parse(i.receivedAt)),
+          readerDay(Date.parse(i.receivedAt), timeZone),
           i.publication,
           `${i.headline}. ${i.summary}`,
           i.names.join(", ") || "-",
@@ -337,7 +347,8 @@ export class Asks implements AskPort {
 
   async ask(q: string): Promise<AskResponse> {
     const started = this.now();
-    const today = readerDay(started);
+    const { timeZone } = await this.source.settings();
+    const today = readerDay(started, timeZone);
     const [corpus, senders, plan] = await Promise.all([
       this.corpus.load(),
       this.source.listSenders(),
@@ -350,17 +361,18 @@ export class Asks implements AskPort {
     // The searches share the stories: one search reads up to 30, three up to 10 each.
     const each = Math.ceil(ASK_STORIES / searches.length);
     const keys = interleave(
-      searches.map((s, k) => searchStories(s, vectors[k], corpus, eligible, each)),
+      searches.map((s, k) => searchStories(s, vectors[k], corpus, eligible, each, timeZone)),
     );
     const items = askItems(keys, corpus);
     let cents = claudeCents(plan.inputTokens, plan.outputTokens);
     const base = { q, searches: searches.map(searchLabel), stories: items.length };
     if (!items.length) {
-      const none = this.latestOutside(searches, vectors, corpus, eligible) ?? NOTHING_FOUND;
+      const none =
+        this.latestOutside(searches, vectors, corpus, eligible, timeZone) ?? NOTHING_FOUND;
       return { ...base, paragraphs: [], none, ms: this.now() - started, cents };
     }
 
-    const res = await this.claude.callTool(answerRequest(q, items, today));
+    const res = await this.claude.callTool(answerRequest(q, items, today, timeZone));
     cents = claudeCents(plan.inputTokens + res.inputTokens, plan.outputTokens + res.outputTokens);
     const answer = parseAnswer(res.input, items);
     const ms = this.now() - started;
@@ -389,11 +401,15 @@ export class Asks implements AskPort {
     vectors: ArrayLike<number>[],
     corpus: Corpus,
     eligible: (issueId: string) => boolean,
+    timeZone: string,
   ): string | undefined {
     for (const [k, s] of searches.entries()) {
       if (!s.from && !s.to) continue;
       const days = searchStories({ query: s.query }, vectors[k], corpus, eligible).map((key) =>
-        readerDay(Date.parse(corpus.issues.get(key.slice(0, key.lastIndexOf("#")))!.receivedAt)),
+        readerDay(
+          Date.parse(corpus.issues.get(key.slice(0, key.lastIndexOf("#")))!.receivedAt),
+          timeZone,
+        ),
       );
       if (days.length) return nothingThen(s, days.sort().at(-1)!);
     }

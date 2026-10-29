@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from "@library/core/settings";
 import { describe, expect, it, vi } from "vitest";
 import type { SenderListItem } from "@library/core/types";
 import {
@@ -208,7 +209,10 @@ describe("Asks", () => {
     };
     const embedder = { embed: vi.fn(async () => unit(1, 0, 0)) };
     const asks = new Asks(
-      { listSenders: async () => [sender("T"), sender("B"), sender("M", true)] },
+      {
+        listSenders: async () => [sender("T"), sender("B"), sender("M", true)],
+        settings: async () => DEFAULT_SETTINGS,
+      },
       new CorpusCache({ readCorpus: async () => ({ issues, stories }) }),
       embedder,
       claude,

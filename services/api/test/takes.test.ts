@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from "@library/core/settings";
 import { describe, expect, it, vi } from "vitest";
 import type { SenderListItem, Takes as TakesResult } from "@library/core/types";
 import type { ClaudePort, ToolRequest } from "../src/claude.js";
@@ -202,6 +203,7 @@ describe("Takes", () => {
   function setup(answer: unknown) {
     const kept = new Map<string, TakesResult>();
     const store: TakesStore = {
+      settings: vi.fn(async () => DEFAULT_SETTINGS),
       timelineStory: vi.fn(async (id: string, n: number) =>
         stories.some((s) => s.id === id && s.n === n) ? open(id, n) : undefined,
       ),

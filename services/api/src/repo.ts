@@ -1238,7 +1238,8 @@ export class DynamoRepo
    * days).
    */
   async history(day: string): Promise<HistoryResponse> {
-    const { from, to } = readerDayBounds(day);
+    const { timeZone } = await this.settings();
+    const { from, to } = readerDayBounds(day, timeZone);
     const [opens, before, after, senders] = await Promise.all([
       this.opensBetween(from, to),
       this.nearestOpen(from, "before"),
@@ -1264,8 +1265,8 @@ export class DynamoRepo
     return {
       day,
       items,
-      ...(before ? { previousDay: readerDay(Date.parse(before)) } : {}),
-      ...(after ? { nextDay: readerDay(Date.parse(after)) } : {}),
+      ...(before ? { previousDay: readerDay(Date.parse(before), timeZone) } : {}),
+      ...(after ? { nextDay: readerDay(Date.parse(after), timeZone) } : {}),
     };
   }
 
@@ -2291,6 +2292,7 @@ export class DynamoRepo
    */
   async summary(limit = 20): Promise<SummaryResponse> {
     const now = Date.now();
+    const { timeZone } = await this.settings();
     const since = new Date(now - CANDIDATE_DAYS * 86_400_000).toISOString();
     const [senders, interests, rated] = await Promise.all([
       this.listSenders(),
@@ -2336,11 +2338,11 @@ export class DynamoRepo
         return vector ? [{ ...r, vector }] : [];
       }),
       now,
-      day: readerDay(now),
+      day: readerDay(now, timeZone),
     });
     const byId = new Map(items.map((i) => [i.id as string, i]));
     const picked = pickTop(ranked, limit);
-    const day = readerDay(now);
+    const day = readerDay(now, timeZone);
     const [digest, digestStats, narrative] = await Promise.all([
       this.todaysDigest(
         day,
@@ -2475,7 +2477,10 @@ export class DynamoRepo
    * how many have a thumbs up (useful) and a thumbs down by now. The PRD's aim: 3 of every 5 up.
    */
   private async digestStats(now = Date.now()): Promise<DigestStats> {
-    const digests = await this.batchGet(recentDays(now, DIGEST_DAYS).map(digestKey), ["ids"]);
+    const { timeZone } = await this.settings();
+    const digests = await this.batchGet(recentDays(now, DIGEST_DAYS, timeZone).map(digestKey), [
+      "ids",
+    ]);
     const ids = [...new Set(digests.flatMap((d) => (d.ids as string[] | undefined) ?? []))];
     const rated = await this.batchGet(ids.map(issueKey), ["rating"]);
     return {
