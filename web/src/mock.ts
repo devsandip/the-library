@@ -78,6 +78,9 @@ import type { LibraryApi, ListIssuesOptions, ListLearningOptions } from "./api.j
 /** VITE_ONBOARDING=1 starts the mock as a new reader, who sees onboarding first (#221). */
 let mockOnboarded = import.meta.env.VITE_ONBOARDING !== "1";
 
+/** VITE_OPERATOR=0 starts the mock as a reader who is not an operator (#224). */
+const mockOperator = import.meta.env.VITE_OPERATOR !== "0";
+
 /** The reader's settings (#184): VITE_ZONE starts the mock in another time zone. */
 let mockSettings: ReaderSettings = {
   ...DEFAULT_SETTINGS,
@@ -1788,8 +1791,11 @@ export class MockLibraryApi implements LibraryApi {
   }
   async status(): Promise<StatusResponse> {
     await delay();
+    // A reader's own status, as the API answers it: no mail in yet, so no check (#224).
+    if (!mockOperator) return { stage: "mock", operator: false, digestStats: digestStats() };
     return {
       stage: "mock",
+      operator: true,
       digestStats: digestStats(),
       lastRunAt: new Date(now - 40 * 60_000).toISOString(),
       lastRunStats: {

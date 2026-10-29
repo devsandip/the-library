@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { HighlightQuote, IssueListItem, SenderListItem } from "@library/core/types";
 import { conflict, HttpError, notFound } from "../src/errors.js";
-import type { Reader } from "@library/core/reader";
+import { OPERATORS_GROUP, type Reader } from "@library/core/reader";
 import { DEFAULT_SETTINGS, type ReaderSettings } from "@library/core/settings";
 import { createHandler } from "../src/handler.js";
 import type { RepoPort, Services } from "../src/port.js";
@@ -91,7 +91,22 @@ function setup(overrides: Partial<RepoPort> = {}) {
       items: [{ ...issue, openedAt: "2026-10-10T03:00:00.000Z", via: "open" as const }],
       previousDay: "2026-10-08",
     })),
-    status: vi.fn(async () => ({ stage: "test", lastError: null })),
+    status: vi.fn(async () => ({
+      stage: "test",
+      lastError: null,
+      lastRunAt: "2026-10-30T03:00:00.000Z",
+      lastRunStats: {
+        query: "q",
+        listed: 3,
+        alreadyStored: 1,
+        newsletters: 2,
+        filtered: 0,
+        errors: 0,
+        errorSamples: [],
+        durationMs: 900,
+      },
+      digestStats: { days: 3, shown: 5, useful: 3, notUseful: 1 },
+    })),
     ...overrides,
   };
   const svc: Services = {
@@ -204,6 +219,7 @@ function setup(overrides: Partial<RepoPort> = {}) {
         onboarded: true,
       })),
     },
+    operator: vi.fn(async (groups: readonly string[]) => groups.includes(OPERATORS_GROUP)),
     startIngest: vi.fn(async () => undefined),
   };
   const servicesFor = vi.fn((_reader: Reader) => svc);
@@ -211,7 +227,7 @@ function setup(overrides: Partial<RepoPort> = {}) {
   const call = async (
     method: string,
     path: string,
-    opts: { query?: Record<string, string>; body?: unknown; sub?: unknown } = {},
+    opts: { query?: Record<string, string>; body?: unknown; sub?: unknown; groups?: unknown } = {},
   ) => {
     const res = (await handler({
       rawPath: `/nutgraf/api${path}`,
@@ -225,7 +241,14 @@ function setup(overrides: Partial<RepoPort> = {}) {
       isBase64Encoded: false,
       requestContext: {
         http: { method },
-        authorizer: { jwt: { claims: "sub" in opts ? { sub: opts.sub } : { sub: "reader-1" } } },
+        authorizer: {
+          jwt: {
+            claims: {
+              sub: "sub" in opts ? opts.sub : "reader-1",
+              ...(opts.groups === undefined ? {} : { "cognito:groups": opts.groups }),
+            },
+          },
+        },
       },
     } as never)) as { statusCode: number; body: string; headers: Record<string, string> };
     return {
@@ -862,11 +885,36 @@ describe("routing and validation", () => {
     expect(repo.updateSender).toHaveBeenLastCalledWith("s0123456789ab", { shelf: null });
   });
 
-  it("ingest starts a run and returns 202; status returns 200", async () => {
+  it("ingest starts a run and returns 202 for an operator; status returns 200", async () => {
     const { call, svc } = setup();
-    expect((await call("POST", "/ingest")).status).toBe(202);
+    expect((await call("POST", "/ingest", { groups: "[operators]" })).status).toBe(202);
     expect(svc.startIngest).toHaveBeenCalledOnce();
     expect((await call("GET", "/status")).body.stage).toBe("test");
+  });
+
+  it("reads the token's groups, as API Gateway hands them on (#224)", async () => {
+    const { call, svc } = setup();
+    await call("GET", "/status", { groups: "[operators readers]" });
+    expect(svc.operator).toHaveBeenLastCalledWith(["operators", "readers"]);
+    await call("GET", "/status");
+    expect(svc.operator).toHaveBeenLastCalledWith([]);
+  });
+
+  it("an operator sees the mail runs; a reader their own status, and may not check now (#224)", async () => {
+    const { call, svc } = setup();
+    const ops = await call("GET", "/status", { groups: "[operators]" });
+    expect(ops.body).toMatchObject({ operator: true, lastRunStats: { newsletters: 2 } });
+
+    const own = await call("GET", "/status");
+    expect(own.body).toEqual({
+      stage: "test",
+      operator: false,
+      lastRunAt: "2026-10-30T03:00:00.000Z",
+      digestStats: { days: 3, shown: 5, useful: 3, notUseful: 1 },
+    });
+    const refused = await call("POST", "/ingest");
+    expect(refused).toMatchObject({ status: 403, body: { error: "operators only" } });
+    expect(svc.startIngest).not.toHaveBeenCalled();
   });
 
   it("unknown paths 404, wrong methods 405, malformed ids 404", async () => {

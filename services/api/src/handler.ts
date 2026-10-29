@@ -2,7 +2,7 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 }
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { S3Client } from "@aws-sdk/client-s3";
-import { readerOf, type Reader } from "@library/core/reader";
+import { groupsOf, OPERATORS_GROUP, readerOf, type Reader } from "@library/core/reader";
 import type { Feature } from "@library/core/usage";
 import { Accounts } from "./account.js";
 import { Asks } from "./ask.js";
@@ -56,9 +56,13 @@ export function createHandler(servicesFor: (reader: Reader) => Services) {
     const req = toRequest(event);
     let status = 500;
     try {
-      const reader = readerOf(event.requestContext.authorizer?.jwt?.claims?.sub);
+      const claims = event.requestContext.authorizer?.jwt?.claims;
+      const reader = readerOf(claims?.sub);
       if (!reader) throw unauthorized();
-      const res = await route(servicesFor(reader), req);
+      const res = await route(servicesFor(reader), {
+        ...req,
+        groups: groupsOf(claims?.["cognito:groups"]),
+      });
       status = res.status;
       return {
         statusCode: res.status,
@@ -121,12 +125,13 @@ const claude = new BedrockClaude();
 
 /** A reader's services, with the caches they keep while the Lambda is warm. */
 function servicesOf(reader: Reader): Services {
+  const keyed = READER_KEYS === "1";
   const repo = new DynamoRepo({
     table: TABLE_NAME!,
     bucket: BUCKET_NAME!,
     stage: STAGE ?? "unknown",
     reader,
-    keyed: READER_KEYS === "1",
+    keyed,
     ddb,
     s3,
   });
@@ -151,6 +156,8 @@ function servicesOf(reader: Reader): Services {
     tuneup: new Tuneups(repo),
     settings: new Settings(repo, meteredEmbedder("interests", meter)),
     account: new Accounts(repo, reader, (job) => invokeAsync(JOBS_FUNCTION!, job)),
+    operator: async (groups) =>
+      !keyed || groups.includes(OPERATORS_GROUP) || (await repo.owner())?.id === reader.id,
     startIngest: () => invokeAsync(INGEST_FUNCTION!, {}),
   };
 }

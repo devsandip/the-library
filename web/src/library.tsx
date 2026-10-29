@@ -73,15 +73,18 @@ export function LibraryProvider({ children }: { children: ComponentChildren }) {
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await api.refreshNow();
-      await new Promise((r) => setTimeout(r, CHECK_WAIT_MS));
+      // Only an operator checks the mail now (#224); anyone else's pull reloads the lists.
+      if (status.data?.operator) {
+        await api.refreshNow();
+        await new Promise((r) => setTimeout(r, CHECK_WAIT_MS));
+      }
       counts.reload();
       status.reload();
       setEpoch((e) => e + 1);
     } finally {
       setRefreshing(false);
     }
-  }, [api, counts.reload, status.reload]);
+  }, [api, counts.reload, status.reload, status.data?.operator]);
 
   return (
     <LibraryCtx.Provider

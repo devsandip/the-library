@@ -100,7 +100,8 @@ export interface RepoPort {
   summary(): Promise<SummaryResponse>;
   /** Issues read on a reader's day (#42, #56), latest first, and the nearest days with reads. */
   history(day: string): Promise<HistoryResponse>;
-  status(): Promise<StatusResponse>;
+  /** The reader's mail runs and ranking; the route adds whether they are an operator (#224). */
+  status(): Promise<Omit<StatusResponse, "operator">>;
 }
 
 /** Search over what the newsletters said (#53). */
@@ -208,6 +209,11 @@ export interface Services {
   settings: SettingsPort;
   /** Deleting the reader's account (#220). */
   account: AccountPort;
+  /**
+   * Whether the reader is an operator (#224): in the operators group, or the owner, whose mail
+   * the runs read. On today's keys, with one library, every reader is.
+   */
+  operator(groups: readonly string[]): Promise<boolean>;
   /** Fire-and-forget ingest run ("refresh now"). */
   startIngest(): Promise<void>;
 }

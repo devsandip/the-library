@@ -843,6 +843,11 @@ export interface NarrativeStats {
 
 export interface StatusResponse {
   stage: string;
+  /**
+   * An operator (#224): the mail runs' details below are theirs, and so is checking the mail now.
+   * A reader who is not one is answered their own ranking and last check only.
+   */
+  operator: boolean;
   lastRunAt?: string;
   lastRunStats?: IngestStats;
   lastError?: string | null;

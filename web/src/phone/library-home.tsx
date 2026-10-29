@@ -33,6 +33,8 @@ const LATE_MS = 10 * 3_600_000;
 /** "Healthy · 12:30", "Late · 02:10", or "Error": the last Gmail check at a glance. */
 export function health(s: StatusResponse | undefined): { word: string; tone: string; at?: string } {
   if (!s) return { word: "…", tone: "" };
+  // A reader without mail in has no checks to report (#224).
+  if (!s.operator && !s.lastRunAt) return { word: "No mail yet", tone: "" };
   const at = s.lastRunAt ? clock(s.lastRunAt) : undefined;
   if (s.lastError) return { word: "Error", tone: "irr", at };
   if (!s.lastRunAt) return { word: "Not run yet", tone: "" };

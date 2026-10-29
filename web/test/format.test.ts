@@ -12,12 +12,26 @@ import {
   shortDay,
 } from "../src/format.js";
 import { digestLine } from "../src/pages/status.js";
+import { health } from "../src/phone/library-home.js";
 
 describe("digestLine", () => {
   it("states the share found useful against the aim", () => {
     expect(digestLine({ days: 4, shown: 20, useful: 7, notUseful: 3 })).toBe(
       "Today's five, last 14 days: 7 of 20 useful (35%), 3 not useful. The aim is 60%.",
     );
+  });
+});
+
+describe("health", () => {
+  it("reports the mail runs to an operator, and no mail to a reader without any (#224)", () => {
+    const at = new Date(Date.now() - 60_000).toISOString();
+    expect(health({ stage: "prod", operator: true }).word).toBe("Not run yet");
+    expect(health({ stage: "prod", operator: true, lastRunAt: at }).word).toBe("Healthy");
+    expect(health({ stage: "prod", operator: true, lastRunAt: at, lastError: "x" }).word).toBe(
+      "Error",
+    );
+    expect(health({ stage: "prod", operator: false })).toEqual({ word: "No mail yet", tone: "" });
+    expect(health({ stage: "prod", operator: false, lastRunAt: at }).word).toBe("Healthy");
   });
 });
 
