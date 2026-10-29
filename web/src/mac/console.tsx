@@ -20,6 +20,7 @@ import {
   searchHref,
   settingsHref,
   statusHref,
+  withHighlight,
   type QueueFilters,
   type QueueTab,
   type Screen,
@@ -48,6 +49,7 @@ import {
 import { health } from "../phone/library-home.js";
 import { ThumbIcon } from "../components/icons.js";
 import { NewsletterFrame } from "../components/newsletter-frame.js";
+import { HighlightButton, HighlightSheet, LostHighlights } from "../components/highlights.js";
 import { ContinueItem } from "../components/now-reading.js";
 import { isWebLink } from "../components/peek.js";
 import { namesLine, RelatedList } from "../components/story.js";
@@ -101,6 +103,7 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
   const filters: QueueFilters = screen.name === "queue" ? screen.filters : DEFAULT_QUEUE;
   const selected = screen.name === "queue" ? screen.id : undefined;
   const storyN = screen.name === "queue" ? screen.story : undefined;
+  const hl = screen.name === "queue" ? screen.hl : undefined;
 
   const queue = useQueue(tab, filters);
   const storyActions = useStoryActions(queue.patchStory);
@@ -125,6 +128,8 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
     issue?: IssueDetailResponse;
     stories: IssueStory[];
     actions?: IssueActions;
+    /** Highlight the passage selected in the page (#167); false when none is. */
+    keep?: () => boolean;
   }>({
     stories: [],
   });
@@ -144,7 +149,7 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
       const at = items.findIndex(
         (q) => q.issue.id === st.selected && (!q.story || q.story.n === st.storyN),
       );
-      const { issue, stories, actions } = reader.current;
+      const { issue, stories, actions, keep } = reader.current;
       const n = st.storyN ?? 1;
       // On Learning, E and M act on the open story itself (#81).
       const learningStory =
@@ -262,6 +267,9 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
             if (learningStory) storyActions.move(issue.id, learningStory);
             else actions.move(issue);
             return true;
+          case "h":
+            // Also heard in the frame, where the selection usually still has the keys (#167).
+            return keep?.() ?? false;
           case "o": {
             const link = stories.find((x) => x.n === n)?.link;
             const url = isWebLink(link) ? link : issue.viewOnlineUrl;
@@ -323,6 +331,7 @@ export function Console({ screen, page }: { screen: Screen; page?: preact.Compon
                 id={selected}
                 tab={tab}
                 storyN={storyN}
+                hl={hl}
                 storyActions={storyActions}
                 rank={queue.items.find((q) => q.issue.id === selected)}
                 onChange={queue.patch}
@@ -479,6 +488,7 @@ function MacReader({
   id,
   tab,
   storyN,
+  hl,
   storyActions,
   rank,
   onChange,
@@ -489,10 +499,17 @@ function MacReader({
   id: string;
   tab: QueueTab;
   storyN?: number;
+  /** A highlight to open the issue at (#167). */
+  hl?: string;
   storyActions: StoryActions;
   rank?: { rank: number; five: boolean };
   onChange: (id: string, change: Partial<IssueDetailResponse>) => void;
-  bind: (r: { issue?: IssueDetailResponse; stories: IssueStory[]; actions?: IssueActions }) => void;
+  bind: (r: {
+    issue?: IssueDetailResponse;
+    stories: IssueStory[];
+    actions?: IssueActions;
+    keep?: () => boolean;
+  }) => void;
   onStories: () => void;
   narrow: boolean;
 }) {
@@ -500,9 +517,9 @@ function MacReader({
   const { dark } = useTheme();
   // A Learning story is read on its own (#81): its issue keeps its state.
   const onStory = tab === "learning" && storyN !== undefined;
-  const { issue, onFit, actions } = useOpenIssue(id, onChange, onStory);
+  const { issue, onFit, actions, highlights } = useOpenIssue(id, onChange, onStory, hl);
   const stories = useStories(id).data?.stories ?? [];
-  bind({ issue: issue.data, stories, actions });
+  bind({ issue: issue.data, stories, actions, keep: highlights.keep });
   const learningStory = onStory
     ? stories.find((s) => s.n === storyN && s.shelf === "learning")
     : undefined;
@@ -514,7 +531,7 @@ function MacReader({
     const d = issue.data;
     if (!d || tab === "saved" || onStory) return;
     const shelf = d.shelf ?? "news";
-    if (shelf !== tab) route(queueHref(shelf, DEFAULT_QUEUE, d.id), true);
+    if (shelf !== tab) route(withHighlight(queueHref(shelf, DEFAULT_QUEUE, d.id), hl), true);
   }, [issue.data?.id]);
 
   if (issue.status === "loading") return <Skeleton rows={2} />;
@@ -628,6 +645,11 @@ function MacReader({
       <div class="page">
         <NewsletterFrame html={d.html} title={d.subject} onFit={onFit} />
       </div>
+      <div class="hl-dock">
+        <HighlightButton h={highlights} wide />
+      </div>
+      <LostHighlights h={highlights} />
+      <HighlightSheet h={highlights} />
     </article>
   );
 }

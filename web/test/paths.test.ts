@@ -7,6 +7,7 @@ import {
   predictionsHref,
   browseHref,
   DEFAULT_QUEUE,
+  highlightHref,
   issueHref,
   parse,
   queueHref,
@@ -14,6 +15,7 @@ import {
   redirect,
   searchHref,
   slug,
+  withHighlight,
 } from "../src/paths.js";
 
 // Tests run with Vite's BASE_URL of "/", so BASE is "" here; in the app it is "/nutgraf".
@@ -153,6 +155,18 @@ describe("redirect", () => {
     expect(redirect("/news/x/story/2", {}, false)).toBe("/issue/x/story/2");
     expect(redirect("/news", {}, false)).toBe("/today");
     expect(redirect("/learning", { show: "all" }, false)).toBe("/browse?kind=learning&show=all");
+  });
+
+  it("opens an issue at a highlight on either device (#167)", () => {
+    const hl = "mock-1.mh0abcd1wxyz";
+    expect(highlightHref("mock-1", hl)).toBe(`/issue/mock-1?hl=${hl}`);
+    expect(parse("/issue/mock-1", { hl })).toEqual({ name: "issue", id: "mock-1", hl });
+    expect(redirect("/issue/mock-1", { hl }, true)).toBe(`/news/mock-1?hl=${hl}`);
+    expect(redirect("/learning/mock-1", { show: "all", hl }, false)).toBe(`/issue/mock-1?hl=${hl}`);
+    expect(parse("/news/mock-1", { show: "all", hl })).toMatchObject({ id: "mock-1", hl });
+    expect(withHighlight("/news/mock-1?show=all", hl)).toBe(`/news/mock-1?show=all&hl=${hl}`);
+    // Not a highlight's id: ignored.
+    expect(parse("/issue/mock-1", { hl: "x" })).toEqual({ name: "issue", id: "mock-1" });
   });
 
   it("leaves a view that is already right alone", () => {

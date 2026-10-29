@@ -1459,6 +1459,135 @@ dialog {
   opacity: 0.4;
 }
 
+/* Highlights (#167): Highlight while a passage is selected, a highlight's sheet, and the ones the
+   page no longer shows. The marks themselves are styled in the frame (newsletter-frame.tsx). */
+.hl-button {
+  position: fixed;
+  z-index: 25;
+  left: 50%;
+  bottom: calc(68px + var(--safe-bottom));
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--fold);
+  color: #000;
+  font: 600 13px/1 var(--font-text);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  box-shadow: var(--shadow-card);
+  animation: fade 160ms ease-out;
+}
+
+/* On the Mac, at the foot of the screen under the reader's column, over the status line: a sticky
+   dock of no height, so it moves nothing as it comes and goes. */
+.hl-dock {
+  position: sticky;
+  z-index: 25;
+  bottom: 46px;
+  height: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.hl-button.wide {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  transform: translateY(-100%);
+}
+
+.hl-button .k {
+  opacity: 0.6;
+}
+
+/* On the Mac, a highlight's sheet is a card in the middle of the window, like ⌘K. */
+@media (min-width: 761px) {
+  .sheet.hl {
+    inset: 14vh 0 auto;
+    margin: 0 auto;
+    width: min(560px, calc(100vw - 32px));
+    min-height: 0;
+    border: 1px solid var(--line-2);
+    border-radius: 10px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  }
+
+  .sheet.hl .grabber {
+    display: none;
+  }
+}
+
+.hl-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+.hl-quote {
+  margin: 0 0 6px;
+  padding-left: 12px;
+  border-left: 3px solid var(--box);
+  font: 400 17px/1.45 var(--font-quote);
+  color: var(--ink-body);
+  max-height: 30dvh;
+  overflow: auto;
+}
+
+.hl-note {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: var(--bg);
+  font: 400 16px/1.4 var(--font-text);
+  resize: vertical;
+}
+
+.hl-remove {
+  align-self: flex-start;
+  color: var(--irr);
+}
+
+.hl-lost {
+  margin: 18px 12px 0;
+}
+
+.mac-reader .hl-lost {
+  margin: 18px 0 0;
+}
+
+.hl-lost-item {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  text-align: left;
+}
+
+.hl-lost-quote {
+  display: block;
+  padding-left: 10px;
+  border-left: 3px solid var(--box);
+  font: 400 15px/1.4 var(--font-quote);
+  color: var(--ink-body);
+}
+
+.hl-lost-note {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
 /* The story sheet: two heights, over the page or the whole screen. */
 .story-layer {
   position: fixed;

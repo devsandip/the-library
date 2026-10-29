@@ -4,7 +4,8 @@ import { useEffect, useRef } from "preact/hooks";
  * Renders sanitized newsletter HTML in a sandboxed srcdoc iframe. No allow-scripts, so nothing in
  * the email runs; allow-same-origin only lets this component measure the content to size the
  * frame. Always a white page, whatever the app theme: emails are designed for white, and the page
- * is never recoloured (dark mode dims it a little, in the stylesheet).
+ * is never recoloured (dark mode dims it a little, in the stylesheet). Highlights (#167) are
+ * marked in yellow with dark text, readable whatever the email's own colours.
  */
 const FRAME_STYLE = `
   html { background: #fff; }
@@ -12,6 +13,7 @@ const FRAME_STYLE = `
   img, video { max-width: 100% !important; height: auto !important; }
   pre { white-space: pre-wrap; }
   a { color: #2f5d8a; }
+  mark.nutgraf-hl { background: #ffe58a !important; color: #1d1d1b !important; border-radius: 2px; cursor: pointer; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 `;
 
 export function wrapNewsletter(html: string): string {
