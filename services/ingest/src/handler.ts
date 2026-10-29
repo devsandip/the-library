@@ -3,7 +3,7 @@ import type { Feature } from "@library/core/usage";
 import type { EnrichStats, PredictionStats, ShelfStats, StoryStats } from "@library/core/types";
 import { Bedrock } from "./bedrock.js";
 import { meteredJev, meteredModel } from "./meter.js";
-import { archiveOldNews, enrich, proposeTopics } from "./enrich.js";
+import { archiveOldNews, enrich, proposeTopics, setUpTopics } from "./enrich.js";
 import { checkFollows } from "./follow.js";
 import { Gmail, type GmailCredentials } from "./gmail.js";
 import { ingest } from "./ingest.js";
@@ -210,6 +210,14 @@ export async function handler(event: IngestEvent = {}) {
     maxMessages: event.maxMessages,
   });
   console.log(JSON.stringify({ level: "info", msg: "ingest done", ...stats }));
+  // A library without topics gets them once it has enough issues (#212), so they sort below.
+  await setUpTopics(store, model("topics"), { sinceIso: daysAgo(30) })
+    .then((p) => p && console.log(JSON.stringify({ level: "info", msg: "topics set up", ...p })))
+    .catch((err: Error) =>
+      console.error(
+        JSON.stringify({ level: "error", msg: "topics not set up", error: err.message }),
+      ),
+    );
   // New issues, plus any from the last two weeks that failed before. Enrichment problems are
   // reported on /status but never fail the run: reading works without summaries.
   // Then the 7-day rule for unread news.
