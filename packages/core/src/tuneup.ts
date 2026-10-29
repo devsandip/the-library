@@ -5,7 +5,7 @@
  * rules. No model is called; Jev's question stays as Sandip left it (2026-10-17). Applying a rule
  * is the newsletter's "always" setting, set by Sandip.
  */
-import { isUnsure, shelfFor, storyShelf } from "./shelves.js";
+import { byReader, isUnsure, shelfFor, storyShelf } from "./shelves.js";
 import type {
   AuditHeadline,
   SenderListItem,
@@ -60,7 +60,7 @@ const other = (s: Shelf): Shelf => (s === "learning" ? "news" : "learning");
 
 /** A story Sandip moved against Jev: Jev read it, and put it on the other shelf. */
 const against = (s: TuneupStory) =>
-  s.shelfSetBy === "sandip" && s.shelf !== undefined && s.learning !== undefined
+  byReader(s.shelfSetBy) && s.shelf !== undefined && s.learning !== undefined
     ? shelfFor(s.learning) !== s.shelf
     : false;
 
@@ -79,7 +79,7 @@ export function propose(
     .map((s) => ({ s, shelf: storyShelf(s).shelf }))
     .filter((x): x is { s: TuneupStory; shelf: Shelf } => x.shelf !== undefined);
   const fixed = shelved.filter((x) => x.shelf === shelf && against(x.s)).map((x) => x.s);
-  const contrary = shelved.some((x) => x.shelf === other(shelf) && x.s.shelfSetBy === "sandip");
+  const contrary = shelved.some((x) => x.shelf === other(shelf) && byReader(x.s.shelfSetBy));
   const onShelf = shelved.filter((x) => x.shelf === shelf).length;
   if (fixed.length < TUNEUP_MIN_FIXES || contrary || onShelf < TUNEUP_SHARE * shelved.length) {
     return undefined;
@@ -133,7 +133,7 @@ export function tuneup(data: TuneupData): TuneupResponse {
       if (!shelf) continue;
       r.stories++;
       if (shelf === "learning") r.learning++;
-      if (s.shelfSetBy !== "sandip") continue;
+      if (!byReader(s.shelfSetBy)) continue;
       r.moved++;
       if (!against(s)) continue;
       if (s.shelf === "learning") r.toLearning++;

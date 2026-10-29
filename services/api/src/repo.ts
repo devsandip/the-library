@@ -46,6 +46,8 @@ import {
   type InterestVector,
   type RelatedMatch,
   type StoredFollow,
+  byReader,
+  READER_MOVE,
 } from "@library/core";
 import type {
   DigestStats,
@@ -231,7 +233,7 @@ function toPrediction(i: Record<string, unknown>): StoredPrediction {
     ...(typeof i.settledAt === "string" ? { settledAt: i.settledAt } : {}),
     ...(typeof i.why === "string" ? { why: i.why } : {}),
     ...(Array.isArray(i.evidence) ? { evidence: i.evidence as StoredPrediction["evidence"] } : {}),
-    ...(i.setBy === "sandip" ? { setBy: "sandip" as const } : {}),
+    ...(byReader(i.setBy) ? { setBy: READER_MOVE } : {}),
     ...(typeof i.tries === "number" ? { tries: i.tries } : {}),
     ...(typeof i.nextTry === "string" ? { nextTry: i.nextTry } : {}),
   };
@@ -832,7 +834,7 @@ export class DynamoRepo
       prev: (item.shelf as string) ?? null,
     });
     if (!stories.length) {
-      if (item.shelf === shelf && item.shelfSetBy === "sandip") return toListItem(item);
+      if (item.shelf === shelf && byReader(item.shelfSetBy)) return toListItem(item);
       await this.transact([
         {
           Update: {
@@ -841,16 +843,16 @@ export class DynamoRepo
             UpdateExpression: "SET #sh = :sh, #by = :by",
             ConditionExpression: "attribute_exists(pk)",
             ExpressionAttributeNames: { "#sh": "shelf", "#by": "shelfSetBy" },
-            ExpressionAttributeValues: { ":sh": shelf, ":by": "sandip" },
+            ExpressionAttributeValues: { ":sh": shelf, ":by": READER_MOVE },
           },
         },
         event,
       ]);
-      return toListItem({ ...item, shelf, shelfSetBy: "sandip" });
+      return toListItem({ ...item, shelf, shelfSetBy: READER_MOVE });
     }
-    const moving = stories.filter((s) => s.shelf !== shelf || s.shelfSetBy !== "sandip");
+    const moving = stories.filter((s) => s.shelf !== shelf || !byReader(s.shelfSetBy));
     if (!moving.length && item.shelf === shelf) return toListItem(item);
-    for (const s of moving) await this.putStoryShelf(id, s, shelf, "sandip");
+    for (const s of moving) await this.putStoryShelf(id, s, shelf, READER_MOVE);
     await this.transact([
       {
         Update: {
@@ -961,9 +963,9 @@ export class DynamoRepo
     );
     if (!res.Item) throw notFound("story not found");
     let s: Item = res.Item;
-    if (patch.shelf && (s.shelf !== patch.shelf || s.shelfSetBy !== "sandip")) {
-      await this.putStoryShelf(id, s, patch.shelf, "sandip");
-      s = { ...s, shelf: patch.shelf, shelfSetBy: "sandip" };
+    if (patch.shelf && (s.shelf !== patch.shelf || !byReader(s.shelfSetBy))) {
+      await this.putStoryShelf(id, s, patch.shelf, READER_MOVE);
+      s = { ...s, shelf: patch.shelf, shelfSetBy: READER_MOVE };
       await this.deriveIssueShelf(id);
     }
     if (patch.state && patch.state !== ((s.state as StoryState | undefined) ?? "unread")) {
@@ -1669,8 +1671,8 @@ export class DynamoRepo
           Key: key,
           ...(verdict
             ? {
-                UpdateExpression: "SET #st = :v, setBy = :sandip, settledAt = :at",
-                ExpressionAttributeValues: { ":v": verdict, ":sandip": "sandip", ":at": at },
+                UpdateExpression: "SET #st = :v, setBy = :reader, settledAt = :at",
+                ExpressionAttributeValues: { ":v": verdict, ":reader": READER_MOVE, ":at": at },
               }
             : {
                 UpdateExpression:
@@ -2113,7 +2115,7 @@ export class DynamoRepo
         headline: s.headline as string,
         ...(typeof s.learning === "number" ? { learning: s.learning } : {}),
         ...(s.shelf === "news" || s.shelf === "learning" ? { shelf: s.shelf as Shelf } : {}),
-        ...(s.shelfSetBy === "jev" || s.shelfSetBy === "sender" || s.shelfSetBy === "sandip"
+        ...(s.shelfSetBy === "jev" || s.shelfSetBy === "sender" || byReader(s.shelfSetBy)
           ? { shelfSetBy: s.shelfSetBy as StoryShelfSetBy }
           : {}),
       })),
@@ -2183,12 +2185,17 @@ export class DynamoRepo
     const names = { "#sh": "shelf", "#by": "shelfSetBy" };
     const unstoried = (i: Item) => {
       const by = i.shelfSetBy as ShelfSetBy | undefined;
-      if (by === "sandip") return undefined;
+      if (byReader(by)) return undefined;
       if (shelf) {
         return {
           UpdateExpression: "SET #sh = :sh, #by = :by",
-          ConditionExpression: "attribute_not_exists(#by) OR #by <> :sandip",
-          ExpressionAttributeValues: { ":sh": shelf, ":by": "sender", ":sandip": "sandip" },
+          ConditionExpression: "attribute_not_exists(#by) OR NOT (#by IN (:sandip, :reader))",
+          ExpressionAttributeValues: {
+            ":sh": shelf,
+            ":by": "sender",
+            ":sandip": "sandip",
+            ":reader": READER_MOVE,
+          },
         };
       }
       if (by !== "sender") return undefined;

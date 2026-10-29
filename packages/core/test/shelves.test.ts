@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { issueShelf, shelfFor, storyIndexAttributes, storyShelf } from "../src/shelves.js";
+import {
+  byReader,
+  issueShelf,
+  shelfFor,
+  storyIndexAttributes,
+  storyShelf,
+} from "../src/shelves.js";
 
 describe("shelfFor", () => {
   it("puts 0.5 and up on Learning", () => {
@@ -11,6 +17,10 @@ describe("storyShelf", () => {
   it("is Sandip's move, then the newsletter's setting, then Jev", () => {
     const moved = { shelf: "news" as const, shelfSetBy: "sandip" as const, learning: 0.9 };
     expect(storyShelf(moved, "learning")).toEqual({ shelf: "news", shelfSetBy: "sandip" });
+    // Moves since #181 say "reader", and win the same way.
+    const now = { ...moved, shelfSetBy: "reader" as const };
+    expect(storyShelf(now, "learning")).toEqual({ shelf: "news", shelfSetBy: "reader" });
+    expect(byReader("reader") && byReader("sandip") && !byReader("jev")).toBe(true);
     expect(storyShelf({ learning: 0.9 }, "news")).toEqual({ shelf: "news", shelfSetBy: "sender" });
     expect(storyShelf({ learning: 0.9 })).toEqual({ shelf: "learning", shelfSetBy: "jev" });
     expect(storyShelf({ learning: 0.2 })).toEqual({ shelf: "news", shelfSetBy: "jev" });

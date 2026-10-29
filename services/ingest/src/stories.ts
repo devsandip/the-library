@@ -12,6 +12,8 @@ import {
   storyRef,
   storyText,
   type EventCandidate,
+  byReader,
+  READER_MOVE,
 } from "@library/core";
 import type { Shelf, StoryState, StoryStats } from "@library/core/types";
 import type { ModelPort, ToolRequest } from "./bedrock.js";
@@ -39,10 +41,10 @@ export interface NewStory extends ParsedStory {
   eventId: string;
 }
 
-/** What a story carries from before a re-split (#98): Sandip's move, and its own read state. */
+/** What a story carries from before a re-split (#98): the reader's move, and its own read state. */
 export interface Carried {
   shelf?: Shelf;
-  shelfSetBy?: "sandip";
+  shelfSetBy?: typeof READER_MOVE;
   state?: Exclude<StoryState, "unread">;
 }
 
@@ -72,8 +74,8 @@ export function carriedOver(s: ParsedStory, old: OldStory[]): Carried {
     old.find((o) => sameWords(o.headline) === sameWords(s.headline));
   if (!match) return {};
   return {
-    ...(match.shelfSetBy === "sandip" && match.shelf
-      ? { shelf: match.shelf, shelfSetBy: "sandip" as const }
+    ...(byReader(match.shelfSetBy) && match.shelf
+      ? { shelf: match.shelf, shelfSetBy: READER_MOVE }
       : {}),
     ...(match.state === "read" || match.state === "archived" ? { state: match.state } : {}),
   };

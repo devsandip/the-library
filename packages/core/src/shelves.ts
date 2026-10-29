@@ -24,6 +24,12 @@ export interface StoryShelfFields {
   learning?: number;
 }
 
+/** What a move the reader makes says it is by (#181). */
+export const READER_MOVE = "reader" as const;
+
+/** Whether a stored move is the reader's: "reader", or "sandip" on moves stored before #181. */
+export const byReader = (by: unknown): boolean => by === READER_MOVE || by === "sandip";
+
 /**
  * A story's effective shelf: Sandip's move, then its newsletter's "always" setting, then Jev.
  * Empty until one of them has decided.
@@ -32,7 +38,7 @@ export function storyShelf(
   s: StoryShelfFields,
   senderShelf?: Shelf,
 ): { shelf?: Shelf; shelfSetBy?: StoryShelfSetBy } {
-  if (s.shelfSetBy === "sandip" && s.shelf) return { shelf: s.shelf, shelfSetBy: "sandip" };
+  if (byReader(s.shelfSetBy) && s.shelf) return { shelf: s.shelf, shelfSetBy: s.shelfSetBy };
   if (senderShelf) return { shelf: senderShelf, shelfSetBy: "sender" };
   if (s.learning !== undefined) return { shelf: shelfFor(s.learning), shelfSetBy: "jev" };
   return {};
