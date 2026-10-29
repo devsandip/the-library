@@ -92,14 +92,21 @@ export async function shelveStories(
 
   if (todo.length) {
     const publication = new Map(issues.map((i) => [i.id, i.publication]));
-    const [port, settings] = await Promise.all([jev(), store.senderSettings()]);
+    const [port, settings, { about }] = await Promise.all([
+      jev(),
+      store.senderSettings(),
+      store.settings(),
+    ]);
     const shelve = async (s: ShelfCandidate) => {
       const d = await port.decide(
-        storyState({
-          publication: publication.get(s.issueId) ?? "",
-          headline: s.headline,
-          summary: s.summary,
-        }),
+        storyState(
+          {
+            publication: publication.get(s.issueId) ?? "",
+            headline: s.headline,
+            summary: s.summary,
+          },
+          about,
+        ),
         SHELF_QUESTIONS,
       );
       stats.inputTokens += d.inputTokens;

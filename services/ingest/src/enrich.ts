@@ -43,10 +43,11 @@ export interface Classification {
 export function classifyRequest(
   issue: { publication: string; subject: string; text: string },
   topics: Topic[],
+  about = READER,
 ): ToolRequest {
   return {
     system: [
-      `You sort newsletter issues for one reader. ${READER}`,
+      `You sort newsletter issues for one reader. ${about}`,
       "",
       "Call classify_issue for the issue the user sends:",
       "- summary: one plain sentence of at most 25 words on what the issue covers. Specific, no " +
@@ -105,10 +106,13 @@ export function parseClassification(input: unknown, topics: Topic[]): Classifica
   };
 }
 
-export function topicsRequest(issues: { publication: string; subject: string }[]): ToolRequest {
+export function topicsRequest(
+  issues: { publication: string; subject: string }[],
+  about = READER,
+): ToolRequest {
   return {
     system: [
-      `You design a short topic list for one reader's newsletters. ${READER}`,
+      `You design a short topic list for one reader's newsletters. ${about}`,
       "The user sends one line per issue: the newsletter's name, then the subject.",
       "Call propose_topics with 6 to 9 topics that group these issues by subject matter. Group " +
         "by subject, not by format: whether an issue is news or a deep dive is tracked " +
@@ -240,6 +244,7 @@ export async function enrich(
   model: ModelPort,
   opts: EnrichOptions,
 ): Promise<EnrichStats> {
+  const { about } = await store.settings();
   const started = Date.now();
   const [candidates, topics, senders] = await Promise.all([
     store.enrichCandidates(opts.sinceIso),
@@ -284,7 +289,7 @@ export async function enrich(
         if (!topics?.length) {
           stats.waitingForTopics++;
         } else {
-          const res = await model.callTool(classifyRequest({ ...issue, text }, topics));
+          const res = await model.callTool(classifyRequest({ ...issue, text }, topics, about));
           stats.inputTokens += res.inputTokens;
           stats.outputTokens += res.outputTokens;
           const c = parseClassification(res.input, topics);
@@ -367,7 +372,7 @@ export async function proposeTopics(
     store.getTopics(),
   ]);
   if (!issues.length) throw new Error("no stored issues to propose topics from");
-  const res = await model.callTool(topicsRequest(issues));
+  const res = await model.callTool(topicsRequest(issues, (await store.settings()).about));
   const topics = parseTopics(res.input);
   const apply = opts.apply && (!existing?.length || opts.replace === true);
   if (apply) await store.putTopics(topics);

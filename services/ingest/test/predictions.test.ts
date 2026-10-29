@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from "@library/core/settings";
 import { describe, expect, it, vi } from "vitest";
 import type { ModelPort, ToolRequest } from "../src/bedrock.js";
 import type { EnrichCandidate } from "../src/enrich.js";
@@ -171,6 +172,7 @@ describe("spotPredictions", () => {
     const removed = new Map<string, number[]>();
     const errors: string[] = [];
     const store = {
+      settings: async () => DEFAULT_SETTINGS,
       enrichCandidates: vi.fn(async () => candidates),
       senderSettings: vi.fn(async () => new Map([["muted", { muted: true }]])),
       getText: vi.fn(async (id: string) => texts[id]),

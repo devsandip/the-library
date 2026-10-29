@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from "@library/core/settings";
 import { describe, expect, it, vi } from "vitest";
 import type { Shelf } from "@library/core/types";
 import type { EnrichCandidate } from "../src/enrich.js";
@@ -70,6 +71,7 @@ function fakeStore(
   const derived: string[][] = [];
   const stale = new Set(opts.stale);
   const store = {
+    settings: async () => DEFAULT_SETTINGS,
     storyShelves: vi.fn(async () => stories),
     enrichCandidates: vi.fn(
       async () =>

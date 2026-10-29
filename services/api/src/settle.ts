@@ -74,11 +74,12 @@ export function settleRequest(
   items: AskItem[],
   today: string,
   timeZone = READER_TIME_ZONE,
+  about = READER,
 ): ToolRequest {
   return {
     system: [
       `You settle one prediction from a reader's newsletters against what their later ` +
-        `newsletters report. ${READER} Today is ${today}.`,
+        `newsletters report. ${about} Today is ${today}.`,
       "",
       "The user sends the prediction (what, who made it, when, and when it came due), then " +
         "stories from later newsletters, oldest first, one per line: an id, the date, the " +
@@ -185,7 +186,7 @@ export class Settler {
   /** Settles today's due predictions, at most `limit`, oldest due first. */
   async settleDue(limit = SETTLE_PER_DAY): Promise<SettleStats> {
     const started = this.now();
-    const { timeZone } = await this.store.settings();
+    const { timeZone, about } = await this.store.settings();
     const today = readerDay(started, timeZone);
     const stats: SettleStats = {
       due: 0,
@@ -229,7 +230,7 @@ export class Settler {
             stats.nothingFound++;
             s = { ...base, status: "unclear", why: NOTHING_SINCE, evidence: [] };
           } else {
-            const res = await this.claude.callTool(settleRequest(p, items, today, timeZone));
+            const res = await this.claude.callTool(settleRequest(p, items, today, timeZone, about));
             stats.inputTokens += res.inputTokens;
             stats.outputTokens += res.outputTokens;
             s = {

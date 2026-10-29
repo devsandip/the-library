@@ -73,10 +73,10 @@ export function narrativeItems(
   });
 }
 
-export function narrativeRequest(items: NarrativeItem[]): ToolRequest {
+export function narrativeRequest(items: NarrativeItem[], about = READER): ToolRequest {
   return {
     system: [
-      `You write one reader's briefing on the day's news, from the stories in their newsletters. ${READER}`,
+      `You write one reader's briefing on the day's news, from the stories in their newsletters. ${about}`,
       "",
       "The user sends the last day's news stories, one per line: an id, the headline and " +
         "summary, the names involved and the newsletters that carried it. A story that several " +
@@ -226,7 +226,7 @@ export async function writeNarrative(
   if (opts.deadline && Date.now() > opts.deadline) return done("out of time");
 
   const items = narrativeItems(today, news);
-  const res = await model.callTool(narrativeRequest(items));
+  const res = await model.callTool(narrativeRequest(items, (await store.settings()).about));
   stats.inputTokens = res.inputTokens;
   stats.outputTokens = res.outputTokens;
   const threads = parseNarrative(res.input, items);

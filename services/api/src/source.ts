@@ -11,6 +11,7 @@
  * until it is kept or says why not. Written only when the reader asks, and kept for the story.
  */
 import { CLAUDE_MODEL, claudeCents, htmlToCleanText, quoteIn, READER } from "@library/core";
+import type { ReaderSettings } from "@library/core/settings";
 import type {
   SourceCheck,
   SourceClaim,
@@ -52,6 +53,8 @@ export interface SourceStory {
 
 /** Where checks read from and are kept. DynamoRepo implements it; tests use a fake. */
 export interface SourceStore {
+  /** The reader's settings: how Claude knows them (#186). */
+  settings(): Promise<ReaderSettings>;
   /** The story, with its issue's text unless `text` is false. */
   sourceStory(id: string, n: number, opts?: { text?: boolean }): Promise<SourceStory | undefined>;
   /** The kept check and the latest run, either of which may be missing. */
@@ -118,10 +121,11 @@ export function sourceRequest(
   page: string,
   url: string,
   from?: string,
+  about = READER,
 ): ToolRequest {
   return {
     system: [
-      `You check what one reader's newsletter said against the page it links to. ${READER}`,
+      `You check what one reader's newsletter said against the page it links to. ${about}`,
       "",
       "The user sends the story as the newsletter told it (its headline, summary, the names in " +
         "it, and the newsletter's own passage), then the text of the page the story links to.",
@@ -304,9 +308,11 @@ export class SourceChecker {
     if (!story) throw notFound(`issue ${id} has no story ${n}`);
     if (!story.link) return { none: NO_LINK };
     const said = story.text ? passage(story.text, story) : undefined;
+    const { about } = await this.store.settings();
     const found = await hunt({ ...story, link: story.link }, said, {
       read: this.read,
       claude: this.claude,
+      about,
       now: this.now,
       progress: (pages, reading) => this.store.progressRun(id, n, pages, reading),
     });
@@ -315,7 +321,7 @@ export class SourceChecker {
     }
     const text = pageText(found.page);
     const from = found.original && found.path.length > 1 ? found.path[0]!.url : undefined;
-    const res = await this.claude.callTool(sourceRequest(story, text, found.page.url, from));
+    const res = await this.claude.callTool(sourceRequest(story, text, found.page.url, from, about));
     const parsed = parseSource(res.input, text.slice(0, PAGE_CHARS));
     if (!parsed) return { none: UNREADABLE };
     const calls = [...found.calls, res];

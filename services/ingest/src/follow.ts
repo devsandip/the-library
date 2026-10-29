@@ -102,10 +102,14 @@ export interface MoveItem {
 /** What a candidate is to its followed story; only a move's stories make a point. */
 const KINDS = ["move", "repeat", "other"] as const;
 
-export function movesRequest(items: MoveItem[], timeZone = READER_TIME_ZONE): ToolRequest {
+export function movesRequest(
+  items: MoveItem[],
+  timeZone = READER_TIME_ZONE,
+  about = READER,
+): ToolRequest {
   return {
     system: [
-      `You keep one reader up to date on the stories they follow, from their own newsletters. ${READER}`,
+      `You keep one reader up to date on the stories they follow, from their own newsletters. ${about}`,
       "",
       "The user sends each followed story as F1, F2 and so on: the steps it has taken so far, " +
         "oldest first and dated. Under each, new stories from the reader's newsletters, as S1, S2 " +
@@ -309,7 +313,8 @@ export async function checkFollows(
   }));
   stats.candidates = k;
 
-  const res = await model.callTool(movesRequest(items, (await store.settings()).timeZone));
+  const settings = await store.settings();
+  const res = await model.callTool(movesRequest(items, settings.timeZone, settings.about));
   stats.inputTokens = res.inputTokens;
   stats.outputTokens = res.outputTokens;
   const moves = parseMoves(res.input, items, new Date(now).toISOString());
