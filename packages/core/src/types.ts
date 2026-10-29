@@ -62,6 +62,8 @@ export interface IssueDetailResponse extends IssueListItem {
   html: string;
   /** Where reading stopped (#44), when this is the issue Now reading points at, unfinished. */
   position?: number;
+  /** The passages highlighted in it (#166), oldest first. */
+  highlights: Highlight[];
 }
 
 export interface SenderListItem {
@@ -464,6 +466,41 @@ export interface HistoryResponse {
   /** The nearest days before and after it with anything read. */
   previousDay?: string;
   nextDay?: string;
+}
+
+/**
+ * A passage as a text-quote anchor (#166, W3C Web Annotation): the passage and a few characters
+ * either side, never offsets, so it is found again however the issue renders and outlives the
+ * stored HTML. Whitespace is collapsed to single spaces in all three.
+ */
+export interface HighlightQuote {
+  exact: string;
+  /** Up to 32 characters before the passage and after it, to tell a repeated passage apart. */
+  prefix: string;
+  suffix: string;
+}
+
+/** A passage Sandip highlighted in an issue (#71, #166), with his note on it. */
+export interface Highlight extends HighlightQuote {
+  /** `<issueId>.<key>`, the key 12 characters that sort by when it was made. */
+  id: string;
+  issueId: string;
+  note?: string;
+  createdAt: string;
+  /** When the note last changed. */
+  updatedAt?: string;
+}
+
+/** A highlight with its issue as a row, as the Highlights page lists it. */
+export interface HighlightListItem extends Highlight {
+  issue: IssueListItem;
+}
+
+/** GET /highlights: newest first, a page at a time. */
+export interface HighlightsResponse {
+  items: HighlightListItem[];
+  /** Pass as `before` for the next page; absent on the last. */
+  next?: string;
 }
 
 /** The issue to come back to (#44): the last one opened, and how far down it was read. */

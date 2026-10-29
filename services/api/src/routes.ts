@@ -1,4 +1,5 @@
 import { isReaderDay, readerDay } from "@library/core/days";
+import { cleanNote, cleanQuote, HIGHLIGHT_MAX, NOTE_MAX } from "@library/core/highlights";
 import type {
   PredictionStatus,
   PredictionView,
@@ -46,6 +47,10 @@ const VERDICTS: readonly Exclude<PredictionStatus, "open">[] = ["right", "wrong"
 const TUNEUP_ID = new RegExp(`^${SENDER_ID}\\.(news|learning)$`);
 /** A prediction's id: `<issueId>.<k>`. */
 const PREDICTION_ID = "([A-Za-z0-9_-]{1,64}\\.[1-9][0-9]?)";
+/** A highlight's id (#166): `<issueId>.<key>`. */
+const HIGHLIGHT_ID = "([A-Za-z0-9_-]{1,64}\\.[0-9a-z]{12})";
+/** The Highlights page's `next`: a highlight's `gsi1` sort key, `<createdAt>#<issueId>#<key>`. */
+const HIGHLIGHT_CURSOR = /^\d{4}-\d{2}-\d{2}T[0-9:.]{8,12}Z#[A-Za-z0-9_-]{1,64}#[0-9a-z]{12}$/;
 
 const ok = (body: unknown): Response => ({ status: 200, body });
 
@@ -79,6 +84,15 @@ function listQuery(req: Request) {
     throw badRequest("topic must be up to 20 topics of 1 to 60 characters, comma-separated");
   }
   return { limit, cursor: req.query.cursor, senderIds, topics };
+}
+
+/** A highlight's note (#166): text, or null or nothing for none. */
+function noteOf(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string" || value.trim().length > NOTE_MAX) {
+    throw badRequest(`note must be text of up to ${NOTE_MAX.toLocaleString("en")} characters`);
+  }
+  return cleanNote(value);
 }
 
 function param(params: string[], i: number): string {
@@ -234,6 +248,65 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     pattern: new RegExp(`^/issues/${ISSUE_ID}/stories/${STORY_N}/follow$`),
     handler: async (svc, _req, p) => {
       await svc.following.unfollow(param(p, 0), Number(param(p, 1)));
+      return { status: 204 };
+    },
+  },
+  {
+    // Keep a passage of the issue (#166); the same passage again answers the one kept.
+    method: "POST",
+    pattern: new RegExp(`^/issues/${ISSUE_ID}/highlights$`),
+    handler: async (svc, req, p) => {
+      const body = json<{ exact?: unknown; prefix?: unknown; suffix?: unknown; note?: unknown }>(
+        req,
+      );
+      for (const k of ["exact", "prefix", "suffix"] as const) {
+        if (body[k] !== undefined && typeof body[k] !== "string") {
+          throw badRequest(`${k} must be text`);
+        }
+      }
+      const quote = cleanQuote({
+        exact: (body.exact as string | undefined) ?? "",
+        prefix: body.prefix as string | undefined,
+        suffix: body.suffix as string | undefined,
+      });
+      if (!quote.exact || quote.exact.length > HIGHLIGHT_MAX) {
+        throw badRequest(
+          `exact must be a passage of 1 to ${HIGHLIGHT_MAX.toLocaleString("en")} characters`,
+        );
+      }
+      return ok(await svc.highlights.add(param(p, 0), quote, noteOf(body.note)));
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/highlights$/,
+    handler: async (svc, req) => {
+      const limit = req.query.limit === undefined ? 50 : Number(req.query.limit);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+        throw badRequest("limit must be an integer from 1 to 200");
+      }
+      const before = req.query.before;
+      if (before !== undefined && !HIGHLIGHT_CURSOR.test(before)) {
+        throw badRequest("before must be a page's next");
+      }
+      return ok(await svc.highlights.list(limit, before));
+    },
+  },
+  {
+    // Sandip's note on a highlight, or null to clear it.
+    method: "PATCH",
+    pattern: new RegExp(`^/highlights/${HIGHLIGHT_ID}$`),
+    handler: async (svc, req, p) => {
+      const body = json<{ note?: unknown }>(req);
+      if (!("note" in body)) throw badRequest("send note, or null to clear it");
+      return ok(await svc.highlights.note(param(p, 0), noteOf(body.note)));
+    },
+  },
+  {
+    method: "DELETE",
+    pattern: new RegExp(`^/highlights/${HIGHLIGHT_ID}$`),
+    handler: async (svc, _req, p) => {
+      await svc.highlights.remove(param(p, 0));
       return { status: 204 };
     },
   },

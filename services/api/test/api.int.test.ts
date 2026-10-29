@@ -39,6 +39,8 @@ import type {
   AskResponse,
   Follow,
   FollowingResponse,
+  Highlight,
+  HighlightsResponse,
   SourceResponse,
   TakesResponse,
   LearningListResponse,
@@ -1909,6 +1911,84 @@ describe("API on dev", () => {
           }),
         )
         .catch(() => undefined);
+    }
+  });
+
+  it("highlights: a passage kept with a note, on its issue and listed, paged, deleted (#166)", async () => {
+    const made: string[] = [];
+    try {
+      const add = (exact: string, extra: Record<string, string> = {}) =>
+        call<Highlight>("POST", "/issues/fx-bytebytego/highlights", { body: { exact, ...extra } });
+      const first = await add("  How a cache\n fails ", {
+        prefix: "Today: ",
+        note: " Read again. ",
+      });
+      expect(first.status).toBe(200);
+      made.push(first.body.id);
+      expect(first.body).toMatchObject({
+        issueId: "fx-bytebytego",
+        exact: "How a cache fails",
+        prefix: "Today: ",
+        suffix: "",
+        note: "Read again.",
+      });
+      // The same passage in the same place again is the one kept.
+      const again = await add("How a cache fails", { prefix: "Today: " });
+      expect(again.body.id).toBe(first.body.id);
+      const second = await add("Second passage");
+      made.push(second.body.id);
+      expect(second.body.id > first.body.id).toBe(true);
+
+      // The issue's detail carries them, oldest first.
+      const detail = await call<IssueDetailResponse>("GET", "/issues/fx-bytebytego");
+      expect(detail.body.highlights.map((h) => h.id)).toEqual(made);
+
+      // Listed newest first with the issue, a page at a time.
+      const page1 = await eventually(
+        () => call<HighlightsResponse>("GET", "/highlights", { query: { limit: "1" } }),
+        (r) => r.body.items[0]?.id === second.body.id,
+      );
+      expect(page1.body.items[0]!.issue.publication).toBe("ByteByteGo");
+      expect(page1.body.next).toBeDefined();
+      const page2 = await call<HighlightsResponse>("GET", "/highlights", {
+        query: { limit: "1", before: page1.body.next! },
+      });
+      expect(page2.body.items.map((h) => h.id)).toEqual([first.body.id]);
+
+      // A note set and cleared; an unknown highlight is 404.
+      const noted = await call<Highlight>("PATCH", `/highlights/${second.body.id}`, {
+        body: { note: "Mine." },
+      });
+      expect(noted.body.note).toBe("Mine.");
+      expect(noted.body.updatedAt).toBeDefined();
+      const cleared = await call<Highlight>("PATCH", `/highlights/${second.body.id}`, {
+        body: { note: null },
+      });
+      expect(cleared.body.note).toBeUndefined();
+      const unknown = `fx-bytebytego.${"0".repeat(12)}`;
+      expect((await call("PATCH", `/highlights/${unknown}`, { body: { note: "x" } })).status).toBe(
+        404,
+      );
+
+      // Filtered mail and unknown issues take none.
+      expect(
+        (await call("POST", "/issues/fx-github/highlights", { body: { exact: "x" } })).status,
+      ).toBe(404);
+      expect(
+        (await call("POST", "/issues/does-not-exist/highlights", { body: { exact: "x" } })).status,
+      ).toBe(404);
+
+      // Deleted: off the issue and off the list.
+      expect((await call("DELETE", `/highlights/${first.body.id}`)).status).toBe(204);
+      const after = await call<IssueDetailResponse>("GET", "/issues/fx-bytebytego");
+      expect(after.body.highlights.map((h) => h.id)).toEqual([second.body.id]);
+      const list = await eventually(
+        () => call<HighlightsResponse>("GET", "/highlights"),
+        (r) => !r.body.items.some((h) => h.id === first.body.id),
+      );
+      expect(list.body.items.map((h) => h.id)).toEqual([second.body.id]);
+    } finally {
+      await Promise.all(made.map((id) => call("DELETE", `/highlights/${id}`)));
     }
   });
 });

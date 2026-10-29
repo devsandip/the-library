@@ -987,6 +987,7 @@ export class MockLibraryApi implements LibraryApi {
       fromAddr: "hello@example.test",
       unsubscribeUrl: "https://example.test/unsubscribe",
       ...(position > 0 && position < 1 ? { position } : {}),
+      highlights: [],
     };
   }
   async setState(id: string, state: ReaderState) {

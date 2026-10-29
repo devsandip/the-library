@@ -4,6 +4,9 @@ import type {
   TuneupResponse,
   Follow,
   FollowingResponse,
+  Highlight,
+  HighlightQuote,
+  HighlightsResponse,
   HistoryResponse,
   IssueDetailResponse,
   IssueListItem,
@@ -146,6 +149,15 @@ export interface TuneupPort {
   dismiss(id: string): Promise<TuneupResponse>;
 }
 
+/** Highlights (#166): passages kept from issues, with notes, listed newest first. */
+export interface HighlightsPort {
+  list(limit: number, before?: string): Promise<HighlightsResponse>;
+  add(issueId: string, quote: HighlightQuote, note?: string): Promise<Highlight>;
+  /** Sets the note, or clears it with undefined. */
+  note(id: string, note: string | undefined): Promise<Highlight>;
+  remove(id: string): Promise<void>;
+}
+
 /** Followed stories (#22): follow a story's event, list them, unfollow, mark them seen. */
 export interface FollowPort {
   list(): Promise<FollowingResponse>;
@@ -163,6 +175,7 @@ export interface Services {
   sources: SourcePort;
   ask: AskPort;
   following: FollowPort;
+  highlights: HighlightsPort;
   predictions: PredictionsPort;
   audit: AuditPort;
   tuneup: TuneupPort;
