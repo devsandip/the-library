@@ -12,7 +12,7 @@ import type { Bucket } from "aws-cdk-lib/aws-s3";
 import { Schedule, ScheduleExpression, ScheduleTargetInput } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import { Construct } from "constructs";
-import { BASE_PATH, type Stage } from "./config.js";
+import { BASE_PATH, READER_KEYS, type Stage } from "./config.js";
 import { bedrockModels, nodeFunction } from "./functions.js";
 
 export interface ApiProps {
@@ -48,6 +48,7 @@ export class Api extends Construct {
         TABLE_NAME: props.table.tableName,
         BUCKET_NAME: props.content.bucketName,
         STAGE: props.stage,
+        READER_KEYS: READER_KEYS[props.stage] ? "1" : "0",
         NODE_OPTIONS: "--enable-source-maps",
       },
     });
@@ -68,6 +69,7 @@ export class Api extends Construct {
         INGEST_FUNCTION: props.ingestFn.functionName,
         JOBS_FUNCTION: this.jobsFn.functionName,
         STAGE: props.stage,
+        READER_KEYS: READER_KEYS[props.stage] ? "1" : "0",
         NODE_OPTIONS: "--enable-source-maps",
       },
     });

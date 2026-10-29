@@ -39,3 +39,10 @@ export const ALARM_EMAIL = "dev.sandip@gmail.com";
 
 /** On since Gmail was connected and the backfill ran (2026-10-09, build plan R5). */
 export const INGEST_SCHEDULE_ENABLED = true;
+
+/**
+ * Keys bound to readers (milestone 13 of docs/features/multi-reader.md): on, each request reads
+ * and writes its reader's items and ingest the owner's; off, today's keys. Prod turns on only once
+ * Sandip's items are copied to Sandip's keys (`pnpm move-to-reader`).
+ */
+export const READER_KEYS: Record<Stage, boolean> = { dev: false, prod: false };

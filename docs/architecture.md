@@ -156,6 +156,14 @@ Through the proxy the app runs on the `https://sandip.dev` origin, so anything o
 
 ### DynamoDB: one table, on-demand, PITR on (prod)
 
+**Every item has an owner (milestone 13 of `docs/features/multi-reader.md`).** The table stays one table shared by every reader. A reader's items carry the reader's id, their Cognito `sub`, at the front of every partition key and every index partition: `R#<readerId>#` before `ISSUE#…`, `SENDER#…`, `STATE`, `CONFIG`, `DIGEST#…`, `TIMELINE#…`, `TAKES#…`, `SOURCE#…`, `FOLLOWING`, `PREDICTIONS`, and before `INBOX`, `ARCHIVE`, `SENDERS`, `STORIES`, `OPENS`, `HIGHLIGHTS`, `UNREAD`, `SAVED`, `LEARNING`, `RATED` and `SENDER#…` in the indexes. Sort keys and ids do not change, so an issue's id, a sender's id, a story's event and every link inside the app stay as they are; two readers of one newsletter have their own sender item, stars and mutes.
+
+- **Keys come from one place.** `keysFor(readerId)` in `packages/core/src/keys.ts` gives every builder and partition bound to a reader; without a reader they are today's. The repository and ingest's store build their keys from it, so no query can name another reader's partition.
+- **Not a reader's:** `CONFIG/OWNER` (the deployment's owner) and `READER#<id>` (settings and interests, keyed by the reader already).
+- **Scans** (rebuilding senders, backfilling history) keep to the reader's prefix.
+- **A switch per stage**, `READER_KEYS` in `infra/lib/config.ts`, passed to the Lambdas: off, everything reads and writes today's keys; on, each request uses its reader's and ingest the owner's. Dev turns it on with the isolation tests; prod turns it on once Sandip's items are copied to Sandip's keys (`pnpm move-to-reader`).
+- **S3 keys do not change.** Issue ids are message ids, unique across mailboxes; each item keeps its own S3 keys.
+
 All four GSIs are defined before the first deploy because CloudFormation adds only one GSI per update. Projections are `ALL`; an issue's embedding lives in its own item so it never lands in an index. Story items (#15) are the exception on purpose: linking reads a window of stories with their vectors in one `gsi1` query.
 
 | Entity | pk | sk | Notes |

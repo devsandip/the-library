@@ -75,6 +75,8 @@ Done when: a test reader in New York with other interests gets New York days, th
 
 The riskiest milestone: the keys of everything stored change.
 
+[Milestone 13](https://github.com/devsandip/the-library/milestone/13): keys bound to a reader behind `READER_KEYS` (#195), the API's repository (#196) and ingest's store (#197) on them, two readers kept apart on dev (#198), "reader" instead of "sandip" (#181), the move (#199), prod on reader keys (#200). The key design is in `docs/architecture.md` section 5: `R#<readerId>#` in front of every partition key and index partition, sort keys and ids unchanged.
+
 1. The key design: the reader leads every partition key and index partition (31 key builders, 4 indexes, about 10 fixed partitions), and a sender's id per reader. Written into `docs/architecture.md` first.
 2. Issues and reading state on the new keys, behind a switch (the repository and ingest's store).
 3. Senders and ranking on the new keys.
