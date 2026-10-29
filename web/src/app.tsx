@@ -23,6 +23,7 @@ import { Ask } from "./pages/ask.js";
 import { Audit } from "./pages/audit.js";
 import { Tuneup } from "./pages/tuneup.js";
 import { Following } from "./pages/following.js";
+import { HIGHLIGHTS } from "./features.js";
 import { Highlights } from "./pages/highlights.js";
 import { Predictions } from "./pages/predictions.js";
 import { Search } from "./pages/search.js";
@@ -67,7 +68,7 @@ function libraryPage(screen: Screen, wide: boolean) {
     case "following":
       return <Following wide={wide} />;
     case "highlights":
-      return <Highlights wide={wide} />;
+      return HIGHLIGHTS ? <Highlights wide={wide} /> : <NotFound />;
     case "predictions":
       return <Predictions view={screen.view} wide={wide} />;
     case "history":
