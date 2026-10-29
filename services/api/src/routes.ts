@@ -1,4 +1,5 @@
 import { isReaderDay, readerDay } from "@library/core/days";
+import { checkSettingsPatch } from "@library/core/settings";
 import { cleanNote, cleanQuote, HIGHLIGHT_MAX, NOTE_MAX } from "@library/core/highlights";
 import type {
   PredictionStatus,
@@ -425,6 +426,21 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
         throw badRequest("id must be <senderId>.news or <senderId>.learning");
       }
       return ok(await svc.tuneup.dismiss(id));
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/settings$/,
+    handler: async (svc) => ok(await svc.repo.settings()),
+  },
+  {
+    // Time zone, interests and the line prompts use (#184).
+    method: "PATCH",
+    pattern: /^\/settings$/,
+    handler: async (svc, req) => {
+      const checked = checkSettingsPatch(json<unknown>(req));
+      if ("error" in checked) throw badRequest(checked.error);
+      return ok(await svc.repo.saveSettings(checked.patch));
     },
   },
   {

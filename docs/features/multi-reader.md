@@ -59,6 +59,8 @@ Done when: no route, job or script reads data without a reader, and the Deploy's
 
 ### 12. Settings instead of Sandip (5)
 
+[Milestone 12](https://github.com/devsandip/the-library/milestone/12): issues 184 to 188. Topics proposed on their own moved to milestone 14, since topics can be a reader's own only once issues are.
+
 Can start beside 13 once 11 is merged.
 
 1. A settings item per reader (time zone, interests, the reader line, what Learning means), seeded with Sandip's values.
