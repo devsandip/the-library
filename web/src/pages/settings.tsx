@@ -1,9 +1,10 @@
 import { useEffect, useState } from "preact/hooks";
+import { exportFileName } from "@library/core/export";
 import { SETTINGS_LIMITS, type Interest, type ReaderSettings } from "@library/core/settings";
 import { useToast } from "../components/toast.js";
 import { useApp } from "../context.js";
 import { saveTheme, useTheme, type ThemePref } from "../theme.js";
-import { readerZone, setReaderZone } from "../zone.js";
+import { readerZone, setReaderZone, today } from "../zone.js";
 import { Page } from "./page.js";
 
 const THEMES: { id: ThemePref; label: string; note: string }[] = [
@@ -51,6 +52,25 @@ export function Settings({ wide }: { wide: boolean }) {
   const [settings, setSettings] = useState<ReaderSettings>();
   const [interests, setInterests] = useState<Interest[]>([]);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  /** Everything Nutgraf keeps for the reader, saved as a JSON file (#219). */
+  const download = async () => {
+    setExporting(true);
+    try {
+      const data = await api.exportData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = exportFileName(today());
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      toast.say((err as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     api.settings().then(
@@ -189,6 +209,17 @@ export function Settings({ wide }: { wide: boolean }) {
           }
         >
           Save interests
+        </button>
+      </div>
+
+      <p class="label section-label">Your data</p>
+      <p class="settings-note">
+        Everything Nutgraf keeps for you, as one file: settings, newsletters, issues, highlights and
+        history. The newsletters' own text stays in your mail.
+      </p>
+      <div class="settings-tools">
+        <button type="button" class="btn line" disabled={exporting} onClick={() => void download()}>
+          {exporting ? "Preparing…" : "Download my data"}
         </button>
       </div>
     </Page>

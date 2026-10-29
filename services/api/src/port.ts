@@ -1,3 +1,4 @@
+import type { ReaderExport } from "@library/core/export";
 import type { ReaderSettings } from "@library/core/settings";
 import type { Limited, UsageResponse } from "@library/core/usage";
 import type { SettingsPort } from "./settings.js";
@@ -89,6 +90,8 @@ export interface RepoPort {
   saveSettings(patch: Partial<ReaderSettings>): Promise<ReaderSettings>;
   /** The reader's model use for their last days, newest first (#208). */
   usage(): Promise<UsageResponse>;
+  /** Everything Nutgraf keeps for the reader (#219). */
+  exportData(): Promise<ReaderExport>;
   /** Counts a use of a limited feature unless the day's are used (#209). */
   takeUse(feature: Limited): Promise<{ ok: boolean; limit: number }>;
   unreadCounts(): Promise<UnreadCountsResponse>;

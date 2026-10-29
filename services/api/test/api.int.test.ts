@@ -15,6 +15,7 @@ import {
   vectorBytes,
   settingsKey,
 } from "@library/core";
+import type { ReaderExport } from "@library/core/export";
 import type { ReaderSettings } from "@library/core/settings";
 import type { UsageResponse } from "@library/core/usage";
 import type {
@@ -2143,5 +2144,20 @@ describe("two readers on dev (#198)", () => {
       settled: { reader?: string }[];
     };
     expect(round.settled.map((s) => s.reader)).toEqual([other.sub]);
+  });
+
+  it("exports everything a reader has, and none of another's (#219)", async () => {
+    const mine = (await call<ReaderExport>("GET", "/export")).body;
+    expect(mine.reader).toBe(INT_READER.id);
+    expect(mine.issues.map((i) => i.id)).toEqual(expect.arrayContaining(FIXTURE_NEWSLETTER_IDS));
+    expect(mine.newsletters.length).toBeGreaterThan(0);
+    expect(mine.settings.timeZone).toBeTruthy();
+    expect(mine.history.length).toBeGreaterThan(0);
+    expect(JSON.stringify(mine)).not.toMatch(/"html"|s3Keys/);
+    const theirs = (await call<ReaderExport>("GET", "/export", other)).body;
+    expect(theirs.reader).toBe(other.sub);
+    expect(theirs.issues).toEqual([]);
+    expect(theirs.newsletters).toEqual([]);
+    expect(theirs.settings.timeZone).toBe("Europe/London");
   });
 });

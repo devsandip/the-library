@@ -46,6 +46,7 @@ function setup(overrides: Partial<RepoPort> = {}) {
     listTopics: vi.fn(async () => [{ name: "AI", description: "Models and tools" }]),
     settings: vi.fn(async () => DEFAULT_SETTINGS),
     usage: vi.fn(async () => ({ days: [] })),
+    exportData: vi.fn(async () => ({ about: "x" }) as never),
     takeUse: vi.fn(async () => ({ ok: true, limit: 50 })),
     saveSettings: vi.fn(async (patch: Partial<ReaderSettings>) => ({
       ...DEFAULT_SETTINGS,
@@ -254,6 +255,15 @@ describe("the reader (#179)", () => {
     }
     expect(servicesFor).not.toHaveBeenCalled();
     expect(repo.listIssues).not.toHaveBeenCalled();
+  });
+});
+
+describe("export (#219)", () => {
+  it("answers everything the reader has", async () => {
+    const { repo, call } = setup();
+    const res = await call("GET", "/export");
+    expect(res.status).toBe(200);
+    expect(repo.exportData).toHaveBeenCalled();
   });
 });
 

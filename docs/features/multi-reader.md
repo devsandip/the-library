@@ -124,6 +124,10 @@ Done when: the 50 readers' jobs run on time within their limits, and the cost pe
 
 ### 15. Sign-up by email (6)
 
+[Milestone 15](https://github.com/devsandip/the-library/milestone/15): issues 219 to 225. Started 2026-10-29 with the parts that need no mail setup; SES (#222) and the email code (#223) wait on Sandip's DNS and SES production access, and highlights (#225) on Sandip's call.
+
+**Export** (#219): `GET /export` answers everything Nutgraf keeps for the reader as one JSON file, newsletters' own text left out; Settings has Download my data (`nutgraf-export-<day>.json`).
+
 1. **Mail from `sandip.dev` through SES.** The domain verified in SES (DKIM records in `sandip.dev`'s DNS); Cognito sends its mail through SES, which sign-in codes need; SES production access, so codes reach any address.
 2. **Sign-up and sign-in by email code.** Cognito's passwordless sign-in with a one-time code by email (the pool already has the Essentials plan it needs), in the managed login. Email codes do not work while MFA is required, so the pool's MFA moves to optional. Sandip keeps password and authenticator: Cognito does not offer the email code to an account with MFA on.
 3. **The operator group**, for Status and the ops pages; readers see only their own.
