@@ -248,12 +248,12 @@ describe("data and ingest", () => {
 describe("auth and API (prod)", () => {
   const t = synth("prod");
 
-  it("user pool: one user, no self sign-up, TOTP required, retained", () => {
+  it("user pool: no self sign-up, TOTP optional (#223), retained", () => {
     t.hasResource("AWS::Cognito::UserPool", {
       DeletionPolicy: "Retain",
       Properties: Match.objectLike({
         UserPoolTier: "ESSENTIALS",
-        MfaConfiguration: "ON",
+        MfaConfiguration: "OPTIONAL",
         EnabledMfas: ["SOFTWARE_TOKEN_MFA"],
         AdminCreateUserConfig: Match.objectLike({ AllowAdminCreateUserOnly: true }),
         DeletionProtection: "ACTIVE",
