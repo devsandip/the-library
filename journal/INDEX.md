@@ -1,11 +1,13 @@
 # Nutgraf: Journal
 
-Last refreshed: 2026-10-28 19:05
-Latest entry: [2026-10-29-1950-every-item-has-an-owner.md](entries/2026-10-29-1950-every-item-has-an-owner.md)
+Last refreshed: 2026-10-30 18:40
+Latest entry: [2026-10-30-1840-email-codes-wait-on-one-command.md](entries/2026-10-30-1840-email-codes-wait-on-one-command.md)
 
-A private newsletter reader for one person: my Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Called The Library until 2026-10-12. Live at https://sandip.dev/nutgraf/.
+A newsletter reader: Gmail newsletters in, one ranked list out, on the iPhone and the Mac. Built for me first, and since 2026-10-29 being opened to any reader. Called The Library until 2026-10-12. Live at https://sandip.dev/nutgraf/.
 
 ## Where we are now
+
+Since 2026-10-29 Nutgraf is being opened to any reader, in steps that leave my own app working (`docs/features/multi-reader.md`). Built: the reader on every request, settings per reader, daily work at each reader's own morning, every model call metered with daily limits, export, delete account, onboarding and an operator group. Each reader's data on their own keys runs on dev; prod waits on my move. Cognito mails through SES since 2026-10-30. Email-code sign-in is two draft pull requests that wait on one command from me, because optional MFA would otherwise drop my authenticator. Still to build: mail in, Google sign-in and the launch. The app is still only mine to use, and highlights are hidden until I decide.
 
 The reader is live on both devices and does what the brief asked of Phase 1: ingest every two hours, clean reading, and a thumbs up or down for whether an issue was useful. Claude gives every issue a line and a topic, and Jev sorts every story into News or Learning; rules archive promos and week-old news, and since 2026-10-11 keep account mail, like sign-in codes, out of the list.
 
@@ -33,9 +35,10 @@ Since 2026-10-19 the thumbs ask one thing: was it useful? Relevant and Irrelevan
 
 ## Recent entries
 
-- [2026-10-28 19:05: Weekly tune-up](entries/2026-10-28-1905-weekly-tune-up.md)
-- [2026-10-29 17:00: Nutgraf for any reader](entries/2026-10-29-1700-nutgraf-for-any-reader.md)
+- [2026-10-30 18:40: Email codes wait on one command](entries/2026-10-30-1840-email-codes-wait-on-one-command.md)
 - [2026-10-29 19:50: Every item has an owner](entries/2026-10-29-1950-every-item-has-an-owner.md)
+- [2026-10-29 17:00: Nutgraf for any reader](entries/2026-10-29-1700-nutgraf-for-any-reader.md)
+- [2026-10-28 19:05: Weekly tune-up](entries/2026-10-28-1905-weekly-tune-up.md)
 - [2026-10-28 14:50: Subscription audit](entries/2026-10-28-1450-subscription-audit.md)
 - [2026-10-28 10:50: Who called it](entries/2026-10-28-1050-who-called-it.md)
 - [2026-10-28 09:05: The hunt on real links](entries/2026-10-28-0905-the-hunt-on-real-links.md)
@@ -76,10 +79,15 @@ Since 2026-10-19 the thumbs ask one thing: was it useful? Relevant and Irrelevan
 - Will I work through Learning's unread stories (428 on 2026-10-27, none expiring), or will it become a backlog to archive?
 - Which search provider, if any, for the web halves of Ask, Backstory and Takes (#16, #17)?
 - What to do about `robots.txt` on `sandip.dev` (#7)?
-- When does the AWS account get Haiku 5.5?
+- When does the AWS account get Haiku 5.5? Still no on 2026-10-30.
+- How should sign-up open: closed, by invitation or open (#225)? And do highlights come back with it?
+- How does mail in work for other readers: a forwarding address, their Gmail, or both?
 
 ## Things ruled out
 
+- Making MFA optional and allowing email codes in one update: Cognito refuses it and CloudFormation rolls back, so it takes two deploys (2026-10-30).
+- Making MFA optional and assuming my authenticator stays: an account enrolled while MFA was required has no preferred MFA and signs in with its password alone, so the preference is set first (2026-10-30).
+- Creating the SES identity in CDK: `sandip.dev` was already verified outside this repo, so the pool only points at it (2026-10-30).
 - Asking Haiku to skip companies' announced dates when spotting predictions: it kept them; it labels them instead and the code drops them (2026-10-28).
 - Asking Claude to keep the source hunt off a page's own site: it saw only "[n]", so the code withholds those links instead (2026-10-28).
 - Extending `sandip.dev`'s CloudFront distribution: it is Amplify Hosting, so the app has its own distribution behind a rewrite rule (2026-10-09).

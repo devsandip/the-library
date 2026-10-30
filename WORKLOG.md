@@ -751,3 +751,24 @@ Sandip: "i will do this later. add this to the ticktick reminder and remind me t
 - Unblocked, for me: nothing in milestone 15 beyond the above. Keep counting #227's Deploys. Decisions waiting on Sandip: #225 (highlights and the sign-up switch), #163 (the recommendation on the issue), #16 (a web search service), and when mail in starts.
 
 **To resume:** open a session in `~/Developer/the-library` and say "resume Nutgraf from the worklog". Read this entry, then the memories `email-codes-pending` and `prod-move-pending`.
+
+## 2026-10-30, evening — journal and resume
+
+Sandip: "journal, worklog and create resume here".
+
+**Did:**
+
+- Wrote the journal entry for 29 October evening and 30 October (`journal/entries/2026-10-30-1840-email-codes-wait-on-one-command.md`) and brought `journal/INDEX.md` up to date; its "Where we are now" had not mentioned opening to any reader.
+- No code changed since the pause entry above.
+
+**State now:**
+
+- Same as the pause entry. Prod runs PR 237's code, the last code to deploy; PRs 238 and 239 and this one are docs, which skip the Deploy. So #227's count stays at three until the next code merge.
+- Sandip has not said the MFA preference or the prod move has run. PRs 235, 236 and 207 stay drafts.
+- The Saturday reminder fires at 9:00 Los Angeles time, which is 21:30 in India.
+
+**Next:**
+
+- Exactly as in the pause entry: wait for Sandip's word on the MFA preference, then PR 235, then PR 236; wait for Sandip's word on the move, then PR 207. Do not start either unprompted.
+
+**To resume:** in a session in `~/Developer/the-library`, say "Resume Nutgraf from the worklog". Read the pause entry and this one, the memories `email-codes-pending` and `prod-move-pending`, then check `gh pr list` and `gh run list --workflow Deploy` before saying where things stand.
