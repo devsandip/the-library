@@ -53,4 +53,4 @@ export const INGEST_SCHEDULE_ENABLED = true;
  * and writes its reader's items and ingest the owner's; off, today's keys. Prod turns on only once
  * Sandip's items are copied to Sandip's keys (`pnpm move-to-reader`).
  */
-export const READER_KEYS: Record<Stage, boolean> = { dev: true, prod: false };
+export const READER_KEYS: Record<Stage, boolean> = { dev: true, prod: true };
