@@ -732,3 +732,22 @@ Sandip: "yes keep building. i will check in 12 hrs".
 - Operators: the owner always is, so prod keeps working for Sandip without anyone in the group.
 - The SES identity stays outside the repo (it existed before); the pool only points at it.
 - Email codes deploy in two steps, after Sandip's preference is set; tested on a throwaway pool, not assumed.
+
+## 2026-10-30 — paused; where to pick up
+
+Sandip: "i will do this later. add this to the ticktick reminder and remind me tomorrow. for now stop working."
+
+**State now:**
+
+- Prod runs main at the worklog merge after PR 237. Nothing is running or half-done: every branch of this stretch is merged or a draft PR.
+- Open PRs, all drafts, none to merge without Sandip: PR 235 (MFA optional) and PR 236 (email codes, stacked on 235) wait on Sandip's MFA preference; PR 207 (prod on reader keys) waits on the prod move; PR 173 (vault script) is on hold.
+- Milestone 15: #222 waits on a test message ("Forgot password?"), #223 on PRs 235 and 236, #225 on Sandip's call. Milestone 13 waits on the prod move. #227 counts clean Deploys (three so far: PRs 233, 234, 237).
+- TickTick: Saturday 31 Oct, 9:00 Los Angeles time (task 6ae343e78f089b81ed3ba7f9) now holds both of Sandip's steps: the MFA preference (with the exact commands) and the prod move. Tuesday 3 Nov holds the prod move only.
+
+**Next:**
+
+- When Sandip says the MFA preference is set: merge PR 235, follow its Deploy; update PR 236 from main (retarget it to main if GitHub has not), merge it, follow its Deploy; ask Sandip to sign in once (password, then authenticator) and to try "Forgot password?" for #222.
+- When Sandip says the prod move's `--apply` has run: merge PR 207, follow its Deploy, then ask for `--apply` again and `--check`; close milestone 13 with its status report.
+- Unblocked, for me: nothing in milestone 15 beyond the above. Keep counting #227's Deploys. Decisions waiting on Sandip: #225 (highlights and the sign-up switch), #163 (the recommendation on the issue), #16 (a web search service), and when mail in starts.
+
+**To resume:** open a session in `~/Developer/the-library` and say "resume Nutgraf from the worklog". Read this entry, then the memories `email-codes-pending` and `prod-move-pending`.
