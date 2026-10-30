@@ -134,6 +134,13 @@ Done when: the 50 readers' jobs run on time within their limits, and the cost pe
 
 **Mail through SES** (#222): the user pool sends as `Nutgraf <no-reply@sandip.dev>` through SES (`MAIL_FROM` in `infra/lib/config.ts`), not Cognito's own mail and its 50 a day. Nothing to add in DNS or the console: the domain and production access were in place.
 
+**MFA optional, then email codes** (#223), tried first on a throwaway pool (2026-10-30), which found two things the plan had wrong:
+
+- MFA cannot go from required to optional in the same update that allows email codes: Cognito refuses email codes while MFA is required, and CloudFormation sends both in one call. So it is two deploys: MFA optional, then email codes (`signInPolicy` with `emailOtp`, and `ALLOW_USER_AUTH` on the client).
+- An account that enrolled its authenticator while MFA was required has no preferred MFA. Once MFA is optional, such an account signs in with its password alone. Set as preferred first (README, "MFA optional"), it is asked for its code as before, and is offered only password sign-in, never an email code. A reader without an authenticator is offered the email code, which reached SES's mailbox simulator through the pool's SES setting.
+
+So, in order: Sandip sets his authenticator as preferred (a write to his prod account, his to run); then MFA optional deploys; then email codes. Sign-up stays off until the switch (#225).
+
 **The operator group** (#224): the prod user pool has a group `operators`. An operator is in it, or is the owner; on today's keys, with one library, every reader is. Status (`GET /status`) answers `operator`, and only an operator gets the mail runs' workings (counts, errors, Claude's sorting, stories, shelves); anyone else gets their ranking and their own last check. Checking the mail now (`POST /ingest`) is an operator's only (403). The app hides the runs and Check Gmail now from a reader who is not one, says getting newsletters in is coming, and their pull to refresh reloads the lists without asking for a check. `VITE_MOCK=1 VITE_OPERATOR=0` starts the mock as such a reader. Adding someone to the group is in the README's runbook.
 
 1. **Mail from `sandip.dev` through SES.** The domain verified in SES (DKIM records in `sandip.dev`'s DNS); Cognito sends its mail through SES, which sign-in codes need; SES production access, so codes reach any address.

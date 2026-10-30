@@ -48,7 +48,12 @@ export class Auth extends Construct {
       signInAliases: { email: true },
       signInCaseSensitive: false,
       autoVerify: { email: true },
-      mfa: Mfa.REQUIRED,
+      // Optional (#223), so readers without an authenticator can sign in with an email code; an
+      // account with one keeps it only if it is the account's preferred MFA, which accounts
+      // enrolled while MFA was required do not have: set it before this deploys (README,
+      // "MFA optional"). Email codes come in a later deploy: Cognito refuses them while MFA is
+      // still required, so the two cannot change in one update.
+      mfa: Mfa.OPTIONAL,
       mfaSecondFactor: { otp: true, sms: false, email: false },
       accountRecovery: AccountRecovery.EMAIL_ONLY,
       passwordPolicy: {
