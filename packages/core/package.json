@@ -10,6 +10,7 @@
     "./export": "./src/export.ts",
     "./follow": "./src/follow.ts",
     "./highlights": "./src/highlights.ts",
+    "./obsidian": "./src/obsidian.ts",
     "./predictions": "./src/predictions.ts",
     "./reader": "./src/reader.ts",
     "./settings": "./src/settings.ts",

@@ -433,7 +433,7 @@ Newsletter rules proposed from Sandip's corrections, nothing applied until he do
 - **Proposal:** "always" a shelf for an unmuted newsletter with no setting, when Sandip moved at least 3 of its stories there against Jev, none of them to the other shelf, and at least three quarters of its shelved stories are there already. `moves` is the stories the rule would take from Jev. Not now hides it until `fixes` grows past the number kept.
 - **Apply:** the newsletter's existing setting, which re-shelves its stories except Sandip's moves.
 
-### Highlights (`packages/core/src/highlights.ts`, `services/api/src/highlights.ts`, `web/src/anchor.ts`, `web/src/highlighting.ts`, issue #71)
+### Highlights (`packages/core/src/highlights.ts`, `services/api/src/highlights.ts`, `web/src/anchor.ts`, `web/src/highlighting.ts`, `packages/core/src/obsidian.ts`, `scripts/highlights-obsidian.ts`, issue #71)
 
 Passages kept while reading, with notes; decisions in `docs/features/highlights.md`.
 
@@ -441,6 +441,7 @@ Passages kept while reading, with notes; decisions in `docs/features/highlights.
 - **Store:** under the issue (`HL#<key>`), read with its detail; in `gsi1` under `HIGHLIGHTS` for the list. The list batch-reads its page's issues as rows.
 - **Markdown:** built in `packages/core` for the page's export and the Obsidian script alike; newsletter text escaped for Markdown and Obsidian, notes left as written. No model call.
 - **Reader:** the frame's text is read as text nodes with a line break at each block; a selection becomes a quote and a kept quote is found again by its passage, the closest context deciding between repeats. Marks are `<mark class="nutgraf-hl">` wrapped around the text found, whitespace between cells left alone. Selection, H and a click on a mark are heard in the frame's own document. One the page no longer holds is listed under it; `?hl=<id>` opens the issue at a highlight.
+- **Vault:** `pnpm highlights-obsidian`, run on the Mac with its AWS profile, reads `GET /highlights` by invoking the API Lambda, and writes one note per issue into the Obsidian vault: properties (`newsletter`, `date`, `link`, `nutgraf`, `nutgraf_id`) and a block between `%% nutgraf:start %%` and `%% nutgraf:end %%`. Notes are found again by `nutgraf_id`; only the block and those properties are rewritten, and a note is written only when it changes.
 
 ### Follow a story (`services/api/src/following.ts`, `services/ingest/src/follow.ts`, `packages/core/src/follow.ts`, issue #22)
 

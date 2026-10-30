@@ -37,7 +37,8 @@
     "shelves": "tsx scripts/shelves.ts",
     "jev:score": "tsx scripts/jev-score.ts",
     "narrative": "tsx scripts/narrative.ts",
-    "history-backfill": "tsx scripts/history-backfill.ts"
+    "history-backfill": "tsx scripts/history-backfill.ts",
+    "highlights-obsidian": "tsx scripts/highlights-obsidian.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-amplify": "^3.1148.0",

@@ -33,6 +33,18 @@ Milestone 10 builds it in four pieces: the API (#166), highlighting in the reade
 - **Empty:** says how to highlight and what the page is for.
 - The page reads every highlight, 200 at a time, each time it opens; Library reads them once for its count, and ⌘K shows what has been read.
 
+## Into the Obsidian vault (#169)
+
+```bash
+AWS_PROFILE=admin pnpm highlights-obsidian
+```
+
+- **What it writes:** one note per issue in `~/Documents/Obsidian/Highlights/` (another with `--vault <path>` and `--folder <name>`), named `2026-10-28 Platformer - <subject>.md`. Its properties: `newsletter`, `date` (the day it came, in India), `link` (the issue online), `nutgraf` (the issue in the app) and `nutgraf_id`. Then the issue's line and its passages as quotes with my notes, the same Markdown as the Highlights page's export, between `%% nutgraf:start %%` and `%% nutgraf:end %%` (Obsidian comments, hidden when reading).
+- **My notes stay mine:** the script rewrites only that block and those five properties. Anything I write above or below the block, and properties I add (tags), are kept. A note is found again by `nutgraf_id`, so it can be renamed. Deleting the block puts it back under the properties on the next run.
+- **Changes:** new highlights are added and deleted ones removed on the next run; a note whose issue has none left says "No highlights left in Nutgraf." and is not deleted. A note is written only when it would change, so a run with nothing new writes nothing. It prints the notes it made and updated.
+- **How it reads:** with the Mac's AWS profile, by invoking the API Lambda for `GET /highlights` as the integration tests do. No app password or token is kept on the Mac, and the notes hold exactly what the Highlights page shows. `--stage dev` reads the dev stack; `--dry-run` prints what it would write.
+- No schedule: run it when I want the vault up to date (a launchd job can come later).
+
 ## Decisions
 
 - **A quote, not offsets.** Offsets into the HTML break when the sanitizer or the frame's styles change, and the stored HTML expires after 365 days (raw mail after 30). The passage with its context is found again in whatever renders, and the passage itself outlives the HTML.
@@ -42,4 +54,6 @@ Milestone 10 builds it in four pieces: the API (#166), highlighting in the reade
 - **The page's text, as read.** Text nodes in order, with a line break where a block starts or ends (a paragraph, a table cell: email is laid out in tables), so a passage across paragraphs keeps a space between them in the export. Styles, scripts and comments are left out. A selection's quote and the search for it read the same text, whitespace collapsed.
 - **Repeats.** Of the places a passage appears, the one whose 32 characters either side match best is marked. Words that repeat with the same 32 characters around them too cannot be told apart, so Highlight asks for a few more words rather than keep a quote that would mark another copy.
 - **Marks.** Wrapped around the text found, never around whitespace on its own (a mark between table cells would move them). Where two highlights overlap, the shared text opens the later one. A mark inside a link stays a link.
+- **The vault through the API, not the table.** Invoking the API Lambda reuses the list the page reads (issue rows joined, filtered issues left out) instead of a second reading of the table in a script, with the same AWS profile the other laptop jobs use.
+- **Markers as Obsidian comments.** `%% … %%` is hidden in reading view and live preview, and newsletter text never holds one (`%%` is escaped in it).
 - **Markdown escaped for Obsidian.** Newsletter text is escaped wherever Markdown or Obsidian would read formatting: `$5 to $10` is not maths, `#1` is not a tag, `==` is not a highlight. My notes are left as I write them, so `[[links]]` work.
